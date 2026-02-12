@@ -16,7 +16,7 @@ const selected = ref(null);
 const emptyForm = () => ({
   name: "",
   technologyStack: "",
-  techOwner: "",
+  assignedPerson: "",
   businessOwner: "",
   firstContactDate: "",
   stage: "New",
@@ -33,7 +33,7 @@ function normalizePayload(v) {
   return {
     name: v.name,
     technologyStack: v.technologyStack || null,
-    techOwner: v.techOwner || null,
+    techOwner: v.assignedPerson || null,
     businessOwner: v.businessOwner || null,
     firstContactDate: v.firstContactDate || null,
     stage: v.stage || null,
@@ -71,7 +71,7 @@ async function openDetail(id) {
     form.value = {
       name: o.Name,
       technologyStack: o.TechnologyStack || "",
-      techOwner: o.TechOwner || "",
+      assignedPerson: o.TechOwner || "",
       businessOwner: o.BusinessOwner || "",
       firstContactDate: o.FirstContactDate?.slice(0, 10) || "",
       stage: o.Stage || "New",
@@ -287,7 +287,7 @@ onMounted(refreshList);
                 Stage: {{ o.Stage || "-" }} • Status: {{ o.Status || "-" }}
               </div>
               <div class="small">
-                <div><b>Tech:</b> {{ o.TechOwner || "-" }}</div>
+                <div><b>Assigned:</b> {{ o.TechOwner || "-" }}</div>
                 <div><b>Biz:</b> {{ o.BusinessOwner || "-" }}</div>
               </div>
               <div class="small text-muted mt-2">Tags: {{ o.Tags || "-" }}</div>
@@ -326,8 +326,14 @@ onMounted(refreshList);
                 <input class="form-control" v-model="form.technologyStack" />
               </div>
               <div class="col-md-6">
-                <label class="form-label">Tech Owner</label>
-                <input class="form-control" v-model="form.techOwner" />
+                <label class="form-label">Assigned Person</label>
+                <select class="form-select" v-model="form.assignedPerson">
+                  <option value="">Select person</option>
+                  <option>Anna Wacholak</option>
+                  <option>Jacek Szostak</option>
+                  <option>Grzegorz Nowakowski</option>
+                  <option>Krzysztof Bukowski</option>
+                </select>
               </div>
               <div class="col-md-6">
                 <label class="form-label">Business Owner</label>
