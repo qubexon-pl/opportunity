@@ -6,3 +6,8 @@ Adds the following nullable columns to `dbo.Opportunities`:
 - `OpportunityTimeline` (`NVARCHAR(100)`)
 
 Run once against your target database (script is idempotent).
+
+## 002_add_opportunity_description.sql
+Adds nullable `Description` (`NVARCHAR(4000)`) to `dbo.Opportunities`.
+
+Run once against your target database (script is idempotent).

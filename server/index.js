@@ -26,6 +26,7 @@ app.get("/health", async (req, res) => {
 const OpportunitySchema = z.object({
   name: z.string().min(1).max(200),
   technologyStack: z.string().max(400).optional().nullable(),
+  description: z.string().max(4000).optional().nullable(),
   techOwner: z.string().max(200).optional().nullable(),
   businessOwner: z.string().max(200).optional().nullable(),
   firstContactDate: z.string().optional().nullable(), // YYYY-MM-DD
@@ -116,6 +117,7 @@ app.post("/opportunities", async (req, res) => {
       .input("Id", sql.UniqueIdentifier, newId)
       .input("Name", sql.NVarChar(200), body.name)
       .input("TechnologyStack", sql.NVarChar(400), body.technologyStack ?? null)
+      .input("Description", sql.NVarChar(4000), body.description ?? null)
       .input("TechOwner", sql.NVarChar(200), body.techOwner ?? null)
       .input("BusinessOwner", sql.NVarChar(200), body.businessOwner ?? null)
       .input("FirstContactDate", sql.Date, body.firstContactDate ?? null)
@@ -130,9 +132,9 @@ app.post("/opportunities", async (req, res) => {
       .query(
         `
         INSERT INTO dbo.Opportunities
-          (Id, Name, TechnologyStack, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline)
+          (Id, Name, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline)
         VALUES
-          (@Id, @Name, @TechnologyStack, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline);
+          (@Id, @Name, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline);
         `
       );
 
@@ -154,6 +156,7 @@ app.put("/opportunities/:id", async (req, res) => {
       .input("Id", sql.UniqueIdentifier, id)
       .input("Name", sql.NVarChar(200), body.name)
       .input("TechnologyStack", sql.NVarChar(400), body.technologyStack ?? null)
+      .input("Description", sql.NVarChar(4000), body.description ?? null)
       .input("TechOwner", sql.NVarChar(200), body.techOwner ?? null)
       .input("BusinessOwner", sql.NVarChar(200), body.businessOwner ?? null)
       .input("FirstContactDate", sql.Date, body.firstContactDate ?? null)
@@ -171,6 +174,7 @@ app.put("/opportunities/:id", async (req, res) => {
         SET
           Name=@Name,
           TechnologyStack=@TechnologyStack,
+          Description=@Description,
           TechOwner=@TechOwner,
           BusinessOwner=@BusinessOwner,
           FirstContactDate=@FirstContactDate,

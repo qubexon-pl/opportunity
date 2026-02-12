@@ -16,6 +16,7 @@ const selected = ref(null);
 const emptyForm = () => ({
   name: "",
   technologyStack: "",
+  description: "",
   assignedPerson: "",
   businessOwner: "",
   firstContactDate: "",
@@ -35,6 +36,7 @@ function normalizePayload(v) {
   return {
     name: v.name,
     technologyStack: v.technologyStack || null,
+    description: v.description || null,
     techOwner: v.assignedPerson || null,
     businessOwner: v.businessOwner || null,
     firstContactDate: v.firstContactDate || null,
@@ -75,6 +77,7 @@ async function openDetail(id) {
     form.value = {
       name: o.Name,
       technologyStack: o.TechnologyStack || "",
+      description: o.Description || "",
       assignedPerson: o.TechOwner || "",
       businessOwner: o.BusinessOwner || "",
       firstContactDate: o.FirstContactDate?.slice(0, 10) || "",
@@ -297,6 +300,7 @@ onMounted(refreshList);
                 <div><b>Biz:</b> {{ o.BusinessOwner || "-" }}</div>
               </div>
               <div class="small text-muted mt-2">Tags: {{ o.Tags || "-" }}</div>
+              <div class="small text-muted">{{ o.Description || "" }}</div>
               <div class="small text-muted">Hours: {{ o.OpportunityHours ?? "-" }} • Timeline: {{ o.OpportunityTimeline || "-" }}</div>
 
               <button class="btn btn-sm btn-outline-primary mt-3" @click="openDetail(o.Id)">
@@ -331,6 +335,10 @@ onMounted(refreshList);
               <div class="col-12">
                 <label class="form-label">Technology Stack</label>
                 <input class="form-control" v-model="form.technologyStack" />
+              </div>
+              <div class="col-12">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" rows="4" v-model="form.description" placeholder="Describe the opportunity..."></textarea>
               </div>
               <div class="col-md-6">
                 <label class="form-label">Assigned Person</label>
