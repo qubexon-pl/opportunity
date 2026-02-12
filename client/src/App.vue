@@ -16,7 +16,8 @@ const selected = ref(null);
 const emptyForm = () => ({
   name: "",
   technologyStack: "",
-  techOwner: "",
+  description: "",
+  assignedPerson: "",
   businessOwner: "",
   firstContactDate: "",
   stage: "New",
@@ -24,7 +25,9 @@ const emptyForm = () => ({
   priority: 3,
   tags: "",
   nextStepSummary: "",
-  nextStepDueDate: ""
+  nextStepDueDate: "",
+  opportunityHours: "",
+  opportunityTimeline: ""
 });
 
 const form = ref(emptyForm());
@@ -33,7 +36,8 @@ function normalizePayload(v) {
   return {
     name: v.name,
     technologyStack: v.technologyStack || null,
-    techOwner: v.techOwner || null,
+    description: v.description || null,
+    techOwner: v.assignedPerson || null,
     businessOwner: v.businessOwner || null,
     firstContactDate: v.firstContactDate || null,
     stage: v.stage || null,
@@ -41,7 +45,9 @@ function normalizePayload(v) {
     priority: Number(v.priority) || null,
     tags: v.tags || null,
     nextStepSummary: v.nextStepSummary || null,
-    nextStepDueDate: v.nextStepDueDate || null
+    nextStepDueDate: v.nextStepDueDate || null,
+    opportunityHours: v.opportunityHours === "" ? null : Number(v.opportunityHours),
+    opportunityTimeline: v.opportunityTimeline || null
   };
 }
 
@@ -71,7 +77,8 @@ async function openDetail(id) {
     form.value = {
       name: o.Name,
       technologyStack: o.TechnologyStack || "",
-      techOwner: o.TechOwner || "",
+      description: o.Description || "",
+      assignedPerson: o.TechOwner || "",
       businessOwner: o.BusinessOwner || "",
       firstContactDate: o.FirstContactDate?.slice(0, 10) || "",
       stage: o.Stage || "New",
@@ -79,7 +86,9 @@ async function openDetail(id) {
       priority: o.Priority ?? 3,
       tags: o.Tags || "",
       nextStepSummary: o.NextStepSummary || "",
-      nextStepDueDate: o.NextStepDueDate?.slice(0, 10) || ""
+      nextStepDueDate: o.NextStepDueDate?.slice(0, 10) || "",
+      opportunityHours: o.OpportunityHours ?? "",
+      opportunityTimeline: o.OpportunityTimeline || ""
     };
 
     view.value = "detail";
@@ -287,10 +296,12 @@ onMounted(refreshList);
                 Stage: {{ o.Stage || "-" }} • Status: {{ o.Status || "-" }}
               </div>
               <div class="small">
-                <div><b>Tech:</b> {{ o.TechOwner || "-" }}</div>
+                <div><b>Assigned:</b> {{ o.TechOwner || "-" }}</div>
                 <div><b>Biz:</b> {{ o.BusinessOwner || "-" }}</div>
               </div>
               <div class="small text-muted mt-2">Tags: {{ o.Tags || "-" }}</div>
+              <div class="small text-muted">{{ o.Description || "" }}</div>
+              <div class="small text-muted">Hours: {{ o.OpportunityHours ?? "-" }} • Timeline: {{ o.OpportunityTimeline || "-" }}</div>
 
               <button class="btn btn-sm btn-outline-primary mt-3" @click="openDetail(o.Id)">
                 Open
@@ -325,9 +336,19 @@ onMounted(refreshList);
                 <label class="form-label">Technology Stack</label>
                 <input class="form-control" v-model="form.technologyStack" />
               </div>
+              <div class="col-12">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" rows="4" v-model="form.description" placeholder="Describe the opportunity..."></textarea>
+              </div>
               <div class="col-md-6">
-                <label class="form-label">Tech Owner</label>
-                <input class="form-control" v-model="form.techOwner" />
+                <label class="form-label">Assigned Person</label>
+                <select class="form-select" v-model="form.assignedPerson">
+                  <option value="">Select person</option>
+                  <option>Anna Wacholak</option>
+                  <option>Jacek Szostak</option>
+                  <option>Grzegorz Nowakowski</option>
+                  <option>Krzysztof Bukowski</option>
+                </select>
               </div>
               <div class="col-md-6">
                 <label class="form-label">Business Owner</label>
@@ -386,6 +407,14 @@ onMounted(refreshList);
               <div class="col-md-6">
                 <label class="form-label">Next Step Due Date</label>
                 <input type="date" class="form-control" v-model="form.nextStepDueDate" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Opportunity Hours</label>
+                <input type="number" min="0" step="0.5" class="form-control" v-model="form.opportunityHours" placeholder="e.g. 120" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Opportunity Timeline</label>
+                <input class="form-control" v-model="form.opportunityTimeline" placeholder="e.g. 4 weeks" />
               </div>
             </div>
           </div>
