@@ -37,6 +37,8 @@ const OpportunitySchema = z.object({
 
   nextStepSummary: z.string().max(500).optional().nullable(),
   nextStepDueDate: z.string().optional().nullable(), // YYYY-MM-DD
+  opportunityHours: z.number().min(0).max(100000).optional().nullable(),
+  opportunityTimeline: z.string().max(100).optional().nullable(),
 });
 
 function toGuid(id) {
@@ -123,12 +125,14 @@ app.post("/opportunities", async (req, res) => {
       .input("Tags", sql.NVarChar(400), body.tags ?? null)
       .input("NextStepSummary", sql.NVarChar(500), body.nextStepSummary ?? null)
       .input("NextStepDueDate", sql.Date, body.nextStepDueDate ?? null)
+      .input("OpportunityHours", sql.Float, body.opportunityHours ?? null)
+      .input("OpportunityTimeline", sql.NVarChar(100), body.opportunityTimeline ?? null)
       .query(
         `
         INSERT INTO dbo.Opportunities
-          (Id, Name, TechnologyStack, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate)
+          (Id, Name, TechnologyStack, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline)
         VALUES
-          (@Id, @Name, @TechnologyStack, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate);
+          (@Id, @Name, @TechnologyStack, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline);
         `
       );
 
@@ -159,6 +163,8 @@ app.put("/opportunities/:id", async (req, res) => {
       .input("Tags", sql.NVarChar(400), body.tags ?? null)
       .input("NextStepSummary", sql.NVarChar(500), body.nextStepSummary ?? null)
       .input("NextStepDueDate", sql.Date, body.nextStepDueDate ?? null)
+      .input("OpportunityHours", sql.Float, body.opportunityHours ?? null)
+      .input("OpportunityTimeline", sql.NVarChar(100), body.opportunityTimeline ?? null)
       .query(
         `
         UPDATE dbo.Opportunities
@@ -173,7 +179,9 @@ app.put("/opportunities/:id", async (req, res) => {
           Priority=@Priority,
           Tags=@Tags,
           NextStepSummary=@NextStepSummary,
-          NextStepDueDate=@NextStepDueDate
+          NextStepDueDate=@NextStepDueDate,
+          OpportunityHours=@OpportunityHours,
+          OpportunityTimeline=@OpportunityTimeline
         WHERE Id=@Id;
         SELECT @@ROWCOUNT as affected;
         `

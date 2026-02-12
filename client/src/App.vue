@@ -24,7 +24,9 @@ const emptyForm = () => ({
   priority: 3,
   tags: "",
   nextStepSummary: "",
-  nextStepDueDate: ""
+  nextStepDueDate: "",
+  opportunityHours: "",
+  opportunityTimeline: ""
 });
 
 const form = ref(emptyForm());
@@ -41,7 +43,9 @@ function normalizePayload(v) {
     priority: Number(v.priority) || null,
     tags: v.tags || null,
     nextStepSummary: v.nextStepSummary || null,
-    nextStepDueDate: v.nextStepDueDate || null
+    nextStepDueDate: v.nextStepDueDate || null,
+    opportunityHours: v.opportunityHours === "" ? null : Number(v.opportunityHours),
+    opportunityTimeline: v.opportunityTimeline || null
   };
 }
 
@@ -79,7 +83,9 @@ async function openDetail(id) {
       priority: o.Priority ?? 3,
       tags: o.Tags || "",
       nextStepSummary: o.NextStepSummary || "",
-      nextStepDueDate: o.NextStepDueDate?.slice(0, 10) || ""
+      nextStepDueDate: o.NextStepDueDate?.slice(0, 10) || "",
+      opportunityHours: o.OpportunityHours ?? "",
+      opportunityTimeline: o.OpportunityTimeline || ""
     };
 
     view.value = "detail";
@@ -291,6 +297,7 @@ onMounted(refreshList);
                 <div><b>Biz:</b> {{ o.BusinessOwner || "-" }}</div>
               </div>
               <div class="small text-muted mt-2">Tags: {{ o.Tags || "-" }}</div>
+              <div class="small text-muted">Hours: {{ o.OpportunityHours ?? "-" }} • Timeline: {{ o.OpportunityTimeline || "-" }}</div>
 
               <button class="btn btn-sm btn-outline-primary mt-3" @click="openDetail(o.Id)">
                 Open
@@ -392,6 +399,14 @@ onMounted(refreshList);
               <div class="col-md-6">
                 <label class="form-label">Next Step Due Date</label>
                 <input type="date" class="form-control" v-model="form.nextStepDueDate" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Opportunity Hours</label>
+                <input type="number" min="0" step="0.5" class="form-control" v-model="form.opportunityHours" placeholder="e.g. 120" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Opportunity Timeline</label>
+                <input class="form-control" v-model="form.opportunityTimeline" placeholder="e.g. 4 weeks" />
               </div>
             </div>
           </div>
