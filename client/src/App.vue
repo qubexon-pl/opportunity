@@ -234,6 +234,25 @@ async function deleteStep(stepId) {
 
 const count = computed(() => opportunities.value.length);
 
+
+function stageBorderClass(stage) {
+  switch ((stage || "").toLowerCase()) {
+    case "discovery":
+      return "border-warning";
+    case "proposal":
+      return "border-orange";
+    case "negotiation":
+      return "border-purple";
+    case "won":
+      return "border-success";
+    case "lost":
+      return "border-danger";
+    case "new":
+    default:
+      return "border-secondary";
+  }
+}
+
 onMounted(refreshList);
 </script>
 
@@ -286,7 +305,7 @@ onMounted(refreshList);
 
       <div class="row g-3">
         <div class="col-md-4" v-for="o in opportunities" :key="o.Id">
-          <div class="card shadow-sm h-100">
+          <div class="card shadow-sm h-100 border-2" :class="stageBorderClass(o.Stage)">
             <div class="card-body">
               <div class="d-flex justify-content-between">
                 <h5 class="card-title mb-1">{{ o.Name }}</h5>
@@ -489,3 +508,8 @@ onMounted(refreshList);
     </section>
   </div>
 </template>
+
+<style scoped>
+.border-orange { border-color: #fd7e14 !important; }
+.border-purple { border-color: #6f42c1 !important; }
+</style>
