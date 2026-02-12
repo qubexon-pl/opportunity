@@ -52,6 +52,8 @@ app.get("/opportunities", async (req, res) => {
   const q = (req.query.q || "").toString().trim();
   const sort = (req.query.sort || "updated").toString(); // updated|created|name
   const dir = (req.query.dir || "desc").toString().toLowerCase() === "asc" ? "ASC" : "DESC";
+  const stage = (req.query.stage || "").toString().trim();
+  const status = (req.query.status || "").toString().trim();
 
   const sortColumn =
     sort === "name" ? "Name" : sort === "created" ? "CreatedAt" : "UpdatedAt";
@@ -61,11 +63,15 @@ app.get("/opportunities", async (req, res) => {
     const r = await pool
       .request()
       .input("q", sql.NVarChar(220), q ? `%${q}%` : null)
+      .input("stage", sql.NVarChar(60), stage || null)
+      .input("status", sql.NVarChar(30), status || null)
       .query(
         `
         SELECT TOP 500 *
         FROM dbo.Opportunities
         WHERE (@q IS NULL OR Name LIKE @q OR TechOwner LIKE @q OR BusinessOwner LIKE @q OR Tags LIKE @q)
+          AND (@stage IS NULL OR Stage = @stage)
+          AND (@status IS NULL OR Status = @status)
         ORDER BY ${sortColumn} ${dir};
         `
       );

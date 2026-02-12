@@ -9,6 +9,8 @@ const error = ref("");
 const q = ref("");
 const sort = ref("updated");
 const dir = ref("desc");
+const stageFilter = ref("");
+const statusFilter = ref("");
 
 const opportunities = ref([]);
 const selected = ref(null);
@@ -58,7 +60,9 @@ async function refreshList() {
     opportunities.value = await api.listOpportunities({
       q: q.value || "",
       sort: sort.value,
-      dir: dir.value
+      dir: dir.value,
+      stage: stageFilter.value || "",
+      status: statusFilter.value || ""
     });
   } catch (e) {
     error.value = e.message;
@@ -275,9 +279,30 @@ onMounted(refreshList);
     <!-- LIST -->
     <section v-if="view === 'list'">
       <div class="row g-3 mb-3 align-items-end">
-        <div class="col-md-5">
+        <div class="col-md-3">
           <label class="form-label">Search</label>
           <input class="form-control" v-model="q" placeholder="name, owners, tags" />
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Stage</label>
+          <select class="form-select" v-model="stageFilter">
+            <option value="">All</option>
+            <option value="New">New</option>
+            <option value="Discovery">Discovery</option>
+            <option value="Proposal">Proposal</option>
+            <option value="Negotiation">Negotiation</option>
+            <option value="Won">Won</option>
+            <option value="Lost">Lost</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Status</label>
+          <select class="form-select" v-model="statusFilter">
+            <option value="">All</option>
+            <option value="Open">Open</option>
+            <option value="On Hold">On Hold</option>
+            <option value="Closed">Closed</option>
+          </select>
         </div>
         <div class="col-md-2">
           <label class="form-label">Sort</label>
@@ -287,14 +312,14 @@ onMounted(refreshList);
             <option value="name">Name</option>
           </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-1">
           <label class="form-label">Direction</label>
           <select class="form-select" v-model="dir">
             <option value="desc">Desc</option>
             <option value="asc">Asc</option>
           </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <button class="btn btn-secondary w-100" @click="refreshList" :disabled="loading">
             {{ loading ? "Loading..." : "Refresh" }}
           </button>
