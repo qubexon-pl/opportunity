@@ -7,6 +7,8 @@ const loading = ref(false);
 const error = ref("");
 
 const MONTHLY_CAPACITY = 160;
+const WORK_DAYS_PER_MONTH = 20;
+const HOURS_PER_DAY = MONTHLY_CAPACITY / WORK_DAYS_PER_MONTH;
 const people = [
   "Anna Wacholak",
   "Jacek Szostak",
@@ -38,7 +40,10 @@ const emptyForm = () => ({
   nextStepSummary: "",
   nextStepDueDate: "",
   opportunityHours: "",
-  opportunityTimeline: ""
+  opportunityTimeline: "",
+  plannedStartDate: "",
+  plannedEndDate: "",
+  allocationPercent: 100
 });
 
 const form = ref(emptyForm());
@@ -57,8 +62,11 @@ function normalizePayload(v) {
     tags: v.tags || null,
     nextStepSummary: v.nextStepSummary || null,
     nextStepDueDate: v.nextStepDueDate || null,
-    opportunityHours: v.opportunityHours === "" ? null : Number(v.opportunityHours),
-    opportunityTimeline: v.opportunityTimeline || null
+    opportunityHours: Number(v.opportunityHours),
+    opportunityTimeline: v.opportunityTimeline || null,
+    plannedStartDate: v.plannedStartDate || null,
+    plannedEndDate: v.plannedEndDate || null,
+    allocationPercent: v.allocationPercent === "" ? null : Number(v.allocationPercent)
   };
 }
 
@@ -101,7 +109,10 @@ async function openDetail(id) {
       nextStepSummary: o.NextStepSummary || "",
       nextStepDueDate: o.NextStepDueDate?.slice(0, 10) || "",
       opportunityHours: o.OpportunityHours ?? "",
-      opportunityTimeline: o.OpportunityTimeline || ""
+      opportunityTimeline: o.OpportunityTimeline || "",
+      plannedStartDate: o.PlannedStartDate?.slice(0, 10) || "",
+      plannedEndDate: o.PlannedEndDate?.slice(0, 10) || "",
+      allocationPercent: o.AllocationPercent ?? 100
     };
 
     view.value = "detail";
@@ -118,7 +129,69 @@ function goNew() {
   view.value = "new";
 }
 
+function goPipeline() {
+  view.value = "list";
+}
+
+function addBusinessDays(date, daysToAdd) {
+  const result = new Date(date);
+  let remaining = Math.max(0, daysToAdd);
+
+  while (remaining > 0) {
+    result.setDate(result.getDate() + 1);
+    const day = result.getDay();
+    if (day !== 0 && day !== 6) {
+      remaining -= 1;
+    }
+  }
+
+  return result;
+}
+
+function calculateEndDate(startDateValue, hours, allocationPercent) {
+  const startDate = toDate(startDateValue);
+  if (!startDate) return null;
+
+  const percent = Number(allocationPercent || 100);
+  if (percent <= 0) return null;
+
+  const totalHours = Number(hours || 0);
+  if (totalHours <= 0) return null;
+
+  const dailyHours = HOURS_PER_DAY * (percent / 100);
+  if (dailyHours <= 0) return null;
+
+  const workDays = Math.max(1, Math.ceil(totalHours / dailyHours));
+  const endDate = addBusinessDays(startDate, workDays - 1);
+  return endDate.toISOString().slice(0, 10);
+}
+
+function calculateDurationWorkDays(hours, allocationPercent) {
+  const percent = Number(allocationPercent || 100);
+  const totalHours = Number(hours || 0);
+  if (percent <= 0 || totalHours <= 0) return null;
+
+  const dailyHours = HOURS_PER_DAY * (percent / 100);
+  if (dailyHours <= 0) return null;
+
+  return Math.max(1, Math.ceil(totalHours / dailyHours));
+}
+
 async function saveNew() {
+  if (!form.value.opportunityHours || Number(form.value.opportunityHours) <= 0) {
+    error.value = "Opportunity Hours is required and must be greater than 0.";
+    return;
+  }
+
+  if (!form.value.plannedEndDate) {
+    const calculatedEnd = calculateEndDate(
+      form.value.plannedStartDate,
+      form.value.opportunityHours,
+      form.value.allocationPercent
+    );
+    if (calculatedEnd) form.value.plannedEndDate = calculatedEnd;
+  }
+
   loading.value = true;
   error.value = "";
   try {
@@ -134,6 +207,20 @@ async function saveNew() {
 
 async function saveEdit() {
   if (!selected.value) return;
+  if (!form.value.opportunityHours || Number(form.value.opportunityHours) <= 0) {
+    error.value = "Opportunity Hours is required and must be greater than 0.";
+    return;
+  }
+
+  if (!form.value.plannedEndDate) {
+    const calculatedEnd = calculateEndDate(
+      form.value.plannedStartDate,
+      form.value.opportunityHours,
+      form.value.allocationPercent
+    );
+    if (calculatedEnd) form.value.plannedEndDate = calculatedEnd;
+  }
+
   loading.value = true;
   error.value = "";
   try {
@@ -263,6 +350,134 @@ const managementPeople = computed(() => {
   });
 });
 
+function toDate(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function monthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+const scheduledOpportunities = computed(() => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  return opportunities.value
+    .filter((opportunity) => opportunity.TechOwner)
+    .map((opportunity) => {
+      const startDate = opportunity.PlannedStartDate?.slice(0, 10)
+        || opportunity.FirstContactDate?.slice(0, 10)
+        || today;
+
+      const allocationPercent = Number(opportunity.AllocationPercent || 100);
+      const calculatedEndDate = calculateEndDate(startDate, opportunity.OpportunityHours, allocationPercent);
+
+      return {
+        ...opportunity,
+        StartDate: startDate,
+        EndDate: opportunity.PlannedEndDate?.slice(0, 10) || calculatedEndDate,
+        CalculatedEndDate: calculatedEndDate,
+        AllocationPercent: allocationPercent
+      };
+    });
+});
+
+const timelineMonths = computed(() => {
+  const today = new Date();
+  const base = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  const dated = scheduledOpportunities.value.filter((item) => item.StartDate && item.EndDate);
+  if (dated.length) {
+    const starts = dated.map((item) => new Date(item.StartDate));
+    const ends = dated.map((item) => new Date(item.EndDate));
+    const minStart = new Date(Math.min(...starts.map((date) => date.getTime())));
+    const maxEnd = new Date(Math.max(...ends.map((date) => date.getTime())));
+
+    base.setFullYear(minStart.getFullYear(), minStart.getMonth(), 1);
+    const minRangeEnd = new Date(today.getFullYear(), today.getMonth() + 5, 1);
+    const rangeEnd = maxEnd > minRangeEnd ? maxEnd : minRangeEnd;
+
+    const months = [];
+    const totalMonths = Math.max(
+      6,
+      (rangeEnd.getFullYear() - base.getFullYear()) * 12 + (rangeEnd.getMonth() - base.getMonth()) + 1
+    );
+
+    for (let i = 0; i < totalMonths; i += 1) {
+      const monthDate = new Date(base.getFullYear(), base.getMonth() + i, 1);
+      months.push({
+        key: monthKey(monthDate),
+        label: monthDate.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+        date: monthDate
+      });
+    }
+
+    return months;
+  }
+
+  const months = [];
+  for (let i = 0; i < 6; i += 1) {
+    const monthDate = new Date(base.getFullYear(), base.getMonth() + i, 1);
+    months.push({
+      key: monthKey(monthDate),
+      label: monthDate.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      date: monthDate
+    });
+  }
+  return months;
+});
+
+const timelineRows = computed(() => {
+  const months = timelineMonths.value;
+  const monthKeys = months.map((month) => month.key);
+  const scheduledByPerson = new Map();
+
+  scheduledOpportunities.value.forEach((opportunity) => {
+    if (!scheduledByPerson.has(opportunity.TechOwner)) {
+      scheduledByPerson.set(opportunity.TechOwner, []);
+    }
+    scheduledByPerson.get(opportunity.TechOwner).push(opportunity);
+  });
+
+  return managementPeople.value.map((member) => {
+    const slots = Object.fromEntries(monthKeys.map((key) => [key, []]));
+    const personItems = scheduledByPerson.get(member.person) || [];
+
+    personItems.forEach((opportunity) => {
+      const start = toDate(opportunity.StartDate);
+      const end = toDate(opportunity.EndDate || opportunity.StartDate);
+      if (!start || !end) return;
+
+      months.forEach((month) => {
+        const monthStart = month.date;
+        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+        if (start <= monthEnd && end >= monthStart) {
+          slots[month.key].push(opportunity);
+        }
+      });
+    });
+
+    return {
+      person: member.person,
+      slots
+    };
+  });
+});
+
+const plannedEndPreview = computed(() => {
+  return calculateEndDate(
+    form.value.plannedStartDate,
+    form.value.opportunityHours,
+    form.value.allocationPercent
+  );
+});
+
+const plannedDurationPreview = computed(() => {
+  return calculateDurationWorkDays(form.value.opportunityHours, form.value.allocationPercent);
+});
+
 function capacityClass(hours) {
   if (hours < 0) return "capacity-over";
   if (hours < 40) return "capacity-tight";
@@ -297,10 +512,19 @@ onMounted(refreshList);
       <div class="container app-header-inner">
         <div class="brand">OPPORTUNITIES</div>
         <nav class="app-nav" aria-label="Primary navigation">
-          <button :class="{ active: view === 'list' }" @click="view='list'">Pipeline</button>
-          <button :class="{ active: view === 'management' }" @click="view='management'">Management</button>
+          <button class="menu-item" :class="{ active: view === 'list' }" @click="view='list'" :aria-current="view === 'list' ? 'page' : undefined">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10" /></svg>
+            <span>Pipeline</span>
+          </button>
+          <button class="menu-item" :class="{ active: view === 'management' }" @click="view='management'" :aria-current="view === 'management' ? 'page' : undefined">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 19v-5m6 5V5m6 14v-8m4 8H2" /></svg>
+            <span>Management</span>
+          </button>
         </nav>
-        <button class="btn btn-light btn-sm new-button" @click="goNew">New opportunity</button>
+        <button class="new-button" @click="goNew">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+          <span>New opportunity</span>
+        </button>
       </div>
     </header>
 
@@ -308,7 +532,7 @@ onMounted(refreshList);
       <div class="page-title mb-4">
         <div>
           <div class="eyebrow">Business development workspace</div>
-          <h1>{{ view === 'management' ? 'Team capacity' : 'Opportunity pipeline' }}</h1>
+          <h1>{{ view === 'management' ? 'Team capacity' : view === 'detail' ? 'Opportunity details' : view === 'new' ? 'Create opportunity' : 'Opportunity pipeline' }}</h1>
         </div>
         <div class="page-meta">{{ count }} opportunities</div>
       </div>
@@ -357,19 +581,40 @@ onMounted(refreshList);
         </div>
 
         <div class="pipeline-grid">
-          <article v-for="o in opportunities" :key="o.Id" class="opportunity-row" @click="openDetail(o.Id)">
-            <div class="stage-marker" :class="stageBorderClass(o.Stage)"></div>
-            <div class="opportunity-name">
-              <strong>{{ o.Name }}</strong>
-              <span>{{ o.TechnologyStack || 'No technology stack' }}</span>
-            </div>
-            <div><span class="data-label">Owner</span>{{ o.TechOwner || 'Unassigned' }}</div>
-            <div><span class="data-label">Stage</span><span class="stage-pill">{{ o.Stage || 'Unspecified' }}</span></div>
-            <div><span class="data-label">Status</span>{{ o.Status || 'Unspecified' }}</div>
-            <div><span class="data-label">Planned</span><strong>{{ o.OpportunityHours ?? 0 }}h</strong></div>
-            <button class="btn btn-outline-primary btn-sm" @click.stop="openDetail(o.Id)">Open</button>
-          </article>
-          <div v-if="!loading && !opportunities.length" class="empty-state">No opportunities match the current filters.</div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Opportunity</th>
+                  <th>Assigned</th>
+                  <th>Stage</th>
+                  <th>Status</th>
+                  <th class="text-end">Hours</th>
+                  <th class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="o in opportunities" :key="o.Id">
+                  <td>
+                    <div class="pipeline-title">{{ o.Name }}</div>
+                    <div class="pipeline-subtitle">{{ o.TechnologyStack || "No technology stack" }}</div>
+                  </td>
+                  <td>{{ o.TechOwner || "Unassigned" }}</td>
+                  <td><span class="badge" :class="stageBorderClass(o.Stage)">{{ o.Stage || "Unspecified" }}</span></td>
+                  <td>{{ o.Status || "Unspecified" }}</td>
+                  <td class="text-end fw-semibold">{{ o.OpportunityHours ?? 0 }}h</td>
+                  <td class="text-end">
+                    <div class="d-inline-flex gap-2 justify-content-end">
+                      <button class="btn btn-primary btn-sm" @click="openDetail(o.Id)">Open</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="!loading && !opportunities.length">
+                  <td colspan="6" class="text-center text-muted py-4">No opportunities match the current filters.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -392,23 +637,57 @@ onMounted(refreshList);
 
         <div class="management-table-wrap">
           <table class="management-table">
-            <thead><tr><th>Person</th><th>Assigned opportunity</th><th>Stage</th><th>Status</th><th class="hours-column">Hours</th></tr></thead>
+            <thead><tr><th>Person</th><th>Assigned opportunity</th><th>Stage</th><th>Status</th><th class="hours-column">Hours</th><th class="hours-column">Actions</th></tr></thead>
             <tbody v-for="member in managementPeople" :key="member.person">
-              <tr v-if="member.assigned.length === 0" class="unassigned-row"><td>{{ member.person }}</td><td colspan="4">No opportunities assigned</td></tr>
+              <tr v-if="member.assigned.length === 0" class="unassigned-row"><td>{{ member.person }}</td><td colspan="5">No opportunities assigned</td></tr>
               <tr v-for="(opportunity, index) in member.assigned" :key="opportunity.Id" class="management-row" @click="openDetail(opportunity.Id)">
                 <td v-if="index === 0" :rowspan="member.assigned.length" class="person-cell">{{ member.person }}</td>
                 <td>{{ opportunity.Name }}</td><td><span class="stage-pill">{{ opportunity.Stage || 'Unspecified' }}</span></td><td>{{ opportunity.Status || 'Unspecified' }}</td><td class="hours-column">{{ opportunity.OpportunityHours ?? 0 }}h</td>
+                <td class="hours-column" @click.stop><button class="btn btn-primary btn-sm" @click="openDetail(opportunity.Id)">Open</button></td>
               </tr>
-              <tr v-if="member.assigned.length" class="person-total"><td colspan="3">{{ member.person }} active load</td><td>{{ member.availableHours }}h available</td><td class="hours-column">{{ member.activeHours }}h</td></tr>
+              <tr v-if="member.assigned.length" class="person-total"><td colspan="3">{{ member.person }} active load</td><td>{{ member.availableHours }}h available</td><td class="hours-column">{{ member.activeHours }}h</td><td></td></tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="timeline-wrap mt-4">
+          <h5 class="mb-3">Project timeline</h5>
+          <div class="table-responsive">
+            <table class="timeline-table">
+              <thead>
+                <tr>
+                  <th>Person</th>
+                  <th v-for="month in timelineMonths" :key="month.key">{{ month.label }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in timelineRows" :key="row.person">
+                  <td class="timeline-person">{{ row.person }}</td>
+                  <td v-for="month in timelineMonths" :key="`${row.person}-${month.key}`">
+                    <button
+                      v-for="opportunity in row.slots[month.key]"
+                      :key="`${opportunity.Id}-${month.key}`"
+                      class="btn btn-outline-primary btn-sm timeline-chip"
+                      @click="openDetail(opportunity.Id)"
+                    >
+                      {{ opportunity.Name }} | {{ opportunity.OpportunityHours ?? 0 }}h | {{ opportunity.AllocationPercent }}% | {{ opportunity.StartDate }} - {{ opportunity.EndDate || 'n/a' }} | {{ calculateDurationWorkDays(opportunity.OpportunityHours, opportunity.AllocationPercent) || '-' }} wd
+                    </button>
+                    <span v-if="!row.slots[month.key].length" class="timeline-empty">-</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
       <!-- NEW / DETAIL -->
       <section v-else>
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h4 class="mb-0">{{ view === "new" ? "Create Opportunity" : "Opportunity Details" }}</h4>
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-secondary btn-sm" @click="goPipeline">Back</button>
+            <h4 class="mb-0">{{ view === "new" ? "Create Opportunity" : "Opportunity Details" }}</h4>
+          </div>
           <div class="d-flex gap-2">
             <button v-if="view==='new'" class="btn btn-success" @click="saveNew" :disabled="loading">Create</button>
             <button v-if="view==='detail'" class="btn btn-success" @click="saveEdit" :disabled="loading">Save</button>
@@ -500,11 +779,27 @@ onMounted(refreshList);
               </div>
               <div class="col-md-6">
                 <label class="form-label">Opportunity Hours</label>
-                <input type="number" min="0" step="0.5" class="form-control" v-model="form.opportunityHours" placeholder="e.g. 120" />
+                <input type="number" min="0.5" step="0.5" required class="form-control" v-model="form.opportunityHours" placeholder="e.g. 120" />
               </div>
               <div class="col-md-6">
                 <label class="form-label">Opportunity Timeline</label>
                 <input class="form-control" v-model="form.opportunityTimeline" placeholder="e.g. 4 weeks" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Planned Start Date</label>
+                <input type="date" class="form-control" v-model="form.plannedStartDate" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Planned End Date</label>
+                <input type="date" class="form-control" v-model="form.plannedEndDate" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Allocation %</label>
+                <input type="number" min="1" max="100" class="form-control" v-model.number="form.allocationPercent" />
+              </div>
+              <div class="col-12 small text-muted">
+                Calculated end date from hours and allocation: <strong>{{ plannedEndPreview || "set start date and hours" }}</strong>
+                <span class="ms-2">Estimated duration: <strong>{{ plannedDurationPreview || "-" }} working days</strong></span>
               </div>
             </div>
           </div>
@@ -586,16 +881,18 @@ onMounted(refreshList);
 .form-label { margin-bottom: 5px; color: #435466; font-size: 12px; font-weight: 600; }
 .refresh-button { min-width: 86px; }
 .pipeline-grid { background: #fff; border: 1px solid #d6dde5; }
-.opportunity-row { display: grid; grid-template-columns: 5px minmax(170px, 1.8fr) minmax(130px, 1.1fr) minmax(100px, .8fr) minmax(85px, .7fr) 75px 54px; gap: 16px; align-items: center; min-height: 75px; padding: 12px 16px 12px 0; border-bottom: 1px solid #e4e9ee; cursor: pointer; font-size: 13px; }
-.opportunity-row:hover, .management-row:hover { background: #eef7fa; }
-.opportunity-name { display: grid; gap: 3px; min-width: 0; }
-.opportunity-name strong { color: #133b60; font-size: 14px; }
-.opportunity-name span { overflow: hidden; color: #617182; text-overflow: ellipsis; white-space: nowrap; }
-.data-label { display: block; margin-bottom: 3px; color: #6b7a89; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
-.stage-marker { align-self: stretch; background: #8495a7; }
-.border-warning { background: #e6a700; }.border-orange { background: #e56f00; }.border-purple { background: #7152a1; }.border-success { background: #107c41; }.border-danger { background: #c4314b; }.border-secondary { background: #637b91; }
-.stage-pill { display: inline-block; color: #294c69; font-size: 12px; font-weight: 600; }
-.empty-state { padding: 38px; color: #637080; text-align: center; }
+.pipeline-grid :deep(table) { margin-bottom: 0; }
+.pipeline-grid :deep(th) { background: #edf1f5; color: #44576a; font-size: 11px; letter-spacing: .4px; text-transform: uppercase; }
+.pipeline-grid :deep(td), .pipeline-grid :deep(th) { padding: 12px 14px; border-color: #e2e7ec; }
+.pipeline-grid :deep(tr:hover td) { background: #eef7fa; }
+.pipeline-title { color: #133b60; font-size: 14px; font-weight: 700; }
+.pipeline-subtitle { color: #617182; font-size: 12px; }
+.border-warning { background: #e6a700; color: #fff; }
+.border-orange { background: #e56f00; color: #fff; }
+.border-purple { background: #7152a1; color: #fff; }
+.border-success { background: #107c41; color: #fff; }
+.border-danger { background: #c4314b; color: #fff; }
+.border-secondary { background: #637b91; color: #fff; }
 .capacity-intro { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 16px; border-left: 4px solid #00a6a6; background: #e7f4f4; color: #274c59; font-size: 13px; }
 .capacity-intro span { color: #526979; }
 .capacity-summary { display: grid; grid-template-columns: repeat(5, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
@@ -610,6 +907,13 @@ onMounted(refreshList);
 .management-table th { padding: 11px 14px; background: #edf1f5; color: #44576a; font-size: 11px; letter-spacing: .4px; text-align: left; text-transform: uppercase; }
 .management-table td { padding: 11px 14px; border-top: 1px solid #e2e7ec; }
 .management-row { cursor: pointer; }.person-cell { color: #133b60; font-weight: 700; vertical-align: top; }.hours-column { text-align: right; }.unassigned-row td { color: #6b7a89; }.person-total { background: #f4f7f9; font-weight: 600; }.person-total td { border-top: 2px solid #ccd6df; }
-@media (max-width: 991px) { .filter-bar { grid-template-columns: repeat(2, 1fr); }.filter-search { grid-column: span 2; }.capacity-summary { grid-template-columns: repeat(2, 1fr); }.opportunity-row { grid-template-columns: 5px 1.5fr 1fr 75px 54px; }.opportunity-row > div:nth-of-type(3), .opportunity-row > div:nth-of-type(4) { display: none; } }
-@media (max-width: 600px) { .filter-bar { grid-template-columns: 1fr; }.filter-search { grid-column: auto; }.capacity-summary { grid-template-columns: 1fr; }.capacity-intro { align-items: start; flex-direction: column; gap: 4px; }.opportunity-row { grid-template-columns: 5px minmax(0, 1fr) 62px 48px; gap: 10px; }.opportunity-row > div:nth-of-type(2), .opportunity-row > div:nth-of-type(3), .opportunity-row > div:nth-of-type(4) { display: none; } }
+.timeline-wrap { background: #fff; border: 1px solid #d6dde5; padding: 14px; }
+.timeline-table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 13px; }
+.timeline-table th, .timeline-table td { padding: 10px 12px; border: 1px solid #e2e7ec; vertical-align: top; }
+.timeline-table th { background: #f3f6f9; color: #44576a; font-size: 11px; letter-spacing: .4px; text-transform: uppercase; }
+.timeline-person { color: #133b60; font-weight: 700; white-space: nowrap; }
+.timeline-chip { display: block; width: 100%; margin-bottom: 6px; text-align: left; }
+.timeline-empty { color: #93a1af; }
+@media (max-width: 991px) { .filter-bar { grid-template-columns: repeat(2, 1fr); }.filter-search { grid-column: span 2; }.capacity-summary { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .filter-bar { grid-template-columns: 1fr; }.filter-search { grid-column: auto; }.capacity-summary { grid-template-columns: 1fr; }.capacity-intro { align-items: start; flex-direction: column; gap: 4px; } }
 </style>

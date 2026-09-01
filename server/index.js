@@ -38,8 +38,11 @@ const OpportunitySchema = z.object({
 
   nextStepSummary: z.string().max(500).optional().nullable(),
   nextStepDueDate: z.string().optional().nullable(), // YYYY-MM-DD
-  opportunityHours: z.number().min(0).max(100000).optional().nullable(),
+  opportunityHours: z.number().gt(0).max(100000),
   opportunityTimeline: z.string().max(100).optional().nullable(),
+  plannedStartDate: z.string().optional().nullable(), // YYYY-MM-DD
+  plannedEndDate: z.string().optional().nullable(), // YYYY-MM-DD
+  allocationPercent: z.number().min(1).max(100).optional().nullable(),
 });
 
 function toGuid(id) {
@@ -133,14 +136,17 @@ app.post("/opportunities", async (req, res) => {
       .input("Tags", sql.NVarChar(400), body.tags ?? null)
       .input("NextStepSummary", sql.NVarChar(500), body.nextStepSummary ?? null)
       .input("NextStepDueDate", sql.Date, body.nextStepDueDate ?? null)
-      .input("OpportunityHours", sql.Float, body.opportunityHours ?? null)
+      .input("OpportunityHours", sql.Float, body.opportunityHours)
       .input("OpportunityTimeline", sql.NVarChar(100), body.opportunityTimeline ?? null)
+      .input("PlannedStartDate", sql.Date, body.plannedStartDate ?? null)
+      .input("PlannedEndDate", sql.Date, body.plannedEndDate ?? null)
+      .input("AllocationPercent", sql.Float, body.allocationPercent ?? null)
       .query(
         `
         INSERT INTO dbo.Opportunities
-          (Id, Name, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline)
+          (Id, Name, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline, PlannedStartDate, PlannedEndDate, AllocationPercent)
         VALUES
-          (@Id, @Name, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline);
+          (@Id, @Name, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline, @PlannedStartDate, @PlannedEndDate, @AllocationPercent);
         `
       );
 
@@ -172,8 +178,11 @@ app.put("/opportunities/:id", async (req, res) => {
       .input("Tags", sql.NVarChar(400), body.tags ?? null)
       .input("NextStepSummary", sql.NVarChar(500), body.nextStepSummary ?? null)
       .input("NextStepDueDate", sql.Date, body.nextStepDueDate ?? null)
-      .input("OpportunityHours", sql.Float, body.opportunityHours ?? null)
+      .input("OpportunityHours", sql.Float, body.opportunityHours)
       .input("OpportunityTimeline", sql.NVarChar(100), body.opportunityTimeline ?? null)
+      .input("PlannedStartDate", sql.Date, body.plannedStartDate ?? null)
+      .input("PlannedEndDate", sql.Date, body.plannedEndDate ?? null)
+      .input("AllocationPercent", sql.Float, body.allocationPercent ?? null)
       .query(
         `
         UPDATE dbo.Opportunities
@@ -191,7 +200,10 @@ app.put("/opportunities/:id", async (req, res) => {
           NextStepSummary=@NextStepSummary,
           NextStepDueDate=@NextStepDueDate,
           OpportunityHours=@OpportunityHours,
-          OpportunityTimeline=@OpportunityTimeline
+          OpportunityTimeline=@OpportunityTimeline,
+          PlannedStartDate=@PlannedStartDate,
+          PlannedEndDate=@PlannedEndDate,
+          AllocationPercent=@AllocationPercent
         WHERE Id=@Id;
         SELECT @@ROWCOUNT as affected;
         `

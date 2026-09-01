@@ -11,3 +11,11 @@ Run once against your target database (script is idempotent).
 Adds nullable `Description` (`NVARCHAR(4000)`) to `dbo.Opportunities`.
 
 Run once against your target database (script is idempotent).
+
+## 003_add_opportunity_planning_fields.sql
+Adds nullable planning columns to `dbo.Opportunities`:
+- `PlannedStartDate` (`DATE`)
+- `PlannedEndDate` (`DATE`)
+- `AllocationPercent` (`FLOAT`)
+
+Run once against your target database (script is idempotent).
