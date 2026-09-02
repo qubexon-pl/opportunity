@@ -11,7 +11,7 @@
         &middot;
       <% } %>
       <%= detail.windowStartText %> &rarr; <%= detail.windowEndText %>
-      (<%= detail.capacityBusinessDays %> working days)
+      (<%= detail.capacityBusinessDays %> working days<% if (detail.member && detail.member.absentDays > 0) { %>, <%= detail.member.absentDays %> absent<% } %>)
     </p>
   </div>
   <div class="d-flex gap-2">
@@ -62,7 +62,12 @@
     <div class="card h-100"><div class="card-body">
       <div class="kpi-label">Capacity</div>
       <div class="kpi-value"><%= detail.member.capacityHours %>h</div>
-      <div class="text-muted small"><%= detail.capacityBusinessDays %> working days</div>
+      <div class="text-muted small">
+        <%= detail.capacityBusinessDays - detail.member.absentDays %> working days
+        <% if (detail.member.absentDays > 0) { %>
+          &middot; <%= detail.member.absentDays %>d absent
+        <% } %>
+      </div>
     </div></div>
   </div>
   <div class="col-lg-3 col-md-6">
@@ -97,6 +102,56 @@
   </div>
 </div>
 
+<% if (detail.absences.length) { %>
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span><i class="bi bi-calendar-x me-2"></i>Absence in this period</span>
+      <a class="btn btn-sm btn-outline-secondary" href="/settings?person=<%= encodeURIComponent(detail.person) %>">
+        Manage in Configuration
+      </a>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width: 180px;">Type</th>
+              <th style="width: 230px;">Dates</th>
+              <th style="width: 150px;">Days in this window</th>
+              <th style="width: 130px;">Capacity removed</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% detail.absences.forEach(function(absence) { %>
+              <tr>
+                <td><span class="badge text-bg-light border"><%= absence.kind %></span></td>
+                <td class="text-muted small"><%= absence.startDate %> &rarr; <%= absence.endDate %></td>
+                <td><%= absence.daysInWindow %>d <span class="text-muted small">of <%= absence.businessDays %>d</span></td>
+                <td class="absence-hint">&minus;<%= Math.round(absence.daysInWindow * detail.member.dailyHours * 100) / 100 %>h</td>
+                <td class="text-muted small"><%= absence.note || '—' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+          <tfoot>
+            <tr class="fw-semibold">
+              <td colspan="2">Capacity in this window</td>
+              <td><%= detail.member.absentDays %>d</td>
+              <td class="absence-hint">&minus;<%= detail.member.absenceHours %>h</td>
+              <td class="text-muted small">
+                <%= detail.member.grossCapacityHours %>h before absence &rarr; <%= detail.member.capacityHours %>h available<% if (detail.member.absencePercentPoints > 0) { %>,
+                  so utilization reads <%= detail.member.chargeabilityReal %>% instead of
+                  <%= detail.member.chargeabilityWithoutAbsence %>% (+<%= detail.member.absencePercentPoints %> pts)<% } else { %>.
+                  Nothing is committed in this window, so utilization is unchanged<% } %>.
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+<% } %>
+
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <span><i class="bi bi-calendar3 me-2"></i>Capacity by period</span>
@@ -118,29 +173,46 @@
         </thead>
         <tbody>
           <% detail.periods.forEach(function(period) { %>
-            <tr>
+            <% var fullyAbsent = period.capacityHours === 0 && period.absentDays > 0 %>
+            <tr class="<%= fullyAbsent ? 'period-absent' : '' %>">
               <td class="text-nowrap">
                 <span class="fw-semibold"><%= period.label %></span>
-                <div class="text-muted small"><%= period.groupLabel %> &middot; <%= period.businessDays %>d</div>
-              </td>
-              <td class="text-end"><%= period.capacityHours %>h</td>
-              <td class="text-end"><%= period.committedHours %>h <span class="text-muted small">(<%= period.usedPercent %>%)</span></td>
-              <td class="text-end <%= capacityClass(period.freeHours) %>"><%= period.freeHours %>h <span class="text-muted small">(<%= period.freePercent %>%)</span></td>
-              <td class="text-end"><% if (period.softHours) { %><span class="soft-hint"><%= period.softHours %>h (<%= period.softPercent %>%)</span><% } else { %><span class="text-muted">-</span><% } %></td>
-              <td>
-                <div class="person-split" title="<%= period.usedPercent %>% committed, <%= period.freePercent %>% free">
-                  <div class="person-split-used" style="width: <%= Math.min(100, period.usedPercent) %>%;"></div>
-                  <div class="person-split-soft" style="width: <%= Math.max(0, Math.min(100 - Math.min(100, period.usedPercent), period.softPercent)) %>%;"></div>
+                <div class="text-muted small">
+                  <%= period.groupLabel %> &middot; <%= period.businessDays - period.absentDays %>d
+                  <% if (period.absentDays) { %><span class="absence-hint">&middot; <%= period.absentDays %>d away</span><% } %>
                 </div>
               </td>
-              <td class="small">
-                <% if (period.parts.length) { %>
-                  <% period.parts.forEach(function(part) { %>
-                    <div><%= part.name %>: <%= part.hours %>h &middot; <%= part.percent %>%</div>
-                  <% }) %>
+              <td class="text-end">
+                <%= period.capacityHours %>h
+                <% if (period.absentDays) { %>
+                  <div class="absence-hint small" title="<%= period.absences.map(function(a) { return a.kind + ' ' + a.startDate + ' to ' + a.endDate; }).join('\n') %>">
+                    &minus;<%= period.absenceHours %>h absence
+                  </div>
                 <% } %>
-                <div class="text-muted">Free: <%= period.freeHours %>h &middot; <%= period.freePercent %>%</div>
               </td>
+              <% if (fullyAbsent) { %>
+                <td class="text-muted text-center" colspan="5">
+                  <i class="bi bi-calendar-x me-1"></i>Away for the whole period, so there is no capacity to share out
+                </td>
+              <% } else { %>
+                <td class="text-end"><%= period.committedHours %>h <span class="text-muted small">(<%= period.usedPercent %>%)</span></td>
+                <td class="text-end <%= capacityClass(period.freeHours) %>"><%= period.freeHours %>h <span class="text-muted small">(<%= period.freePercent %>%)</span></td>
+                <td class="text-end"><% if (period.softHours) { %><span class="soft-hint"><%= period.softHours %>h (<%= period.softPercent %>%)</span><% } else { %><span class="text-muted">-</span><% } %></td>
+                <td>
+                  <div class="person-split" title="<%= period.usedPercent %>% committed, <%= period.freePercent %>% free">
+                    <div class="person-split-used" style="width: <%= Math.min(100, period.usedPercent) %>%;"></div>
+                    <div class="person-split-soft" style="width: <%= Math.max(0, Math.min(100 - Math.min(100, period.usedPercent), period.softPercent)) %>%;"></div>
+                  </div>
+                </td>
+                <td class="small">
+                  <% if (period.parts.length) { %>
+                    <% period.parts.forEach(function(part) { %>
+                      <div><%= part.name %>: <%= part.hours %>h &middot; <%= part.percent %>%</div>
+                    <% }) %>
+                  <% } %>
+                  <div class="text-muted">Free: <%= period.freeHours %>h &middot; <%= period.freePercent %>%</div>
+                </td>
+              <% } %>
             </tr>
           <% }) %>
           <% if (!detail.periods.length) { %>

@@ -597,3 +597,52 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
 .person-split-used { background: var(--color-primary); }
 .person-split-soft { background: repeating-linear-gradient(45deg, var(--color-primary) 0 3px, transparent 3px 6px); }
 .person-split-free { background: transparent; }
+
+/* Absence: capacity a person does not have, as opposed to a hold, which hands
+   capacity back. Warm amber to read as "gone", distinct from the soft-booking blue. */
+.absence-hint {
+  color: var(--bs-warning-text-emphasis, #915907);
+}
+
+.absence-impact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(255, 193, 7, 0.12);
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  color: var(--bs-warning-text-emphasis, #915907);
+}
+
+.absence-panel {
+  padding: 0.85rem 1rem 1rem;
+  background: var(--surface-muted, rgba(0, 0, 0, 0.02));
+  border-top: 1px solid var(--bs-border-color, rgba(0, 0, 0, 0.1));
+}
+
+.absence-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--bs-secondary-color, #6c757d);
+}
+
+.absence-row > td {
+  background: transparent;
+}
+.timeline-free.is-absent {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 193, 7, 0.14),
+    rgba(255, 193, 7, 0.14) 6px,
+    rgba(255, 193, 7, 0.05) 6px,
+    rgba(255, 193, 7, 0.05) 12px
+  );
+  border-color: rgba(255, 193, 7, 0.45);
+  color: var(--bs-warning-text-emphasis, #915907);
+}
+.period-absent > td {
+  background: rgba(255, 193, 7, 0.06);
+}

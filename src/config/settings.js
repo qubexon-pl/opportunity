@@ -54,6 +54,7 @@ function getConfig() {
       dailyHours: fileConfig.personDailyHours && typeof fileConfig.personDailyHours === 'object' ? fileConfig.personDailyHours : {},
       roles: fileConfig.personRoles && typeof fileConfig.personRoles === 'object' ? fileConfig.personRoles : {},
       costs: fileConfig.personCosts && typeof fileConfig.personCosts === 'object' ? fileConfig.personCosts : {},
+      absences: fileConfig.personAbsences && typeof fileConfig.personAbsences === 'object' ? fileConfig.personAbsences : {},
     },
     capacity: {
       firmStages: Array.isArray(fileConfig.firmStages) ? fileConfig.firmStages : DEFAULT_FIRM_STAGES,
@@ -82,12 +83,13 @@ function validateConfig({ requireProductionSecrets = false } = {}) {
   return cfg;
 }
 
-function updatePeopleConfig({ people, personDailyHours, personRoles, personCosts }) {
+function updatePeopleConfig({ people, personDailyHours, personRoles, personCosts, personAbsences }) {
   const fileConfig = loadFileConfig();
   if (Array.isArray(people)) fileConfig.people = people;
   if (personDailyHours && typeof personDailyHours === 'object') fileConfig.personDailyHours = personDailyHours;
   if (personRoles && typeof personRoles === 'object') fileConfig.personRoles = personRoles;
   if (personCosts && typeof personCosts === 'object') fileConfig.personCosts = personCosts;
+  if (personAbsences && typeof personAbsences === 'object') fileConfig.personAbsences = personAbsences;
   saveFileConfig(fileConfig);
 }
 

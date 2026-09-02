@@ -27,6 +27,11 @@ function getCostMap() {
   return { ...getConfig().people.costs };
 }
 
+/** Raw absence store, used when removing a person so their entries go with them. */
+function getAbsenceMap() {
+  return { ...getConfig().people.absences };
+}
+
 function getPersonDailyHours(personName) {
   const configured = Number(getConfig().people.dailyHours[personName]);
   if (Number.isFinite(configured) && configured > 0) return configured;
@@ -108,11 +113,19 @@ function removePerson(personName) {
   const dailyHoursMap = getDailyHoursMap();
   const roleMap = getRoleMap();
   const costMap = getCostMap();
+  const absenceMap = getAbsenceMap();
   delete dailyHoursMap[name];
   delete roleMap[name];
   delete costMap[name];
+  delete absenceMap[name];
 
-  updatePeopleConfig({ people, personDailyHours: dailyHoursMap, personRoles: roleMap, personCosts: costMap });
+  updatePeopleConfig({
+    people,
+    personDailyHours: dailyHoursMap,
+    personRoles: roleMap,
+    personCosts: costMap,
+    personAbsences: absenceMap,
+  });
 }
 
 /** Saves the editable columns of a configured person in one go. */

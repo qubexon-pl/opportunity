@@ -14,6 +14,7 @@ const {
   periodBounds,
 } = require('./dateService');
 const { listPeople, getPersonDailyHours, getPersonRole, getPersonCost, COST_CURRENCY } = require('./peopleService');
+const { absenceBusinessDays, absencesInWindow } = require('./absenceService');
 const { countsTowardsCapacity, listFirmStages } = require('./bookingService');
 
 const TIMELINE_ROW_TOP_PADDING = 8;
@@ -97,6 +98,7 @@ const PEOPLE_SORT_FIELDS = [
   { key: 'soft', label: 'Soft booked hours', type: 'number', value: (member) => member.softHours },
   { key: 'free', label: 'Free hours', type: 'number', value: (member) => member.availableHours },
   { key: 'held', label: 'Hours on hold', type: 'number', value: (member) => member.heldHours },
+  { key: 'absence', label: 'Absence hours', type: 'number', value: (member) => member.absenceHours },
   { key: 'real', label: 'Chargeability (real)', type: 'number', value: (member) => member.chargeabilityReal },
   { key: 'predicted', label: 'Chargeability (predicted)', type: 'number', value: (member) => member.chargeabilityPredicted },
 ];
@@ -240,6 +242,30 @@ function capacityWindow(perspective, unitsToShow) {
   return { start, endExclusive: addUnit(start, perspective, units), units };
 }
 
+/**
+ * A person's real capacity for a period: their working days in it, less the days
+ * they are absent, at their daily rate.
+ *
+ * Absence removes the days themselves, so it shrinks capacity rather than
+ * freeing it. That is the opposite of an allocation hold, which leaves capacity
+ * intact and hands back the hours one assignment was consuming.
+ */
+function personCapacity(personName, start, endExclusive) {
+  const dailyHours = getPersonDailyHours(personName);
+  const businessDays = countBusinessDays(start, endExclusive);
+  const absentDays = Math.min(businessDays, absenceBusinessDays(personName, start, endExclusive));
+
+  return {
+    dailyHours,
+    businessDays,
+    absentDays,
+    workingDays: businessDays - absentDays,
+    grossHours: round2(businessDays * dailyHours),
+    absenceHours: round2(absentDays * dailyHours),
+    hours: round2((businessDays - absentDays) * dailyHours),
+  };
+}
+
 function timelineRange(scheduled, perspective, unitsToShow) {
   const horizonUnits = Math.max(1, Number(unitsToShow || 1));
   const dated = scheduled.filter((item) => item.StartDate && item.EndDate);
@@ -345,7 +371,8 @@ function freeSegments(assignmentsForPerson, personName, window, perspective) {
     const endExclusive = new Date(Math.min(nextUnit.getTime(), window.endExclusive.getTime()));
 
     if (endExclusive > start) {
-      const capacityHours = countBusinessDays(start, endExclusive) * getPersonDailyHours(personName);
+      const capacity = personCapacity(personName, start, endExclusive);
+      const capacityHours = capacity.hours;
       const share = (hours) => (capacityHours > 0 ? round2((hours / capacityHours) * 100) : 0);
 
       // Soft bookings never reduce free capacity; they are reported separately.
@@ -382,6 +409,12 @@ function freeSegments(assignmentsForPerson, personName, window, perspective) {
         usedPercent: share(assignedHours),
         freePercent: share(freeHours),
         softPercent: share(softHours),
+        // Absence is shown against the days it removed, not as a share of what
+        // is left, since the remaining capacity is exactly what 100% now means.
+        absenceHours: capacity.absenceHours,
+        absentDays: capacity.absentDays,
+        grossCapacityHours: capacity.grossHours,
+        absences: capacity.absentDays > 0 ? absencesInWindow(personName, start, endExclusive) : [],
       });
     }
 
@@ -393,11 +426,11 @@ function freeSegments(assignmentsForPerson, personName, window, perspective) {
 
 function buildManagementPeople(assignmentRows, window) {
   const assignedPeople = assignmentRows.map((assignment) => assignment.PersonName).filter(Boolean);
-  const businessDays = countBusinessDays(window.start, window.endExclusive);
 
   return [...new Set([...listPeople(), ...assignedPeople])].map((person) => {
-    const dailyHours = getPersonDailyHours(person);
-    const capacityHours = round2(businessDays * dailyHours);
+    const capacity = personCapacity(person, window.start, window.endExclusive);
+    const dailyHours = capacity.dailyHours;
+    const capacityHours = capacity.hours;
     const assigned = assignmentRows.filter((assignment) => assignment.PersonName === person);
     const visible = assigned.filter((assignment) => assignment.IsTimelineVisible);
 
@@ -425,6 +458,12 @@ function buildManagementPeople(assignmentRows, window) {
     const chargeabilityPredicted = capacityHours > 0 ? round2(((activeHours + softHours) / capacityHours) * 100) : 0;
     const chargeabilityWithoutHolds = capacityHours > 0 ? round2((activeIgnoringHolds / capacityHours) * 100) : 0;
 
+    // Absence does not change the hours anyone owes, only the days available to
+    // deliver them, so the same committed hours over a smaller base read as
+    // higher utilization. Comparing against the gross base says by how much.
+    const chargeabilityWithoutAbsence =
+      capacity.grossHours > 0 ? round2((activeHours / capacity.grossHours) * 100) : 0;
+
     return {
       person,
       role: getPersonRole(person),
@@ -446,6 +485,14 @@ function buildManagementPeople(assignmentRows, window) {
       heldAssignments: heldRows.length,
       chargeabilityWithoutHolds,
       holdPercentPoints: round2(Math.max(0, chargeabilityWithoutHolds - chargeabilityReal)),
+      // Absence reporting: the days and hours removed from the window, and the
+      // utilization difference that removal makes.
+      absentDays: capacity.absentDays,
+      absenceHours: capacity.absenceHours,
+      grossCapacityHours: capacity.grossHours,
+      absences: capacity.absentDays > 0 ? absencesInWindow(person, window.start, window.endExclusive) : [],
+      chargeabilityWithoutAbsence,
+      absencePercentPoints: round2(Math.max(0, chargeabilityReal - chargeabilityWithoutAbsence)),
       chargeabilityClass: chargeabilityClass(chargeabilityReal),
       chargeabilityPredictedClass: chargeabilityClass(chargeabilityPredicted),
     };
@@ -458,18 +505,26 @@ function buildManagementPeople(assignmentRows, window) {
  */
 function summariseChargeability(people) {
   const capacityHours = people.reduce((total, member) => total + member.capacityHours, 0);
+  const grossCapacityHours = people.reduce((total, member) => total + member.grossCapacityHours, 0);
   const activeHours = people.reduce((total, member) => total + member.activeHours, 0);
   const softHours = people.reduce((total, member) => total + member.softHours, 0);
+  const absenceHours = people.reduce((total, member) => total + member.absenceHours, 0);
 
   const real = capacityHours > 0 ? round2((activeHours / capacityHours) * 100) : 0;
   const predicted = capacityHours > 0 ? round2(((activeHours + softHours) / capacityHours) * 100) : 0;
+  const withoutAbsence = grossCapacityHours > 0 ? round2((activeHours / grossCapacityHours) * 100) : 0;
 
   return {
     capacityHours: round2(capacityHours),
+    grossCapacityHours: round2(grossCapacityHours),
     activeHours: round2(activeHours),
     softHours: round2(softHours),
+    absenceHours: round2(absenceHours),
+    absentPeople: people.filter((member) => member.absentDays > 0).length,
     real,
     predicted,
+    withoutAbsence,
+    absencePercentPoints: round2(Math.max(0, real - withoutAbsence)),
     realClass: chargeabilityClass(real),
     predictedClass: chargeabilityClass(predicted),
   };
@@ -710,6 +765,9 @@ function buildPersonDetail({ opportunities, assignments, perspective, unitsToSho
       usedPercent: segment.usedPercent,
       freePercent: segment.freePercent,
       softPercent: segment.softPercent,
+      absenceHours: segment.absenceHours,
+      absentDays: segment.absentDays,
+      absences: segment.absences,
       parts: segment.parts,
     };
   });
@@ -752,6 +810,7 @@ function buildPersonDetail({ opportunities, assignments, perspective, unitsToSho
     windowStartText: toDateText(window.start),
     windowEndText: toDateText(new Date(window.endExclusive.getTime() - DAY_MS)),
     capacityBusinessDays: countBusinessDays(window.start, window.endExclusive),
+    absences: absencesInWindow(name, window.start, window.endExclusive),
   };
 }
 
@@ -770,6 +829,7 @@ module.exports = {
   sortBy,
   buildAssignmentRows,
   assignmentHoursInWindow,
+  personCapacity,
   freeSegments,
   buildManagementView,
   buildPersonDetail,
