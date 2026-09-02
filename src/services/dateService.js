@@ -26,14 +26,14 @@ function parseDateOnlyUtc(value) {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-/** Counts Mon-Fri days in [startDate, endExclusive). */
+/** Counts Mon-Fri days in [startDate, endExclusive). Boundaries are UTC midnight. */
 function countBusinessDays(startDate, endExclusive) {
   let count = 0;
   const cursor = new Date(startDate);
   while (cursor < endExclusive) {
-    const day = cursor.getDay();
+    const day = cursor.getUTCDay();
     if (day !== 0 && day !== 6) count += 1;
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return count;
 }
@@ -114,47 +114,52 @@ function addMonths(date, months) {
   return d;
 }
 
+/**
+ * Unit boundaries are built at UTC midnight, matching how every stored date is
+ * parsed. Building them in local time instead put the rendered window text a day
+ * out east of Greenwich, and left bar geometry skewed by the UTC offset.
+ */
 function startOfIsoWeek(date) {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - day);
+  d.setUTCHours(0, 0, 0, 0);
+  const day = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - day);
   return d;
 }
 
 function startOfUnit(date, perspective) {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCHours(0, 0, 0, 0);
   if (perspective === 'weeks') return startOfIsoWeek(d);
   if (perspective === 'quarters') {
-    d.setDate(1);
-    d.setMonth(Math.floor(d.getMonth() / 3) * 3);
+    d.setUTCDate(1);
+    d.setUTCMonth(Math.floor(d.getUTCMonth() / 3) * 3);
     return d;
   }
   if (perspective === 'halfyears') {
-    d.setDate(1);
-    d.setMonth(d.getMonth() < 6 ? 0 : 6);
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() < 6 ? 0 : 6);
     return d;
   }
-  d.setDate(1);
+  d.setUTCDate(1);
   return d;
 }
 
 function addUnit(date, perspective, units) {
   const d = new Date(date);
   if (perspective === 'weeks') {
-    d.setDate(d.getDate() + units * 7);
+    d.setUTCDate(d.getUTCDate() + units * 7);
     return d;
   }
   if (perspective === 'quarters') {
-    d.setMonth(d.getMonth() + units * 3);
+    d.setUTCMonth(d.getUTCMonth() + units * 3);
     return d;
   }
   if (perspective === 'halfyears') {
-    d.setMonth(d.getMonth() + units * 6);
+    d.setUTCMonth(d.getUTCMonth() + units * 6);
     return d;
   }
-  d.setMonth(d.getMonth() + units);
+  d.setUTCMonth(d.getUTCMonth() + units);
   return d;
 }
 
@@ -163,12 +168,12 @@ function formatUnitLabel(date, perspective) {
     return formatWeekRangeLabel(date);
   }
   if (perspective === 'quarters') {
-    return `Q${Math.floor(date.getMonth() / 3) + 1} ${String(date.getFullYear()).slice(-2)}`;
+    return `Q${Math.floor(date.getUTCMonth() / 3) + 1} ${String(date.getUTCFullYear()).slice(-2)}`;
   }
   if (perspective === 'halfyears') {
-    return `${date.getMonth() < 6 ? 'H1' : 'H2'} ${String(date.getFullYear()).slice(-2)}`;
+    return `${date.getUTCMonth() < 6 ? 'H1' : 'H2'} ${String(date.getUTCFullYear()).slice(-2)}`;
   }
-  return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
 }
 
 /** 1 -> "1st", 22 -> "22nd", 13 -> "13th". */
@@ -185,8 +190,8 @@ function ordinal(day) {
 /** A week column reads as its day range, e.g. "22nd - 28th". */
 function formatWeekRangeLabel(weekStart) {
   const end = new Date(weekStart);
-  end.setDate(end.getDate() + 6);
-  return `${ordinal(weekStart.getDate())} - ${ordinal(end.getDate())}`;
+  end.setUTCDate(end.getUTCDate() + 6);
+  return `${ordinal(weekStart.getUTCDate())} - ${ordinal(end.getUTCDate())}`;
 }
 
 /**
@@ -196,11 +201,11 @@ function formatWeekRangeLabel(weekStart) {
 function unitGroup(date, perspective) {
   if (perspective === 'weeks') {
     return {
-      key: `${date.getFullYear()}-${date.getMonth()}`,
-      label: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      key: `${date.getUTCFullYear()}-${date.getUTCMonth()}`,
+      label: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
     };
   }
-  return { key: String(date.getFullYear()), label: String(date.getFullYear()) };
+  return { key: String(date.getUTCFullYear()), label: String(date.getUTCFullYear()) };
 }
 
 function formatMonthLabel(date) {
