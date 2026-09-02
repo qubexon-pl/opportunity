@@ -91,11 +91,11 @@
     var windowHours = hoursInWindow(chip, startMs, endMs, hours);
     var capacityPercent = capacityHours > 0 ? round2((windowHours / capacityHours) * 100) : 0;
     var days = businessDays(startMs, endMs);
-    var stage = chip.dataset.stageLabel || '';
     var resized = Math.abs(hours - initialHours) >= 0.01;
 
+    // The stage lives beside the opportunity name, so it is not repeated here.
     meta.textContent = initialHours + 'h' + (resized ? ' \u2192 ' + hours + 'h' : '') +
-      ' \u00b7 ' + capacityPercent + '% cap' + (stage ? ' \u00b7 ' + stage : '');
+      ' \u00b7 ' + capacityPercent + '% cap';
 
     chip.title = (chip.dataset.person || '') + ' \u00b7 ' + toDateText(startMs) + ' \u2192 ' + toDateText(endMs) +
       ' (' + days + ' working days)\n' +
@@ -110,10 +110,9 @@
     if (!meta) return;
     var initialHours = Number(chip.dataset.initialHours) || 0;
     var hours = Number(chip.dataset.hours) || 0;
-    var stage = chip.dataset.stageLabel || '';
     var resized = Math.abs(hours - initialHours) >= 0.01;
     meta.textContent = initialHours + 'h' + (resized ? ' \u2192 ' + hours + 'h' : '') +
-      ' \u00b7 ' + (Number(chip.dataset.capacityPercent) || 0) + '% cap' + (stage ? ' \u00b7 ' + stage : '');
+      ' \u00b7 ' + (Number(chip.dataset.capacityPercent) || 0) + '% cap';
   }
 
   /* Position the chip live while dragging, mirroring the server geometry maths. */

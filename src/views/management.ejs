@@ -21,9 +21,25 @@
   </div>
 <% } %>
 
-<div class="card mb-4">
-  <div class="card-header"><i class="bi bi-sliders me-2"></i>Perspective</div>
-  <div class="card-body">
+<div class="card mb-4 perspective-dock" id="perspectiveDock">
+  <div class="card-header d-flex justify-content-between align-items-center gap-2">
+    <span><i class="bi bi-sliders me-2"></i>Perspective</span>
+    <div class="d-flex align-items-center gap-2">
+      <span class="perspective-summary text-muted small">
+        <%= perspective %> &middot; <%= unitsToShow %> units &middot;
+        <%= stageFilters.length ? stageFilters.length + ' stages' : 'all stages' %> &middot;
+        <%= statusFilters.length ? statusFilters.length + ' statuses' : 'all statuses' %> &middot;
+        <%= personFilters.length ? personFilters.length + ' people' : 'all people' %>
+      </span>
+      <button class="btn btn-sm btn-outline-secondary perspective-toggle" type="button"
+              data-perspective-toggle
+              aria-expanded="false"
+              title="Show the filters">
+        <i class="bi bi-chevron-down"></i>
+      </button>
+    </div>
+  </div>
+  <div class="card-body" data-perspective-body>
     <form method="get" action="/management" class="row g-3 align-items-end">
       <input type="hidden" name="applied" value="1">
       <div class="col-lg-3 col-md-4 col-6">
@@ -443,18 +459,6 @@ Away <%= row.absentDays %>d, which removes <%= row.absenceHours %>h of capacity:
               <div class="timeline-gridlines">
                 <% view.timeline.units.forEach(function(unit) { %><div class="timeline-gridline"></div><% }) %>
               </div>
-              <% row.absenceBands.forEach(function(band) { %>
-                <%
-                  // Drawn across the whole row because an absence belongs to the
-                  // person, not to one assignment: every chip it crosses is hit.
-                  var bandLabel = band.kind + ' ' + band.daysInWindow + 'd';
-                %>
-                <div class="timeline-absence"
-                     style="left: <%= band.geometry.left.toFixed(3) %>%; width: <%= band.geometry.width.toFixed(3) %>%;"
-                     aria-hidden="true">
-                  <span class="timeline-absence-label"><%= bandLabel %></span>
-                </div>
-              <% }) %>
               <% row.chips.forEach(function(chip) { %>
                 <div class="timeline-chip <%= chip.accentClass %> <%= chip.IsCommitted ? 'is-committed' : 'is-soft' %> <%= chip.IsOnHold ? 'is-on-hold' : '' %>"
                      data-assignment-id="<%= chip.Id %>"
@@ -486,13 +490,13 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                   <% } %>
                   <a class="timeline-chip-body" href="/opportunities/<%= chip.OpportunityId %>#assignments">
                     <span class="timeline-chip-title">
-                      <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %>
+                      <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %><%
+                      %><span class="timeline-chip-stage <%= chip.accentClass %>"><%= stageStatusLabel(chip.Stage) %></span>
                     </span>
                     <span class="timeline-chip-meta" data-role="meta"><%
                       %><%= chip.InitialAllocatedHours %>h<%
                       %><% if (chip.IsResized) { %> &rarr; <%= chip.AllocatedHours %>h<% } %><%
-                      %> &middot; <%= chip.capacityPercent %>% cap<%
-                      %> &middot; <%= stageStatusLabel(chip.Stage) %></span>
+                      %> &middot; <%= chip.capacityPercent %>% cap</span>
                   </a>
                   <span class="timeline-chip-resizer end" data-edge="end" title="Drag to change the end date"></span>
                 </div>
@@ -513,19 +517,37 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                       }).join('\n')
                     : '';
                 %>
-                <div class="timeline-free<%= fullyAbsent ? ' is-absent' : '' %>"
+                <div class="timeline-free<%= fullyAbsent ? ' is-absent' : '' %><%= segment.isOver ? ' is-over' : '' %>"
                      style="left: <%= segment.geometry.left.toFixed(3) %>%; width: <%= segment.geometry.width.toFixed(3) %>%; top: <%= segment.geometry.top %>px;"
-                     title="<%= segment.groupLabel %> <%= segment.unitLabel %> &middot; <%= segment.capacityHours %>h capacity<%= segment.absentDays ? ' (' + segment.grossCapacityHours + 'h \u2212 ' + segment.absenceHours + 'h absence)' : '' %><%= fullyAbsent ? '\nAway for the whole period, so there is no capacity to share out.' : '\n' + breakdown + '\nTotal: ' + (segment.usedPercent + segment.freePercent).toFixed(2) + '%' %><%= segment.softHours ? '\nSoft booked on top: ' + segment.softHours + 'h = ' + segment.softPercent + '%' : '' %><%= absenceDetail %>">
+                     title="<%= segment.groupLabel %> <%= segment.unitLabel %> &middot; <%= segment.capacityHours %>h capacity<%= segment.absentDays ? ' (' + segment.grossCapacityHours + 'h \u2212 ' + segment.absenceHours + 'h absence)' : '' %><%= fullyAbsent ? '\nAway for the whole period, so there is no capacity to share out.' : '\n' + breakdown + '\nTotal: ' + (segment.usedPercent + segment.freePercent).toFixed(2) + '%' %><%= segment.isOver ? '\nOver capacity by ' + segment.overHours + 'h: more is committed here than there are hours to give.' : '' %><%= segment.softHours ? '\nSoft booked on top: ' + segment.softHours + 'h = ' + segment.softPercent + '%' : '' %><%= absenceDetail %>">
                   <span class="timeline-free-label">
                     <% if (fullyAbsent) { %>
-                      <%= segment.unitLabel %> &middot; away <%= segment.absentDays %>d
+                      Away <%= segment.absentDays %>d
+                    <% } else if (segment.isOver) { %>
+                      <i class="bi bi-exclamation-triangle-fill me-1"></i><%= segment.overHours %>h over &middot; <%= segment.usedPercent %>%<% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %>
                     <% } else { %>
-                      <%= segment.unitLabel %> &middot; <%= segment.freeHours %>h free &middot; <%= segment.freePercent %>%<% if (segment.softHours) { %> &middot; <%= segment.softHours %>h soft<% } %><% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %>
+                      <%= segment.freeHours %>h free &middot; <%= segment.freePercent %>%<% if (segment.softHours) { %> &middot; <%= segment.softHours %>h soft<% } %><% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %>
                     <% } %>
                   </span>
                 </div>
               <% }) %>
-              <% if (!row.chips.length && !row.freeChips.length) { %>
+              <% row.absenceBands.forEach(function(band) { %>
+                <%
+                  // On its own lane, read like the free bar: an absence is not
+                  // work, but it is a claim on the same days.
+                  var bandRange = band.startDate + ' \u2192 ' + band.endDate;
+                %>
+                <div class="timeline-absence"
+                     style="left: <%= band.geometry.left.toFixed(3) %>%; width: <%= band.geometry.width.toFixed(3) %>%; top: <%= band.geometry.top %>px;"
+                     title="<%= band.kind %><%= band.note ? ' \u2014 ' + band.note : '' %>
+<%= bandRange %><%= band.startsBefore || band.endsAfter ? ' (continues outside this window)' : '' %>
+<%= band.daysInWindow %> working days here, removing <%= band.hours %>h of capacity">
+                  <span class="timeline-absence-label">
+                    <i class="bi bi-person-dash me-1"></i><%= band.kind %> &middot; <%= band.daysInWindow %>d &middot; <%= band.hours %>h off
+                  </span>
+                </div>
+              <% }) %>
+              <% if (!row.chips.length && !row.freeChips.length && !row.absenceBands.length) { %>
                 <div class="timeline-empty">No scheduled work in this window</div>
               <% } %>
             </div>

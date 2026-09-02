@@ -52,6 +52,9 @@
     });
 
     window.addEventListener('scroll', refresh, { passive: true });
+    // The page scrolls inside .main-content, so that is where the movement is.
+    const pane = scroller.closest('.main-content');
+    if (pane) pane.addEventListener('scroll', refresh, { passive: true });
     window.addEventListener('resize', refresh);
     if (window.ResizeObserver) new ResizeObserver(refresh).observe(scroller);
 

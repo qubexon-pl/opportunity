@@ -157,7 +157,16 @@
 .legend-chip.is-active { border-color: var(--color-primary); color: var(--color-primary); font-weight: 600; }
 .legend-free::before { background: repeating-linear-gradient(45deg, var(--color-primary) 0 3px, transparent 3px 6px); }
 
-.timeline-scroll { overflow-x: auto; }
+/*
+ * The timeline is its own scroll viewport in both directions. That is what lets
+ * the year/unit header and the person column stay put while the board moves
+ * underneath them: a sticky element only sticks inside a scrollport, so without
+ * a capped height here there would be nothing for it to stick to.
+ */
+.timeline-scroll {
+  overflow: auto;
+  max-height: max(340px, calc(100vh - 300px));
+}
 
 /*
  * The board widens with the number of columns so a label always has room; the
@@ -192,13 +201,44 @@
 .timeline-floating-scroll.is-visible { display: block; }
 .timeline-floating-scroll > div { height: 1px; }
 
+/*
+ * The filters stay within reach: the card sticks below the top bar, and
+ * condenses to a single docked line once it has been scrolled past, so it costs
+ * a strip of the board rather than a whole card. The full form is one click
+ * away, and is shown in full whenever the page is at the top.
+ */
+.perspective-dock {
+  position: sticky;
+  /* Below the top bar, which is sticky at 0: without this offset the dock
+     would slide underneath it and be unreachable. */
+  top: var(--topbar-height, 56px);
+  z-index: 1010;
+}
+
+.perspective-dock.is-stuck { box-shadow: var(--shadow-md); }
+.perspective-dock.is-stuck:not(.is-open) > .card-body { display: none; }
+.perspective-dock .perspective-summary { display: none; }
+.perspective-dock.is-stuck .perspective-summary { display: inline; }
+.perspective-dock:not(.is-stuck) .perspective-toggle { display: none; }
+.perspective-dock.is-stuck.is-open .perspective-toggle i { transform: rotate(180deg); }
+.perspective-toggle i { display: inline-block; transition: transform .15s ease; }
+
 .person-role {
   font-size: .74rem;
   line-height: 1.2;
   margin-top: .1rem;
 }
 
-.timeline-head { display: flex; border-bottom: 1px solid var(--color-border); }
+/* Frozen: the columns scroll under the header, so a bar is always readable
+   against its year and unit without scrolling back up. */
+.timeline-head {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: var(--color-surface, #fff);
+}
 
 .timeline-head-stack { flex: 1; display: flex; flex-direction: column; }
 
@@ -395,6 +435,40 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
 }
 
 [data-theme="dark"] .timeline-free-label { color: var(--color-primary); }
+
+/*
+ * A bar can be resized past the capacity it draws from, which leaves negative
+ * free hours. That reads red rather than as a very small "free" figure, since
+ * the two mean opposite things.
+ */
+.timeline-free.is-over {
+  border-style: solid;
+  border-color: var(--bs-danger, #dc3545);
+  background: rgba(220, 53, 69, .12);
+}
+
+.timeline-free.is-over .timeline-free-label {
+  color: var(--bs-danger-text-emphasis, #b02a37);
+  font-weight: 600;
+}
+
+[data-theme="dark"] .timeline-free.is-over .timeline-free-label { color: #ea868f; }
+
+/* The stage rides next to the name, so a bar says what it is without hovering. */
+.timeline-chip-stage {
+  display: inline-block;
+  margin-left: .35rem;
+  padding: 0 .3rem;
+  border-radius: 999px;
+  border: 1px solid var(--accent, var(--color-border));
+  color: var(--accent, var(--color-text-muted));
+  background: var(--color-surface);
+  font-size: .62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  vertical-align: middle;
+}
 
 .timeline-empty {
   position: absolute;
@@ -646,52 +720,50 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
 .period-absent > td {
   background: rgba(255, 193, 7, 0.06);
 }
-/* --- Timeline absence bands --------------------------------------------- */
-/* Drawn across the full row: an absence belongs to the person, so every
-   assignment chip it crosses is affected. */
+/* --- Timeline absence lane ---------------------------------------------- */
+/* An absence gets a lane of its own rather than a band over the chips: it
+   belongs to the person, not to one assignment, and keeping it off the chips
+   leaves the resize handles free. */
 .timeline-absence {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  /* Context only: it must never sit above a chip or swallow a resize drag, so
-     it stays in the natural paint order (before the chips) and takes no input. */
-  pointer-events: none;
-  border-left: 2px solid rgba(214, 158, 46, 0.75);
-  border-right: 2px solid rgba(214, 158, 46, 0.75);
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(214, 158, 46, 0.16),
-    rgba(214, 158, 46, 0.16) 6px,
-    rgba(214, 158, 46, 0.04) 6px,
-    rgba(214, 158, 46, 0.04) 12px
-  );
+  height: 50px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-absence-border, #868e96);
+  border-left: 4px solid var(--color-absence-strong, #495057);
+  background: var(--color-absence-soft, #ced4da);
+  display: flex;
+  align-items: center;
+  padding: 0 .5rem;
+  overflow: hidden;
 }
 
 .timeline-absence-label {
-  position: absolute;
-  top: 2px;
-  left: 4px;
-  right: 4px;
-  font-size: 0.66rem;
+  font-size: .72rem;
   font-weight: 600;
-  color: #8a6100;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  color: var(--color-absence-text, #212529);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+[data-theme="dark"] .timeline-absence {
+  border-color: #6c757d;
+  border-left-color: #adb5bd;
+  background: rgba(173, 181, 189, .18);
+}
+
+[data-theme="dark"] .timeline-absence-label { color: #dee2e6; }
+
 .legend-chip.legend-absence {
   cursor: help;
-  border-color: rgba(214, 158, 46, 0.75);
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(214, 158, 46, 0.18),
-    rgba(214, 158, 46, 0.18) 5px,
-    transparent 5px,
-    transparent 10px
-  );
+  border-color: var(--color-absence-border, #868e96);
+  background: var(--color-absence-soft, #ced4da);
+  color: var(--color-absence-text, #212529);
+}
+
+[data-theme="dark"] .legend-chip.legend-absence {
+  background: rgba(173, 181, 189, .18);
+  color: #dee2e6;
 }
 
 /* --- Over/under assignment against opportunity scope --------------------- */
