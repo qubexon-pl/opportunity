@@ -1,0 +1,27 @@
+{
+  "name": "opportunities",
+  "version": "2.0.0",
+  "description": "Opportunities App - track business development opportunities, assignments, and team capacity",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test",
+    "check": "npm run check:js && npm test",
+    "check:js": "node scripts/check-js.js"
+  },
+  "dependencies": {
+    "connect-flash": "^0.1.1",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^17.2.3",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "mssql": "^12.2.0",
+    "zod": "^4.3.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "ISC"
+}

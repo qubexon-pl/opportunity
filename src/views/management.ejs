@@ -1,0 +1,233 @@
+<%- include('partials/header') %>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">  <div>
+    <h2><i class="bi bi-diagram-3 me-2"></i>Team capacity</h2>
+    <p class="text-muted mb-0">
+      Capacity window: <%= toDateText(view.window.start) %> &rarr; <%= toDateText(view.window.endExclusive) %>
+      (<%= view.capacityBusinessDays %> working days, baseline <%= monthlyCapacity %>h/month).
+    </p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <span class="badge text-bg-secondary">Assignments: <%= view.stats.total %></span>
+    <span class="badge text-bg-success">On timeline: <%= view.stats.visible %></span>
+    <span class="badge text-bg-warning">Hidden: <%= view.stats.hidden %></span>
+  </div>
+</div>
+
+<% if (typeof loadError !== 'undefined' && loadError) { %>
+  <div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle me-2"></i>Could not load assignment data: <%= loadError %>
+  </div>
+<% } %>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-sliders me-2"></i>Perspective</div>
+  <div class="card-body">
+    <form method="get" action="/management" class="row g-3 align-items-end">
+      <div class="col-lg-3 col-md-4 col-6">
+        <label class="form-label" for="perspective">Timeline unit</label>
+        <select class="form-select" id="perspective" name="perspective">
+          <% timelineUnitOptions.forEach(function(option) { %>
+            <option value="<%= option.key %>" <%= perspective === option.key ? 'selected' : '' %>><%= option.label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-3 col-md-4 col-6">
+        <label class="form-label" for="units">Horizon (units)</label>
+        <input type="number" class="form-control" id="units" name="units" min="1" max="24" value="<%= unitsToShow %>">
+      </div>
+      <div class="col-lg-3 col-md-4 col-6">
+        <label class="form-label" for="stage">Stage filter</label>
+        <select class="form-select" id="stage" name="stage">
+          <option value="">All stages</option>
+          <option value="free" <%= stageFilter === 'free' ? 'selected' : '' %>>Free capacity only</option>
+          <% stageLegend.forEach(function(item) { %>
+            <option value="<%= item.label %>" <%= String(stageFilter).toLowerCase() === item.key ? 'selected' : '' %>><%= item.label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-3 col-md-4 col-6 d-flex gap-2">
+        <button class="btn btn-primary flex-grow-1" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
+        <a class="btn btn-outline-secondary" href="/management" title="Reset"><i class="bi bi-x-lg"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <% view.people.forEach(function(member) { %>
+    <div class="col-xl-3 col-lg-4 col-md-6">
+      <div class="card h-100 capacity-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="fw-semibold"><%= member.person %></div>
+            <span class="small text-muted"><%= member.dailyHours %>h/day</span>
+          </div>
+          <div class="capacity-track">
+            <div class="capacity-fill" style="width: <%= member.assignedPercent.toFixed(2) %>%;"></div>
+          </div>
+          <div class="d-flex justify-content-between small mt-2">
+            <span class="text-muted"><%= member.activeHours %>h assigned</span>
+            <span class="<%= capacityClass(member.availableHours) %>"><%= member.availableHours %>h free</span>
+          </div>
+          <div class="text-muted small mt-1">Capacity <%= member.capacityHours %>h in window</div>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+  <% if (!view.people.length) { %>
+    <div class="col-12"><div class="alert alert-info mb-0">No people configured. Add people in <a href="/settings">Configuration</a>.</div></div>
+  <% } %>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-bar-chart-steps me-2"></i>Timeline</span>
+    <div class="timeline-legend d-flex flex-wrap gap-2">
+      <a class="legend-chip <%= stageFilter === '' ? 'is-active' : '' %>" href="/management?perspective=<%= perspective %>&units=<%= unitsToShow %>">All</a>
+      <% stageLegend.forEach(function(item) { %>
+        <a class="legend-chip accent-<%= item.key %> <%= String(stageFilter).toLowerCase() === item.key ? 'is-active' : '' %>"
+           href="/management?perspective=<%= perspective %>&units=<%= unitsToShow %>&stage=<%= item.label %>"
+           title="<%= item.meaning %>"><%= item.label %></a>
+      <% }) %>
+      <a class="legend-chip legend-free <%= stageFilter === 'free' ? 'is-active' : '' %>"
+         href="/management?perspective=<%= perspective %>&units=<%= unitsToShow %>&stage=free">Free capacity</a>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="timeline-scroll">
+      <div class="timeline-grid">
+        <div class="timeline-head">
+          <div class="timeline-person-head">Person</div>
+          <div class="timeline-units" style="--timeline-units: <%= view.timeline.units.length %>;">
+            <% view.timeline.units.forEach(function(unit) { %>
+              <div class="timeline-unit"><%= unit.label %></div>
+            <% }) %>
+          </div>
+        </div>
+
+        <% view.timeline.rows.forEach(function(row) { %>
+          <div class="timeline-row" style="height: <%= row.height %>px;">
+            <div class="timeline-person"><%= row.person %></div>
+            <div class="timeline-lane" style="--timeline-units: <%= view.timeline.units.length %>;">
+              <div class="timeline-gridlines">
+                <% view.timeline.units.forEach(function(unit) { %><div class="timeline-gridline"></div><% }) %>
+              </div>
+              <% row.chips.forEach(function(chip) { %>
+                <a class="timeline-chip <%= chip.accentClass %>"
+                   href="/opportunities/<%= chip.OpportunityId %>#assignments"
+                   style="left: <%= chip.geometry.left.toFixed(3) %>%; width: <%= chip.geometry.width.toFixed(3) %>%; top: <%= chip.geometry.top %>px;"
+                   title="<%= chip.OpportunityName %> &middot; <%= chip.StartDate %> &rarr; <%= chip.EndDate %> &middot; <%= chip.AllocatedHours %>h">
+                  <span class="timeline-chip-title"><%= chip.OpportunityName %></span>
+                  <span class="timeline-chip-meta"><%= chip.AllocationPercent || 0 %>% &middot; <%= chip.AllocatedHours %>h &middot; <%= stageStatusLabel(chip.Stage) %></span>
+                </a>
+              <% }) %>
+              <% row.freeChips.forEach(function(segment) { %>
+                <div class="timeline-free"
+                     style="left: <%= segment.geometry.left.toFixed(3) %>%; width: <%= segment.geometry.width.toFixed(3) %>%; top: <%= segment.geometry.top %>px;"
+                     title="<%= segment.monthLabel %>: <%= segment.freeHours %>h free of <%= segment.capacityHours %>h">
+                  <span class="timeline-free-label"><%= segment.monthLabel %> &middot; <%= segment.freeHours %>h free</span>
+                </div>
+              <% }) %>
+              <% if (!row.chips.length && !row.freeChips.length) { %>
+                <div class="timeline-empty">No scheduled work in this window</div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+
+        <% if (!view.timeline.rows.length) { %>
+          <div class="p-4 text-center text-muted">Nothing to display for the selected filters.</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-plus-circle me-2"></i>Quick assign</div>
+  <div class="card-body">
+    <form method="post" action="/management/assignments" class="row g-2 align-items-end">
+      <div class="col-lg-4 col-md-6">
+        <label class="form-label">Opportunity</label>
+        <select class="form-select" name="opportunityId" required>
+          <option value="">Select opportunity</option>
+          <% projects.forEach(function(project) { %>
+            <option value="<%= project.Id %>"><%= project.Name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <label class="form-label">Person</label>
+        <select class="form-select" name="personName" required>
+          <option value="">Select person</option>
+          <% people.forEach(function(person) { %>
+            <option value="<%= person %>"><%= person %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-4 col-6">
+        <label class="form-label">Start</label>
+        <input type="date" class="form-control" name="plannedStartDate" value="<%= today %>" required>
+      </div>
+      <div class="col-lg-2 col-md-4 col-6">
+        <label class="form-label">End</label>
+        <input type="date" class="form-control" name="plannedEndDate" value="<%= today %>" required>
+      </div>
+      <div class="col-lg-1 col-md-2 col-6">
+        <label class="form-label">%</label>
+        <input type="number" class="form-control" name="allocationPercent" min="1" max="100" step="1" value="50">
+      </div>
+      <div class="col-lg-1 col-md-2 col-6">
+        <button class="btn btn-primary w-100" type="submit">Assign</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-list-ul me-2"></i>Assignments (<%= view.assignmentRows.length %>)</span>
+    <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Filter rows..." oninput="filterTable(this, 'assignmentTable')">
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 management-table" id="assignmentTable">
+        <thead>
+          <tr>
+            <th>Person</th>
+            <th>Opportunity</th>
+            <th>Stage</th>
+            <th>Window</th>
+            <th class="text-end">Allocation</th>
+            <th class="text-end">Hours</th>
+            <th class="text-end">Timeline</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% view.assignmentRows.forEach(function(assignment) { %>
+            <tr>
+              <td class="fw-semibold"><%= assignment.PersonName %></td>
+              <td><a href="/opportunities/<%= assignment.OpportunityId %>#assignments"><%= assignment.OpportunityName %></a></td>
+              <td><span class="stage-dot <%= stageAccentClass(assignment.Stage) %>"></span><%= assignment.Stage || '-' %> <span class="text-muted small">(<%= stageStatusLabel(assignment.Stage) %>)</span></td>
+              <td class="text-nowrap"><%= assignment.StartDate || '-' %> &rarr; <%= assignment.EndDate || '-' %></td>
+              <td class="text-end"><%= assignment.AllocationPercent || 0 %>%</td>
+              <td class="text-end"><%= assignment.AllocatedHours %>h</td>
+              <td class="text-end">
+                <form method="post" action="/management/assignments/<%= assignment.Id %>/visibility">
+                  <input type="hidden" name="isTimelineVisible" value="<%= assignment.IsTimelineVisible ? 'false' : 'true' %>">
+                  <button class="btn btn-sm <%= assignment.IsTimelineVisible ? 'btn-outline-secondary' : 'btn-outline-success' %>" type="submit">
+                    <%= assignment.IsTimelineVisible ? 'Hide' : 'Show' %>
+                  </button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+          <% if (!view.assignmentRows.length) { %>
+            <tr><td colspan="7" class="text-center text-muted py-4">No assignments yet.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<%- include('partials/footer') %>

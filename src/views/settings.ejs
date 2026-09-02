@@ -1,0 +1,79 @@
+<%- include('partials/header') %>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <h2><i class="bi bi-gear me-2"></i>Configuration</h2>
+    <p class="text-muted mb-0">People and daily capacity used for timeline and allocation calculations.</p>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people me-2"></i>People management (daily capacity)</span>
+        <span class="text-muted small">Default <%= defaultDailyHours %>h/day &middot; <%= monthlyCapacity %>h/month</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Person</th>
+                <th style="width: 200px;">Daily hours</th>
+                <th class="text-end" style="width: 140px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% people.forEach(function(person) { %>
+                <tr>
+                  <td class="fw-semibold"><%= person.name %></td>
+                  <td>
+                    <form method="post" action="/settings/people/hours" class="d-flex gap-2">
+                      <input type="hidden" name="personName" value="<%= person.name %>">
+                      <input type="number" class="form-control form-control-sm" name="dailyHours" min="1" max="24" step="0.5" value="<%= person.dailyHours %>">
+                      <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>
+                    </form>
+                  </td>
+                  <td class="text-end">
+                    <form method="post" action="/settings/people/remove" data-confirm="Remove <%= person.name %> from the people list?" data-confirm-title="Remove person" data-confirm-text="Remove">
+                      <input type="hidden" name="personName" value="<%= person.name %>">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!people.length) { %>
+                <tr><td colspan="3" class="text-center text-muted py-4">No people configured yet.</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-person-plus me-2"></i>Add person</div>
+      <div class="card-body">
+        <form method="post" action="/settings/people" class="row g-3">
+          <div class="col-12">
+            <label class="form-label" for="personName">Name</label>
+            <input class="form-control" id="personName" name="personName" required placeholder="Full name">
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="dailyHours">Daily hours</label>
+            <input type="number" class="form-control" id="dailyHours" name="dailyHours" min="1" max="24" step="0.5" value="8" required>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1"></i>Add person</button>
+          </div>
+        </form>
+        <p class="text-muted small mb-0 mt-3">
+          Settings are stored in <code>config.local.json</code> at the repository root, so they are shared by everyone using this server.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('partials/footer') %>
