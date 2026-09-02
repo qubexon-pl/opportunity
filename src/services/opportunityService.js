@@ -25,6 +25,7 @@ const OpportunitySchema = z.object({
   plannedStartDate: z.string().optional().nullable(),
   plannedEndDate: z.string().optional().nullable(),
   allocationPercent: z.number().min(1).max(100).optional().nullable(),
+  countsTowardsCapacity: z.boolean().optional().nullable(),
 });
 
 const NoteSchema = z.object({
@@ -59,27 +60,45 @@ function bindOpportunity(request, body) {
     .input('OpportunityTimeline', sql.NVarChar(100), body.opportunityTimeline ?? null)
     .input('PlannedStartDate', sql.Date, body.plannedStartDate ?? null)
     .input('PlannedEndDate', sql.Date, body.plannedEndDate ?? null)
-    .input('AllocationPercent', sql.Float, body.allocationPercent ?? null);
+    .input('AllocationPercent', sql.Float, body.allocationPercent ?? null)
+    .input('CountsTowardsCapacity', sql.Bit, body.countsTowardsCapacity ?? null);
+}
+
+/** Builds a parameterised IN clause, keeping user values out of the SQL text. */
+function buildInClause(request, column, values, prefix, sqlType) {
+  if (!values.length) return '';
+  const names = values.map((value, index) => {
+    const name = `${prefix}${index}`;
+    request.input(name, sqlType, value);
+    return `@${name}`;
+  });
+  return ` AND ${column} IN (${names.join(', ')})`;
+}
+
+function toFilterArray(value) {
+  const list = Array.isArray(value) ? value : value === undefined || value === null ? [] : [value];
+  return [...new Set(list.map((item) => String(item).trim()).filter(Boolean))];
 }
 
 async function listOpportunities({ q = '', sort = 'updated', dir = 'desc', stage = '', status = '' } = {}) {
   const sortColumn = sort === 'name' ? 'Name' : sort === 'created' ? 'CreatedAt' : 'UpdatedAt';
   const sortDir = String(dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
+  const stages = toFilterArray(stage);
+  const statuses = toFilterArray(status);
+
   const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('q', sql.NVarChar(220), q ? `%${q}%` : null)
-    .input('stage', sql.NVarChar(60), stage || null)
-    .input('status', sql.NVarChar(30), status || null)
-    .query(
-      `SELECT TOP 500 *
-       FROM dbo.Opportunities
-       WHERE (@q IS NULL OR Name LIKE @q OR TechOwner LIKE @q OR BusinessOwner LIKE @q OR Tags LIKE @q)
-         AND (@stage IS NULL OR Stage = @stage)
-         AND (@status IS NULL OR Status = @status)
-       ORDER BY ${sortColumn} ${sortDir};`
-    );
+  const request = pool.request().input('q', sql.NVarChar(220), q ? `%${q}%` : null);
+
+  const stageClause = buildInClause(request, 'Stage', stages, 'stage', sql.NVarChar(60));
+  const statusClause = buildInClause(request, 'Status', statuses, 'status', sql.NVarChar(30));
+
+  const result = await request.query(
+    `SELECT TOP 500 *
+     FROM dbo.Opportunities
+     WHERE (@q IS NULL OR Name LIKE @q OR TechOwner LIKE @q OR BusinessOwner LIKE @q OR Tags LIKE @q)${stageClause}${statusClause}
+     ORDER BY ${sortColumn} ${sortDir};`
+  );
 
   return result.recordset;
 }
@@ -135,9 +154,9 @@ async function createOpportunity(payload) {
 
   await bindOpportunity(pool.request().input('Id', sql.UniqueIdentifier, newId), body).query(
     `INSERT INTO dbo.Opportunities
-       (Id, Name, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline, PlannedStartDate, PlannedEndDate, AllocationPercent)
+       (Id, Name, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline, PlannedStartDate, PlannedEndDate, AllocationPercent, CountsTowardsCapacity)
      VALUES
-       (@Id, @Name, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline, @PlannedStartDate, @PlannedEndDate, @AllocationPercent);`
+       (@Id, @Name, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @CountsTowardsCapacity);`
   );
 
   return newId;
@@ -166,11 +185,27 @@ async function updateOpportunity(rawId, payload) {
          OpportunityTimeline=@OpportunityTimeline,
          PlannedStartDate=@PlannedStartDate,
          PlannedEndDate=@PlannedEndDate,
-         AllocationPercent=@AllocationPercent
+         AllocationPercent=@AllocationPercent,
+         CountsTowardsCapacity=@CountsTowardsCapacity
      WHERE Id=@Id;
      SELECT @@ROWCOUNT as affected;`
   );
 
+  return result.recordset[0].affected > 0;
+}
+
+/** Updates only the capacity booking override (used by the pipeline inline control). */
+async function setBookingFlag(rawId, flag) {
+  const id = toGuid(rawId);
+  const pool = await getPool();
+  const result = await pool
+    .request()
+    .input('Id', sql.UniqueIdentifier, id)
+    .input('CountsTowardsCapacity', sql.Bit, flag === null || flag === undefined ? null : !!flag)
+    .query(
+      `UPDATE dbo.Opportunities SET CountsTowardsCapacity=@CountsTowardsCapacity WHERE Id=@Id;
+       SELECT @@ROWCOUNT as affected;`
+    );
   return result.recordset[0].affected > 0;
 }
 
@@ -264,6 +299,7 @@ module.exports = {
   getOpportunity,
   createOpportunity,
   updateOpportunity,
+  setBookingFlag,
   deleteOpportunity,
   addNote,
   deleteNote,

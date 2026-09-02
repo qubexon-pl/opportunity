@@ -15,6 +15,7 @@ const {
   periodBounds,
 } = require('./dateService');
 const { listPeople, getPersonDailyHours } = require('./peopleService');
+const { countsTowardsCapacity, listFirmStages } = require('./bookingService');
 
 const TIMELINE_ROW_TOP_PADDING = 8;
 const TIMELINE_LANE_HEIGHT = 58;
@@ -78,6 +79,7 @@ function capacityClass(hours) {
 /** Joins assignments with their opportunity, filling in derived hours. */
 function buildAssignmentRows(opportunities, assignments) {
   const byId = new Map(opportunities.map((o) => [o.Id, o]));
+  const firmStages = listFirmStages();
 
   return assignments
     .map((assignment) => {
@@ -94,13 +96,39 @@ function buildAssignmentRows(opportunities, assignments) {
         AllocatedHours: Number.isFinite(allocated) ? allocated : fallback,
         StartDate: toDateText(assignment.PlannedStartDate),
         EndDate: toDateText(assignment.PlannedEndDate),
+        HoldStartDate: toDateText(assignment.HoldStartDate),
+        HoldEndDate: toDateText(assignment.HoldEndDate),
+        IsOnHold: !!(assignment.HoldStartDate && assignment.HoldEndDate),
         IsTimelineVisible: !!assignment.IsTimelineVisible,
+        IsCommitted: countsTowardsCapacity(opportunity, firmStages),
       };
     })
     .filter(Boolean);
 }
 
-/** Portion of an assignment's hours that falls inside [windowStart, windowEndExclusive). */
+/** Business days of an assignment's hold window that fall inside [from, toExclusive). */
+function heldBusinessDays(assignment, from, toExclusive) {
+  const holdStart = toDate(assignment.HoldStartDate);
+  const holdEnd = toDate(assignment.HoldEndDate);
+  if (!holdStart || !holdEnd) return 0;
+
+  const holdEndExclusive = new Date(holdEnd);
+  holdEndExclusive.setDate(holdEndExclusive.getDate() + 1);
+
+  const overlapStart = new Date(Math.max(holdStart.getTime(), from.getTime()));
+  const overlapEndExclusive = new Date(Math.min(holdEndExclusive.getTime(), toExclusive.getTime()));
+  if (overlapEndExclusive <= overlapStart) return 0;
+
+  return countBusinessDays(overlapStart, overlapEndExclusive);
+}
+
+/**
+ * Portion of an assignment's hours that falls inside [windowStart, windowEndExclusive).
+ *
+ * Hours are consumed at the assignment's normal daily rate. Days inside a hold
+ * window are skipped, so a hold frees the person's capacity for that period
+ * without changing the assignment's stored total.
+ */
 function assignmentHoursInWindow(assignment, windowStart, windowEndExclusive) {
   const assignmentStart = toDate(assignment.StartDate || assignment.PlannedStartDate);
   const assignmentEnd = toDate(assignment.EndDate || assignment.PlannedEndDate);
@@ -115,12 +143,13 @@ function assignmentHoursInWindow(assignment, windowStart, windowEndExclusive) {
 
   const totalBusinessDays = countBusinessDays(assignmentStart, assignmentEndExclusive);
   const overlapBusinessDays = countBusinessDays(overlapStart, overlapEndExclusive);
-  if (totalBusinessDays <= 0 || overlapBusinessDays <= 0) return 0;
+  const activeBusinessDays = overlapBusinessDays - heldBusinessDays(assignment, overlapStart, overlapEndExclusive);
+  if (totalBusinessDays <= 0 || activeBusinessDays <= 0) return 0;
 
   const allocated = Number(assignment.AllocatedHours);
   const fallback = Number(assignment.OpportunityHours || 0) * (Number(assignment.AllocationPercent || 0) / 100);
   const totalHours = Number.isFinite(allocated) ? allocated : fallback;
-  return totalHours * (overlapBusinessDays / totalBusinessDays);
+  return totalHours * (activeBusinessDays / totalBusinessDays);
 }
 
 function capacityWindow(perspective, unitsToShow) {
@@ -209,10 +238,14 @@ function monthlyFreeSegments(assignmentsForPerson, personName, window) {
 
     if (endExclusive > start) {
       const capacityHours = countBusinessDays(start, endExclusive) * getPersonDailyHours(personName);
-      const assignedHours = assignmentsForPerson.reduce(
-        (total, assignment) => total + assignmentHoursInWindow(assignment, start, endExclusive),
-        0
-      );
+      // Soft bookings never reduce free capacity; they are reported separately.
+      const assignedHours = assignmentsForPerson
+        .filter((assignment) => assignment.IsCommitted)
+        .reduce((total, assignment) => total + assignmentHoursInWindow(assignment, start, endExclusive), 0);
+      const softHours = assignmentsForPerson
+        .filter((assignment) => !assignment.IsCommitted)
+        .reduce((total, assignment) => total + assignmentHoursInWindow(assignment, start, endExclusive), 0);
+
       segments.push({
         key: `${monthCursor.getFullYear()}-${String(monthCursor.getMonth() + 1).padStart(2, '0')}`,
         monthLabel: formatMonthLabel(monthCursor),
@@ -220,6 +253,7 @@ function monthlyFreeSegments(assignmentsForPerson, personName, window) {
         endExclusive,
         capacityHours: round2(capacityHours),
         freeHours: round2(capacityHours - assignedHours),
+        softHours: round2(softHours),
       });
     }
 
@@ -238,11 +272,16 @@ function buildManagementPeople(assignmentRows, window) {
     const capacityHours = round2(businessDays * dailyHours);
     const assigned = assignmentRows.filter((assignment) => assignment.PersonName === person);
     const visible = assigned.filter((assignment) => assignment.IsTimelineVisible);
-    const activeHours = visible.reduce(
-      (total, assignment) => total + assignmentHoursInWindow(assignment, window.start, window.endExclusive),
-      0
-    );
+
+    const hoursIn = (rows) =>
+      rows.reduce((total, assignment) => total + assignmentHoursInWindow(assignment, window.start, window.endExclusive), 0);
+
+    // Only committed work consumes capacity; soft bookings are reported alongside it.
+    const activeHours = hoursIn(visible.filter((assignment) => assignment.IsCommitted));
+    const softHours = hoursIn(visible.filter((assignment) => !assignment.IsCommitted));
+
     const assignedPercent = capacityHours > 0 ? Math.min(100, Math.max(0, (activeHours / capacityHours) * 100)) : 0;
+    const softPercent = capacityHours > 0 ? Math.min(100 - assignedPercent, Math.max(0, (softHours / capacityHours) * 100)) : 0;
 
     return {
       person,
@@ -250,11 +289,30 @@ function buildManagementPeople(assignmentRows, window) {
       dailyHours,
       capacityHours,
       activeHours: round2(activeHours),
+      softHours: round2(softHours),
       availableHours: round2(capacityHours - activeHours),
+      availableIfWonHours: round2(capacityHours - activeHours - softHours),
       assignedPercent,
+      softPercent,
       availablePercent: Math.max(0, 100 - assignedPercent),
     };
   });
+}
+
+/** Hold overlay position expressed relative to the chip it sits on. */
+function holdOverlay(range, assignment, chipBox) {
+  if (!assignment.IsOnHold || chipBox.width <= 0) return null;
+  const box = chipGeometry(range, assignment.HoldStartDate, assignment.HoldEndDate, 0);
+  if (box.width <= 0) return null;
+
+  const left = ((box.left - chipBox.left) / chipBox.width) * 100;
+  const width = (box.width / chipBox.width) * 100;
+  const clampedLeft = Math.max(0, Math.min(100, left));
+
+  return {
+    left: clampedLeft,
+    width: Math.max(0, Math.min(100 - clampedLeft, width)),
+  };
 }
 
 /**
@@ -267,14 +325,19 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
   const people = buildManagementPeople(assignmentRows, window);
 
   const scheduled = assignmentRows.filter((assignment) => assignment.IsTimelineVisible);
-  const normalizedStage = String(stageFilter || '').toLowerCase();
-  const showFreeBars = normalizedStage === '' || normalizedStage === 'free';
+
+  // The filter accepts several stages at once; "free" is a pseudo-stage for the free bars.
+  const selected = (Array.isArray(stageFilter) ? stageFilter : stageFilter ? [stageFilter] : [])
+    .map((stage) => String(stage).toLowerCase())
+    .filter(Boolean);
+  const stagesOnly = selected.filter((stage) => stage !== 'free');
+  const showFreeBars = selected.length === 0 || selected.includes('free');
   const displayed =
-    normalizedStage === 'free'
-      ? []
-      : normalizedStage
-        ? scheduled.filter((assignment) => String(assignment.Stage || '').toLowerCase() === normalizedStage)
-        : scheduled;
+    selected.length === 0
+      ? scheduled
+      : stagesOnly.length === 0
+        ? []
+        : scheduled.filter((assignment) => stagesOnly.includes(String(assignment.Stage || '').toLowerCase()));
 
   const range = timelineRange(scheduled, perspective, unitsToShow);
   const units = buildTimelineUnits(range, perspective);
@@ -298,11 +361,15 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
       .slice()
       .sort((a, b) => String(a.StartDate).localeCompare(String(b.StartDate)));
 
-    const chips = forPerson.map((assignment, index) => ({
-      ...assignment,
-      accentClass: stageAccentClass(assignment.Stage),
-      geometry: chipGeometry(range, assignment.StartDate, assignment.EndDate, index),
-    }));
+    const chips = forPerson.map((assignment, index) => {
+      const geometry = chipGeometry(range, assignment.StartDate, assignment.EndDate, index);
+      return {
+        ...assignment,
+        accentClass: stageAccentClass(assignment.Stage),
+        geometry,
+        hold: holdOverlay(range, assignment, geometry),
+      };
+    });
 
     const freeChips = showFreeBars
       ? monthlyFreeSegments(allForPerson, member.person, window).map((segment) => ({
@@ -321,11 +388,13 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
 
   const total = assignmentRows.length;
   const visible = assignmentRows.filter((assignment) => assignment.IsTimelineVisible).length;
+  const committed = assignmentRows.filter((assignment) => assignment.IsCommitted).length;
+  const onHold = assignmentRows.filter((assignment) => assignment.IsOnHold).length;
 
   return {
     assignmentRows,
     people,
-    stats: { total, visible, hidden: total - visible },
+    stats: { total, visible, hidden: total - visible, committed, soft: total - committed, onHold },
     timeline: {
       range,
       units,

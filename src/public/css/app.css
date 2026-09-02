@@ -65,12 +65,47 @@
   background: var(--color-surface-offset);
   border: 1px solid var(--color-border);
   overflow: hidden;
+  display: flex;
 }
 
 .capacity-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--color-primary), var(--color-primary-hover));
 }
+
+/* Soft bookings are stacked after committed hours so the bar shows both. */
+.capacity-fill-soft {
+  height: 100%;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(13, 110, 253, .35),
+    rgba(13, 110, 253, .35) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+.soft-hint { color: var(--color-text-muted, #6c757d); font-style: italic; }
+
+.booking-control {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  justify-content: flex-start;
+}
+
+.booking-control .form-select { max-width: 8.5rem; }
+
+.booking-state {
+  font-size: .7rem;
+  font-weight: 600;
+  padding: .1rem .45rem;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.booking-state.is-committed { background: rgba(25, 135, 84, .14); color: #146c43; }
+.booking-state.is-soft { background: rgba(232, 185, 35, .2); color: #8a6300; }
 
 .capacity-available { color: var(--color-success); font-weight: 600; }
 .capacity-tight { color: #b35309; font-weight: 600; }
@@ -164,7 +199,6 @@
 .timeline-chip {
   position: absolute;
   height: 50px;
-  padding: .3rem .55rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--accent, var(--color-border));
   border-left: 4px solid var(--accent, var(--color-primary));
@@ -174,10 +208,71 @@
   text-decoration: none;
   color: inherit;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-items: stretch;
   transition: transform .12s ease, box-shadow .12s ease;
 }
+
+.timeline-chip.is-resizing { transition: none; box-shadow: var(--shadow-md); z-index: 5; }
+
+/* Soft bookings do not consume capacity, so they read as provisional. */
+.timeline-chip.is-soft {
+  border-style: dashed;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, .045),
+    rgba(0, 0, 0, .045) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+
+.timeline-chip-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: .3rem .55rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+}
+
+.timeline-chip-body:hover { color: inherit; }
+
+.timeline-chip-resizer {
+  flex: 0 0 8px;
+  cursor: ew-resize;
+  background: transparent;
+  transition: background .12s ease;
+}
+
+.timeline-chip-resizer:hover,
+.timeline-chip.is-resizing .timeline-chip-resizer {
+  background: var(--accent, var(--color-primary));
+  opacity: .5;
+}
+
+body.timeline-resizing { cursor: ew-resize; user-select: none; }
+
+/* Hold window drawn over the part of a bar where capacity is free again. */
+.timeline-chip-hold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(108, 117, 125, .38),
+    rgba(108, 117, 125, .38) 4px,
+    rgba(255, 255, 255, .55) 4px,
+    rgba(255, 255, 255, .55) 8px
+  );
+  border-left: 1px dashed rgba(108, 117, 125, .8);
+  border-right: 1px dashed rgba(108, 117, 125, .8);
+}
+
+.timeline-chip.is-on-hold .timeline-chip-title { color: var(--color-text-muted, #6c757d); }
 
 .timeline-chip:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); color: inherit; }
 
@@ -234,25 +329,29 @@
   display: flex;
   flex-wrap: wrap;
   gap: .75rem;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: .65rem 0;
+  padding: .9rem 0;
   border-top: 1px solid var(--color-divider);
 }
 
-.assignment-edit-grid {
-  display: grid;
-  grid-template-columns: minmax(140px, 1.4fr) 145px 145px 100px 70px 110px auto;
-  gap: .5rem;
-  align-items: center;
+/* The edit form mirrors the create form so an allocation is changed the same way it was made. */
+.assignment-edit-form {
   flex: 1 1 640px;
+  margin: 0;
 }
 
-@media (max-width: 991.98px) {
-  .assignment-edit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+.assignment-edit-form .form-label { margin-bottom: .15rem; }
+
+.assignment-actions { padding-top: 1.6rem; }
 
 .allocation-preview { min-height: 1.2rem; }
+
+/* Multi-value filter lists. */
+.filter-multi { min-height: 6.5rem; padding: .25rem; }
+.filter-multi option { padding: .15rem .35rem; border-radius: var(--radius-sm); }
+
+.hold-hint { color: #0a58ca; }
 
 .note-item {
   padding: .65rem 0;

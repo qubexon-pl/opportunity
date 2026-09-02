@@ -54,4 +54,9 @@ function isMissingAssignmentsTable(error) {
   return String(error).includes(MISSING_ASSIGNMENTS_TABLE);
 }
 
-module.exports = { sql, getPool, isMissingAssignmentsTable, isDatabaseUnavailable };
+/** True when a query referenced a column that a pending migration would add. */
+function isMissingColumn(error, columnName) {
+  return String(error).includes(`Invalid column name '${columnName}'`);
+}
+
+module.exports = { sql, getPool, isMissingAssignmentsTable, isMissingColumn, isDatabaseUnavailable };

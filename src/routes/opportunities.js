@@ -5,6 +5,7 @@ const {
   getOpportunity,
   createOpportunity,
   updateOpportunity,
+  setBookingFlag,
   deleteOpportunity,
   addNote,
   deleteNote,
@@ -16,6 +17,14 @@ const { addAssignment, updateAssignment, deleteAssignment } = require('../servic
 const { listPeople, getDailyHoursMap } = require('../services/peopleService');
 const { calculateEndDate, calculateDurationWorkDays, toDateText, round2 } = require('../services/dateService');
 const { stageStatusLabel, stageAccentClass, stageBadgeClass } = require('../services/capacityService');
+const {
+  BOOKING_MODES,
+  bookingMode,
+  bookingModeToFlag,
+  bookingLabel,
+  countsTowardsCapacity,
+  listFirmStages,
+} = require('../services/bookingService');
 
 const router = express.Router();
 
@@ -32,6 +41,12 @@ function num(value) {
 
 function bool(value) {
   return value === 'on' || value === 'true' || value === true;
+}
+
+/** Allocation inputs only make sense above zero; anything else means "not supplied". */
+function positiveNum(value) {
+  const parsed = num(value);
+  return parsed !== null && parsed > 0 ? parsed : undefined;
 }
 
 /** Maps the opportunity form body onto the service payload shape. */
@@ -62,6 +77,7 @@ function opportunityPayload(body) {
     plannedStartDate,
     plannedEndDate,
     allocationPercent: num(body.allocationPercent),
+    countsTowardsCapacity: bookingModeToFlag(String(body.bookingMode || 'auto')),
   };
 }
 
@@ -84,10 +100,12 @@ function emptyForm() {
     PlannedStartDate: '',
     PlannedEndDate: '',
     AllocationPercent: 100,
+    CountsTowardsCapacity: null,
   };
 }
 
 function baseViewModel(extra) {
+  const firmStages = listFirmStages();
   return {
     stages: STAGES,
     statuses: STATUSES,
@@ -96,6 +114,11 @@ function baseViewModel(extra) {
     stageStatusLabel,
     stageAccentClass,
     stageBadgeClass,
+    bookingModes: BOOKING_MODES,
+    bookingMode,
+    bookingLabel: (opportunity) => bookingLabel(opportunity, firmStages),
+    isCommitted: (opportunity) => countsTowardsCapacity(opportunity, firmStages),
+    firmStages,
     toDateText,
     round2,
     ...extra,
@@ -192,6 +215,22 @@ router.post('/:id', async (req, res, next) => {
   }
 });
 
+/** Inline capacity booking control (used by the pipeline and the detail form). */
+router.post('/:id/booking', async (req, res) => {
+  const back = req.get('referer') || '/';
+  try {
+    const mode = String(req.body.bookingMode || 'auto');
+    if (!BOOKING_MODES.some((option) => option.key === mode)) {
+      throw new Error('Unknown booking mode.');
+    }
+    await setBookingFlag(req.params.id, bookingModeToFlag(mode));
+    req.flash('success', 'Capacity booking updated.');
+  } catch (err) {
+    req.flash('error', friendlyError(err));
+  }
+  res.redirect(back);
+});
+
 router.post('/:id/delete', async (req, res, next) => {
   try {
     const deleted = await deleteOpportunity(req.params.id);
@@ -268,9 +307,11 @@ router.post('/:id/assignments', async (req, res, next) => {
       personName: String(req.body.personName || '').trim(),
       plannedStartDate: String(req.body.plannedStartDate || '').slice(0, 10),
       plannedEndDate: String(req.body.plannedEndDate || '').slice(0, 10),
-      allocationPercent: num(req.body.allocationPercent) ?? undefined,
-      allocatedHours: num(req.body.allocatedHours) ?? undefined,
+      allocationPercent: positiveNum(req.body.allocationPercent),
+      allocatedHours: positiveNum(req.body.allocatedHours),
       isTimelineVisible: true,
+      holdStartDate: String(req.body.holdStartDate || '').slice(0, 10),
+      holdEndDate: String(req.body.holdEndDate || '').slice(0, 10),
     });
     req.flash('success', 'Assignment added.');
   } catch (err) {
@@ -285,8 +326,11 @@ router.post('/:id/assignments/:assignmentId', async (req, res, next) => {
       personName: String(req.body.personName || '').trim(),
       plannedStartDate: String(req.body.plannedStartDate || '').slice(0, 10),
       plannedEndDate: String(req.body.plannedEndDate || '').slice(0, 10),
-      allocationPercent: num(req.body.allocationPercent) ?? undefined,
+      allocationPercent: positiveNum(req.body.allocationPercent),
+      allocatedHours: positiveNum(req.body.allocatedHours),
       isTimelineVisible: bool(req.body.isTimelineVisible),
+      holdStartDate: String(req.body.holdStartDate || '').slice(0, 10),
+      holdEndDate: String(req.body.holdEndDate || '').slice(0, 10),
     });
     req.flash('success', 'Assignment saved.');
   } catch (err) {
