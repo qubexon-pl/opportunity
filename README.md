@@ -40,9 +40,11 @@ The app listens on `http://localhost:4000` by default.
 
 ## Database
 
-Run the migrations in `src/sql/` in numeric order against your Azure SQL database.
-`004_*.sql` creates `dbo.OpportunityAssignments`; until it is applied the management
-timeline degrades gracefully and shows a migration hint.
+The migrations in `src/sql/` are applied automatically, in numeric order, the first
+time the app connects. They are idempotent, so restarting is safe and there is
+nothing to run by hand. If the SQL login cannot execute DDL the app logs a
+`[migrate]` warning and keeps running; the management timeline then degrades
+gracefully and shows a hint naming the script to apply.
 
 ## Configuration
 
