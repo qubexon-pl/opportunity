@@ -1,0 +1,234 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <h2><i class="bi bi-person-badge me-2"></i><%= detail.person %></h2>
+    <p class="text-muted mb-0">
+      <% if (detail.member) { %>
+        <% if (detail.member.role) { %><%= detail.member.role %> &middot; <% } %>
+        <%= detail.member.dailyHours %>h/day
+        <% if (detail.cost !== null) { %> &middot; <%= detail.cost %> <%= detail.costCurrency %> internal cost<% } %>
+        &middot;
+      <% } %>
+      <%= detail.windowStartText %> &rarr; <%= detail.windowEndText %>
+      (<%= detail.capacityBusinessDays %> working days)
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="/management?applied=1&perspective=<%= perspective %>&units=<%= unitsToShow %>">
+      <i class="bi bi-arrow-left me-1"></i>Back to capacity
+    </a>
+  </div>
+</div>
+
+<% if (typeof loadError !== 'undefined' && loadError) { %>
+  <div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle me-2"></i>Could not load assignment data: <%= loadError %>
+  </div>
+<% } %>
+
+<% if (!detail.isKnown) { %>
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle me-2"></i><%= detail.person %> is not configured and has no assignments.
+    Add them in <a href="/settings">Configuration</a>.
+  </div>
+<% } else { %>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-sliders me-2"></i>Period</div>
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-lg-3 col-md-4 col-6">
+        <label class="form-label" for="perspective">Timeline unit</label>
+        <select class="form-select" id="perspective" name="perspective">
+          <% timelineUnitOptions.forEach(function(option) { %>
+            <option value="<%= option.key %>" <%= perspective === option.key ? 'selected' : '' %>><%= option.label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-3 col-md-4 col-6">
+        <label class="form-label" for="units">Horizon (units)</label>
+        <input type="number" class="form-control" id="units" name="units" min="1" max="24" value="<%= unitsToShow %>">
+      </div>
+      <div class="col-lg-3 col-md-4">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-3 col-md-6">
+    <div class="card h-100"><div class="card-body">
+      <div class="kpi-label">Capacity</div>
+      <div class="kpi-value"><%= detail.member.capacityHours %>h</div>
+      <div class="text-muted small"><%= detail.capacityBusinessDays %> working days</div>
+    </div></div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="card h-100"><div class="card-body">
+      <div class="kpi-label">Committed</div>
+      <div class="kpi-value <%= detail.member.chargeabilityClass %>"><%= detail.member.activeHours %>h</div>
+      <div class="text-muted small"><%= detail.member.chargeabilityReal %>% utilization</div>
+    </div></div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="card h-100"><div class="card-body">
+      <div class="kpi-label">Free</div>
+      <div class="kpi-value <%= capacityClass(detail.member.availableHours) %>"><%= detail.member.availableHours %>h</div>
+      <div class="text-muted small">
+        <%= detail.member.softHours %>h soft booked &middot; <%= detail.member.availableIfWonHours %>h if all won
+      </div>
+    </div></div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="card h-100"><div class="card-body">
+      <div class="kpi-label">Released by holds</div>
+      <div class="kpi-value"><%= detail.member.heldHours %>h</div>
+      <div class="text-muted small">
+        <% if (detail.member.heldHours > 0) { %>
+          <%= detail.member.chargeabilityReal %>% instead of <%= detail.member.chargeabilityWithoutHolds %>%
+          (&minus;<%= detail.member.holdPercentPoints %> pts)
+        <% } else { %>
+          Nothing on hold in this window
+        <% } %>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-calendar3 me-2"></i>Capacity by period</span>
+    <span class="text-muted small">Committed + free = capacity, so each row is 100%</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 person-period-table">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th class="text-end">Capacity</th>
+            <th class="text-end">Committed</th>
+            <th class="text-end">Free</th>
+            <th class="text-end">Soft</th>
+            <th style="width: 130px;">Split</th>
+            <th>Breakdown</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% detail.periods.forEach(function(period) { %>
+            <tr>
+              <td class="text-nowrap">
+                <span class="fw-semibold"><%= period.label %></span>
+                <div class="text-muted small"><%= period.groupLabel %> &middot; <%= period.businessDays %>d</div>
+              </td>
+              <td class="text-end"><%= period.capacityHours %>h</td>
+              <td class="text-end"><%= period.committedHours %>h <span class="text-muted small">(<%= period.usedPercent %>%)</span></td>
+              <td class="text-end <%= capacityClass(period.freeHours) %>"><%= period.freeHours %>h <span class="text-muted small">(<%= period.freePercent %>%)</span></td>
+              <td class="text-end"><% if (period.softHours) { %><span class="soft-hint"><%= period.softHours %>h (<%= period.softPercent %>%)</span><% } else { %><span class="text-muted">-</span><% } %></td>
+              <td>
+                <div class="person-split" title="<%= period.usedPercent %>% committed, <%= period.freePercent %>% free">
+                  <div class="person-split-used" style="width: <%= Math.min(100, period.usedPercent) %>%;"></div>
+                  <div class="person-split-soft" style="width: <%= Math.max(0, Math.min(100 - Math.min(100, period.usedPercent), period.softPercent)) %>%;"></div>
+                </div>
+              </td>
+              <td class="small">
+                <% if (period.parts.length) { %>
+                  <% period.parts.forEach(function(part) { %>
+                    <div><%= part.name %>: <%= part.hours %>h &middot; <%= part.percent %>%</div>
+                  <% }) %>
+                <% } %>
+                <div class="text-muted">Free: <%= period.freeHours %>h &middot; <%= period.freePercent %>%</div>
+              </td>
+            </tr>
+          <% }) %>
+          <% if (!detail.periods.length) { %>
+            <tr><td colspan="7" class="text-center text-muted py-4">No periods in this window.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-list-check me-2"></i>Allocations in this period (<%= detail.inWindow.length %>)</span>
+    <% if (detail.hiddenCount) { %>
+      <span class="text-muted small"><%= detail.hiddenCount %> hidden from the timeline</span>
+    <% } %>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Opportunity</th>
+            <th>Stage</th>
+            <th>Window</th>
+            <th class="text-end">Project Allocation</th>
+            <th class="text-end">Hours on the bar</th>
+            <th class="text-end">In this period</th>
+            <th class="text-end">% of capacity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% detail.inWindow.forEach(function(row) { %>
+            <tr>
+              <td>
+                <a href="/opportunities/<%= row.OpportunityId %>#assignments"><%= row.OpportunityName %></a>
+                <% if (!row.IsCommitted) { %><span class="booking-state is-soft ms-1">Soft</span><% } %>
+                <% if (!row.IsTimelineVisible) { %><span class="text-muted small ms-1">(hidden)</span><% } %>
+              </td>
+              <td><span class="stage-dot <%= stageAccentClass(row.Stage) %>"></span><%= row.Stage || '-' %></td>
+              <td class="text-nowrap">
+                <%= row.StartDate || '-' %> &rarr; <%= row.EndDate || '-' %>
+                <div class="text-muted small"><%= row.businessDays %> working days</div>
+                <% if (row.IsOnHold) { %>
+                  <div class="hold-hint small">
+                    <i class="bi bi-pause-circle me-1"></i>On hold <%= row.HoldStartDate %> &rarr; <%= row.HoldEndDate %>
+                    <% if (row.releasedByHoldHours > 0) { %>(frees <%= row.releasedByHoldHours %>h)<% } %>
+                  </div>
+                <% } %>
+              </td>
+              <td class="text-end" title="<%= row.InitialAllocatedHours %>h of the <%= row.OpportunityHours %>h project scope">
+                <%= row.InitialAllocatedHours %>h &middot; <%= row.InitialPercent %>%
+              </td>
+              <td class="text-end"><%= row.AllocatedHours %>h<% if (row.IsResized) { %> <span class="text-muted small">(resized)</span><% } %></td>
+              <td class="text-end fw-semibold"><%= row.windowHours %>h</td>
+              <td class="text-end"><%= row.capacityPercent %>%</td>
+            </tr>
+          <% }) %>
+          <% if (!detail.inWindow.length) { %>
+            <tr><td colspan="7" class="text-center text-muted py-4">Nothing allocated in this period.</td></tr>
+          <% } %>
+        </tbody>
+        <% if (detail.inWindow.length) { %>
+          <tfoot>
+            <tr class="fw-semibold">
+              <td colspan="5" class="text-end">Committed in this period</td>
+              <td class="text-end"><%= detail.member.activeHours %>h</td>
+              <td class="text-end"><%= detail.member.chargeabilityReal %>%</td>
+            </tr>
+            <tr>
+              <td colspan="5" class="text-end text-muted">Free</td>
+              <td class="text-end text-muted"><%= detail.member.availableHours %>h</td>
+              <td class="text-end text-muted"><%= (100 - detail.member.chargeabilityReal).toFixed(2) %>%</td>
+            </tr>
+          </tfoot>
+        <% } %>
+      </table>
+    </div>
+  </div>
+  <% if (detail.outsideWindow.length) { %>
+    <div class="card-footer text-muted small">
+      <%= detail.outsideWindow.length %> further allocation<%= detail.outsideWindow.length === 1 ? '' : 's' %>
+      fall<%= detail.outsideWindow.length === 1 ? 's' : '' %> outside this period.
+    </div>
+  <% } %>
+</div>
+
+<% } %>
+
+<%- include('partials/footer') %>

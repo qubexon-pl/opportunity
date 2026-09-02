@@ -13,7 +13,7 @@ const {
   unitsToCoverRange,
   periodBounds,
 } = require('./dateService');
-const { listPeople, getPersonDailyHours, getPersonRole } = require('./peopleService');
+const { listPeople, getPersonDailyHours, getPersonRole, getPersonCost, COST_CURRENCY } = require('./peopleService');
 const { countsTowardsCapacity, listFirmStages } = require('./bookingService');
 
 const TIMELINE_ROW_TOP_PADDING = 8;
@@ -73,6 +73,62 @@ function capacityClass(hours) {
   if (hours < 0) return 'capacity-over';
   if (hours < 40) return 'capacity-tight';
   return 'capacity-available';
+}
+
+/** Sortable columns of the Management assignments table, in display order. */
+const ASSIGNMENT_SORT_FIELDS = [
+  { key: 'person', label: 'Person', type: 'text', value: (row) => row.PersonName },
+  { key: 'opportunity', label: 'Opportunity', type: 'text', value: (row) => row.OpportunityName },
+  { key: 'stage', label: 'Stage', type: 'text', value: (row) => stageStatusLabel(row.Stage) },
+  { key: 'start', label: 'Window', type: 'text', value: (row) => row.StartDate || '' },
+  { key: 'allocation', label: 'Project Allocation', type: 'number', value: (row) => Number(row.InitialPercent || 0) },
+  { key: 'hours', label: 'Hours', type: 'number', value: (row) => Number(row.AllocatedHours || 0) },
+  { key: 'booking', label: 'Booking', type: 'text', value: (row) => (row.IsCommitted ? 'Committed' : 'Soft') },
+  { key: 'timeline', label: 'Timeline', type: 'text', value: (row) => (row.IsTimelineVisible ? 'Shown' : 'Hidden') },
+];
+
+/** Sortable fields of the People summary, which also orders the timeline rows. */
+const PEOPLE_SORT_FIELDS = [
+  { key: 'person', label: 'Name', type: 'text', value: (member) => member.person },
+  { key: 'role', label: 'Role', type: 'text', value: (member) => member.role || '' },
+  { key: 'daily', label: 'Hours per day', type: 'number', value: (member) => member.dailyHours },
+  { key: 'capacity', label: 'Capacity', type: 'number', value: (member) => member.capacityHours },
+  { key: 'committed', label: 'Committed hours', type: 'number', value: (member) => member.activeHours },
+  { key: 'soft', label: 'Soft booked hours', type: 'number', value: (member) => member.softHours },
+  { key: 'free', label: 'Free hours', type: 'number', value: (member) => member.availableHours },
+  { key: 'held', label: 'Hours on hold', type: 'number', value: (member) => member.heldHours },
+  { key: 'real', label: 'Chargeability (real)', type: 'number', value: (member) => member.chargeabilityReal },
+  { key: 'predicted', label: 'Chargeability (predicted)', type: 'number', value: (member) => member.chargeabilityPredicted },
+];
+
+/** Falls back to the first field, so an unknown or absent key still sorts predictably. */
+function resolveSort(fields, key, dir) {
+  const field = fields.find((candidate) => candidate.key === String(key || '')) || fields[0];
+  return { key: field.key, dir: String(dir) === 'desc' ? 'desc' : 'asc', field };
+}
+
+/**
+ * Orders rows by one field, keeping the original order for ties so repeated
+ * sorts on the same key stay stable.
+ */
+function sortBy(rows, fields, key, dir) {
+  const { field, dir: direction } = resolveSort(fields, key, dir);
+  const sign = direction === 'desc' ? -1 : 1;
+
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const left = field.value(a.row);
+      const right = field.value(b.row);
+      let comparison;
+      if (field.type === 'number') {
+        comparison = (Number(left) || 0) - (Number(right) || 0);
+      } else {
+        comparison = String(left).localeCompare(String(right), undefined, { sensitivity: 'base' });
+      }
+      return comparison !== 0 ? comparison * sign : a.index - b.index;
+    })
+    .map((entry) => entry.row);
 }
 
 /** Traffic-light band for a chargeability percentage. */
@@ -148,9 +204,12 @@ function heldBusinessDays(assignment, from, toExclusive) {
  *
  * Hours are consumed at the assignment's normal daily rate. Days inside a hold
  * window are skipped, so a hold frees the person's capacity for that period
- * without changing the assignment's stored total.
+ * without changing the assignment's stored total. Pass `ignoreHolds` to get the
+ * figure the assignment *would* consume if it were not paused, which is what the
+ * hold-impact reporting compares against.
  */
-function assignmentHoursInWindow(assignment, windowStart, windowEndExclusive) {
+function assignmentHoursInWindow(assignment, windowStart, windowEndExclusive, options) {
+  const ignoreHolds = !!(options && options.ignoreHolds);
   const assignmentStart = toDate(assignment.StartDate || assignment.PlannedStartDate);
   const assignmentEnd = toDate(assignment.EndDate || assignment.PlannedEndDate);
   if (!assignmentStart || !assignmentEnd) return 0;
@@ -164,7 +223,9 @@ function assignmentHoursInWindow(assignment, windowStart, windowEndExclusive) {
 
   const totalBusinessDays = countBusinessDays(assignmentStart, assignmentEndExclusive);
   const overlapBusinessDays = countBusinessDays(overlapStart, overlapEndExclusive);
-  const activeBusinessDays = overlapBusinessDays - heldBusinessDays(assignment, overlapStart, overlapEndExclusive);
+  const activeBusinessDays = ignoreHolds
+    ? overlapBusinessDays
+    : overlapBusinessDays - heldBusinessDays(assignment, overlapStart, overlapEndExclusive);
   if (totalBusinessDays <= 0 || activeBusinessDays <= 0) return 0;
 
   const allocated = Number(assignment.AllocatedHours);
@@ -270,6 +331,9 @@ function rowHeight(assignmentCount, includeFreeLane) {
 /**
  * Free capacity bars, one per column of the selected perspective, so the
  * "free" figures line up with whatever period the timeline is showing.
+ *
+ * Each segment also carries the share of that column's capacity taken by each
+ * committed assignment, so the committed shares plus the free share are 100%.
  */
 function freeSegments(assignmentsForPerson, personName, window, perspective) {
   const segments = [];
@@ -282,13 +346,27 @@ function freeSegments(assignmentsForPerson, personName, window, perspective) {
 
     if (endExclusive > start) {
       const capacityHours = countBusinessDays(start, endExclusive) * getPersonDailyHours(personName);
+      const share = (hours) => (capacityHours > 0 ? round2((hours / capacityHours) * 100) : 0);
+
       // Soft bookings never reduce free capacity; they are reported separately.
-      const assignedHours = assignmentsForPerson
-        .filter((assignment) => assignment.IsCommitted)
-        .reduce((total, assignment) => total + assignmentHoursInWindow(assignment, start, endExclusive), 0);
+      const committed = assignmentsForPerson.filter((assignment) => assignment.IsCommitted);
+      const parts = committed
+        .map((assignment) => ({
+          name: assignment.OpportunityName,
+          hours: round2(assignmentHoursInWindow(assignment, start, endExclusive)),
+          percent: share(assignmentHoursInWindow(assignment, start, endExclusive)),
+        }))
+        .filter((part) => part.hours > 0);
+
+      const assignedHours = committed.reduce(
+        (total, assignment) => total + assignmentHoursInWindow(assignment, start, endExclusive),
+        0
+      );
       const softHours = assignmentsForPerson
         .filter((assignment) => !assignment.IsCommitted)
         .reduce((total, assignment) => total + assignmentHoursInWindow(assignment, start, endExclusive), 0);
+
+      const freeHours = capacityHours - assignedHours;
 
       segments.push({
         key: `${perspective}-${toDateText(cursor)}`,
@@ -297,8 +375,13 @@ function freeSegments(assignmentsForPerson, personName, window, perspective) {
         start,
         endExclusive,
         capacityHours: round2(capacityHours),
-        freeHours: round2(capacityHours - assignedHours),
+        freeHours: round2(freeHours),
         softHours: round2(softHours),
+        parts,
+        // Reported against the same capacity base, so used + free is always 100%.
+        usedPercent: share(assignedHours),
+        freePercent: share(freeHours),
+        softPercent: share(softHours),
       });
     }
 
@@ -318,12 +401,21 @@ function buildManagementPeople(assignmentRows, window) {
     const assigned = assignmentRows.filter((assignment) => assignment.PersonName === person);
     const visible = assigned.filter((assignment) => assignment.IsTimelineVisible);
 
-    const hoursIn = (rows) =>
-      rows.reduce((total, assignment) => total + assignmentHoursInWindow(assignment, window.start, window.endExclusive), 0);
+    const hoursIn = (rows, options) =>
+      rows.reduce(
+        (total, assignment) => total + assignmentHoursInWindow(assignment, window.start, window.endExclusive, options),
+        0
+      );
 
     // Only committed work consumes capacity; soft bookings are reported alongside it.
     const activeHours = hoursIn(visible.filter((assignment) => assignment.IsCommitted));
     const softHours = hoursIn(visible.filter((assignment) => !assignment.IsCommitted));
+
+    // What the committed work would consume if none of it were paused. The
+    // difference is the capacity that holds hand back for this window.
+    const heldRows = visible.filter((assignment) => assignment.IsCommitted && assignment.IsOnHold);
+    const activeIgnoringHolds = activeHours + (hoursIn(heldRows, { ignoreHolds: true }) - hoursIn(heldRows));
+    const heldHours = round2(Math.max(0, activeIgnoringHolds - activeHours));
 
     const assignedPercent = capacityHours > 0 ? Math.min(100, Math.max(0, (activeHours / capacityHours) * 100)) : 0;
     const softPercent = capacityHours > 0 ? Math.min(100 - assignedPercent, Math.max(0, (softHours / capacityHours) * 100)) : 0;
@@ -331,6 +423,7 @@ function buildManagementPeople(assignmentRows, window) {
     // Chargeability is reported uncapped so over-allocation stays visible.
     const chargeabilityReal = capacityHours > 0 ? round2((activeHours / capacityHours) * 100) : 0;
     const chargeabilityPredicted = capacityHours > 0 ? round2(((activeHours + softHours) / capacityHours) * 100) : 0;
+    const chargeabilityWithoutHolds = capacityHours > 0 ? round2((activeIgnoringHolds / capacityHours) * 100) : 0;
 
     return {
       person,
@@ -347,6 +440,12 @@ function buildManagementPeople(assignmentRows, window) {
       availablePercent: Math.max(0, 100 - assignedPercent),
       chargeabilityReal,
       chargeabilityPredicted,
+      // Hold reporting: how much capacity is released, and what utilization
+      // would look like if the paused work were running.
+      heldHours,
+      heldAssignments: heldRows.length,
+      chargeabilityWithoutHolds,
+      holdPercentPoints: round2(Math.max(0, chargeabilityWithoutHolds - chargeabilityReal)),
       chargeabilityClass: chargeabilityClass(chargeabilityReal),
       chargeabilityPredictedClass: chargeabilityClass(chargeabilityPredicted),
     };
@@ -396,7 +495,18 @@ function holdOverlay(range, assignment, chipBox) {
  * Builds the full view model for the Management page: capacity cards, assignment table,
  * and the positioned timeline chips.
  */
-function buildManagementView({ opportunities, assignments, perspective, unitsToShow, stageFilter, personFilter }) {
+function buildManagementView({
+  opportunities,
+  assignments,
+  perspective,
+  unitsToShow,
+  stageFilter,
+  personFilter,
+  sort,
+  dir,
+  peopleSort,
+  peopleDir,
+}) {
   const assignmentRows = buildAssignmentRows(opportunities, assignments);
   const window = capacityWindow(perspective, unitsToShow);
   const allPeople = buildManagementPeople(assignmentRows, window);
@@ -405,7 +515,12 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
   const selectedPeople = (Array.isArray(personFilter) ? personFilter : personFilter ? [personFilter] : [])
     .map((name) => String(name))
     .filter(Boolean);
-  const people = selectedPeople.length ? allPeople.filter((member) => selectedPeople.includes(member.person)) : allPeople;
+  const people = sortBy(
+    selectedPeople.length ? allPeople.filter((member) => selectedPeople.includes(member.person)) : allPeople,
+    PEOPLE_SORT_FIELDS,
+    peopleSort,
+    peopleDir
+  );
 
   const visibleRows = assignmentRows.filter(
     (assignment) => !selectedPeople.length || selectedPeople.includes(assignment.PersonName)
@@ -481,6 +596,7 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
       committedHours: member.activeHours,
       softHours: member.softHours,
       freeHours: member.availableHours,
+      heldHours: member.heldHours,
       chips,
       freeChips,
       height: rowHeight(forPerson.length, showFreeBars),
@@ -493,7 +609,9 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
   const onHold = visibleRows.filter((assignment) => assignment.IsOnHold).length;
 
   return {
-    assignmentRows,
+    assignmentRows: sortBy(assignmentRows, ASSIGNMENT_SORT_FIELDS, sort, dir),
+    sort: resolveSort(ASSIGNMENT_SORT_FIELDS, sort, dir),
+    peopleSort: resolveSort(PEOPLE_SORT_FIELDS, peopleSort, peopleDir),
     people,
     allPeople,
     chargeability: summariseChargeability(people),
@@ -554,18 +672,106 @@ function buildUpcoming(opportunities, periodKey, nextSteps) {
   return { items, label: `${formatShortDate(start)} - ${formatShortDate(endInclusive)}` };
 }
 
+/**
+ * Everything the person detail page needs: one member's capacity broken down by
+ * the columns of the selected perspective, plus the assignments behind it.
+ *
+ * Per period the committed hours plus the free hours equal capacity, and per
+ * assignment the hours are the portion falling inside that period, so the
+ * figures reconcile with the timeline bars.
+ */
+function buildPersonDetail({ opportunities, assignments, perspective, unitsToShow, person }) {
+  const name = String(person || '');
+  const assignmentRows = buildAssignmentRows(opportunities, assignments);
+  const window = capacityWindow(perspective, unitsToShow);
+  const member = buildManagementPeople(assignmentRows, window).find((candidate) => candidate.person === name) || null;
+
+  const mine = assignmentRows
+    .filter((assignment) => assignment.PersonName === name)
+    .sort((a, b) => String(a.StartDate).localeCompare(String(b.StartDate)));
+  const visible = mine.filter((assignment) => assignment.IsTimelineVisible);
+
+  const periods = freeSegments(visible, name, window, perspective).map((segment) => {
+    const softInPeriod = visible
+      .filter((assignment) => !assignment.IsCommitted)
+      .reduce((total, a) => total + assignmentHoursInWindow(a, segment.start, segment.endExclusive), 0);
+
+    return {
+      key: segment.key,
+      label: segment.unitLabel,
+      groupLabel: segment.groupLabel,
+      startText: toDateText(segment.start),
+      endText: toDateText(new Date(segment.endExclusive.getTime() - DAY_MS)),
+      businessDays: countBusinessDays(segment.start, segment.endExclusive),
+      capacityHours: segment.capacityHours,
+      committedHours: round2(segment.capacityHours - segment.freeHours),
+      freeHours: segment.freeHours,
+      softHours: round2(softInPeriod),
+      usedPercent: segment.usedPercent,
+      freePercent: segment.freePercent,
+      softPercent: segment.softPercent,
+      parts: segment.parts,
+    };
+  });
+
+  // Per-assignment figures for the selected window, which is what the person is
+  // actually being asked to deliver in the period on screen.
+  const rows = mine.map((assignment) => {
+    const windowHours = round2(assignmentHoursInWindow(assignment, window.start, window.endExclusive));
+    const withoutHold = round2(
+      assignmentHoursInWindow(assignment, window.start, window.endExclusive, { ignoreHolds: true })
+    );
+    const capacityHours = member ? member.capacityHours : 0;
+
+    return {
+      ...assignment,
+      windowHours,
+      releasedByHoldHours: round2(Math.max(0, withoutHold - windowHours)),
+      capacityPercent: capacityHours > 0 ? round2((windowHours / capacityHours) * 100) : 0,
+      businessDays: countBusinessDaysInclusive(assignment.StartDate, assignment.EndDate),
+      accentClass: stageAccentClass(assignment.Stage),
+    };
+  });
+
+  const inWindow = rows.filter((row) => row.windowHours > 0 || row.releasedByHoldHours > 0);
+
+  return {
+    person: name,
+    isKnown: !!member,
+    member,
+    cost: getPersonCost(name),
+    costCurrency: COST_CURRENCY,
+    periods,
+    rows,
+    inWindow,
+    outsideWindow: rows.filter((row) => !inWindow.includes(row)),
+    hiddenCount: mine.length - visible.length,
+    window,
+    perspective,
+    unitsToShow,
+    windowStartText: toDateText(window.start),
+    windowEndText: toDateText(new Date(window.endExclusive.getTime() - DAY_MS)),
+    capacityBusinessDays: countBusinessDays(window.start, window.endExclusive),
+  };
+}
+
 module.exports = {
   HOURS_PER_DAY,
   TIMELINE_UNIT_OPTIONS,
   STAGE_LEGEND,
   UPCOMING_PERIODS,
+  ASSIGNMENT_SORT_FIELDS,
+  PEOPLE_SORT_FIELDS,
   stageStatusLabel,
   stageAccentClass,
   stageBadgeClass,
   capacityClass,
   chargeabilityClass,
+  sortBy,
   buildAssignmentRows,
   assignmentHoursInWindow,
+  freeSegments,
   buildManagementView,
+  buildPersonDetail,
   buildUpcoming,
 };

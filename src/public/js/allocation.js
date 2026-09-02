@@ -60,13 +60,26 @@
     const preview = form.querySelector('[data-role="preview"]');
     const percentField = form.querySelector('[data-role="percent-field"]');
     const hoursField = form.querySelector('[data-role="hours-field"]');
+    // Quick assign picks the opportunity inside the form, so the scope it is a
+    // percentage of changes as the user chooses; the detail form has it fixed.
+    const opportunity = form.querySelector('[data-role="opportunity"]');
     if (!mode || !value || !percentField || !hoursField) return;
+
+    function opportunityHoursFor() {
+      if (opportunity) {
+        const option = opportunity.options[opportunity.selectedIndex];
+        return Number((option && option.dataset.hours) || 0);
+      }
+      return Number(form.dataset.opportunityHours || 0);
+    }
 
     let last = { percent: 0, hours: 0 };
 
     function paintPreview(state) {
       if (state.opportunityHours <= 0) {
-        preview.textContent = 'Set the opportunity total hours to convert between percent and hours.';
+        preview.textContent = opportunity && !opportunity.value
+          ? 'Select an opportunity to convert between percent and hours.'
+          : 'Set the opportunity total hours to convert between percent and hours.';
         preview.classList.add('is-warning');
         return;
       }
@@ -97,7 +110,7 @@
     }
 
     function compute() {
-      const opportunityHours = Number(form.dataset.opportunityHours || 0);
+      const opportunityHours = opportunityHoursFor();
       const months = countMonths(start && start.value, end && end.value);
       const raw = Number(value.value);
       const input = Number.isFinite(raw) && raw > 0 ? raw : 0;
@@ -135,7 +148,7 @@
       compute();
     });
 
-    [person, start, end, value].forEach(function (el) {
+    [person, start, end, value, opportunity].forEach(function (el) {
       if (!el) return;
       el.addEventListener('change', compute);
       el.addEventListener('input', compute);

@@ -228,7 +228,20 @@
   font-size: .85rem;
   border-right: 1px solid var(--color-border);
   color: var(--color-text);
+  /*
+   * Pinned to the left edge so the name stays readable while the lanes scroll
+   * sideways. The opaque background stops chips showing through underneath.
+   */
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  background: var(--color-surface, #fff);
 }
+
+.timeline-person-head { z-index: 7; background: var(--color-surface-offset, #f8f9fa); }
+
+.timeline-person .person-link { color: inherit; text-decoration: none; }
+.timeline-person .person-link:hover { color: var(--color-primary); text-decoration: underline; }
 
 .timeline-person-head { display: flex; align-items: flex-end; }
 
@@ -539,3 +552,48 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
 
 .management-table td,
 .management-table th { vertical-align: middle; }
+
+/* ──── Sortable table headers ──── */
+
+.sort-link {
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sort-link:hover { color: var(--color-primary); }
+.sort-link i { font-size: .7rem; opacity: .45; }
+.sort-link:hover i { opacity: .8; }
+.sort-link.is-active { color: var(--color-primary); font-weight: 600; }
+.sort-link.is-active i { opacity: 1; }
+
+.person-link { color: inherit; text-decoration: none; }
+.person-link:hover { color: var(--color-primary); text-decoration: underline; }
+
+/* How much capacity a hold hands back, shown on the capacity card. */
+.hold-impact {
+  color: var(--color-text-muted);
+  border-top: 1px dashed var(--color-divider);
+  padding-top: .35rem;
+}
+
+.hold-impact strong { color: var(--color-text); }
+
+/* ──── Person detail ──── */
+
+.person-period-table td, .person-period-table th { font-size: .82rem; }
+
+.person-split {
+  display: flex;
+  height: 8px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface-offset);
+  min-width: 90px;
+}
+
+.person-split-used { background: var(--color-primary); }
+.person-split-soft { background: repeating-linear-gradient(45deg, var(--color-primary) 0 3px, transparent 3px 6px); }
+.person-split-free { background: transparent; }
