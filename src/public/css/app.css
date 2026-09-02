@@ -157,10 +157,55 @@
 .legend-chip.is-active { border-color: var(--color-primary); color: var(--color-primary); font-weight: 600; }
 .legend-free::before { background: repeating-linear-gradient(45deg, var(--color-primary) 0 3px, transparent 3px 6px); }
 
-.timeline-scroll { overflow-x: auto; }
-.timeline-grid { min-width: 900px; }
+.timeline-scroll { overflow-x: auto; }.timeline-grid { min-width: 900px; }
+
+/*
+ * Floating horizontal scrollbar: mirrors the timeline's scroll position and is
+ * pinned to the bottom of the viewport while the timeline is on screen, so the
+ * user does not have to scroll to the end of the page to pan sideways.
+ */
+.timeline-floating-scroll {
+  position: fixed;
+  bottom: 0;
+  z-index: 1030;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--color-surface, #fff);
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, .08);
+  display: none;
+}
+
+.timeline-floating-scroll.is-visible { display: block; }
+.timeline-floating-scroll > div { height: 1px; }
+
+.person-role {
+  font-size: .74rem;
+  line-height: 1.2;
+  margin-top: .1rem;
+}
 
 .timeline-head { display: flex; border-bottom: 1px solid var(--color-border); }
+
+.timeline-head-stack { flex: 1; display: flex; flex-direction: column; }
+
+/* Month (or year) band sitting above the unit columns. */
+.timeline-groups { display: grid; grid-template-columns: repeat(var(--timeline-units, 1), 1fr); }
+
+.timeline-group {
+  grid-column: span var(--group-span, 1);
+  padding: .35rem .5rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--color-text);
+  border-left: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-surface-offset, #f8f9fa);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.timeline-group:first-child { border-left: none; }
 
 .timeline-person-head,
 .timeline-person {
@@ -171,6 +216,8 @@
   border-right: 1px solid var(--color-border);
   color: var(--color-text);
 }
+
+.timeline-person-head { display: flex; align-items: flex-end; }
 
 .timeline-units { flex: 1; display: grid; grid-template-columns: repeat(var(--timeline-units, 1), 1fr); }
 

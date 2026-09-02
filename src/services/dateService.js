@@ -160,7 +160,7 @@ function addUnit(date, perspective, units) {
 
 function formatUnitLabel(date, perspective) {
   if (perspective === 'weeks') {
-    return `W ${date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' })}`;
+    return formatWeekRangeLabel(date);
   }
   if (perspective === 'quarters') {
     return `Q${Math.floor(date.getMonth() / 3) + 1} ${String(date.getFullYear()).slice(-2)}`;
@@ -169,6 +169,38 @@ function formatUnitLabel(date, perspective) {
     return `${date.getMonth() < 6 ? 'H1' : 'H2'} ${String(date.getFullYear()).slice(-2)}`;
   }
   return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
+
+/** 1 -> "1st", 22 -> "22nd", 13 -> "13th". */
+function ordinal(day) {
+  const n = Number(day);
+  const remainderTen = n % 10;
+  const remainderHundred = n % 100;
+  if (remainderTen === 1 && remainderHundred !== 11) return `${n}st`;
+  if (remainderTen === 2 && remainderHundred !== 12) return `${n}nd`;
+  if (remainderTen === 3 && remainderHundred !== 13) return `${n}rd`;
+  return `${n}th`;
+}
+
+/** A week column reads as its day range, e.g. "22nd - 28th". */
+function formatWeekRangeLabel(weekStart) {
+  const end = new Date(weekStart);
+  end.setDate(end.getDate() + 6);
+  return `${ordinal(weekStart.getDate())} - ${ordinal(end.getDate())}`;
+}
+
+/**
+ * The band shown above the unit columns: weeks are grouped by month, longer
+ * units by year, so a column always says which period it belongs to.
+ */
+function unitGroup(date, perspective) {
+  if (perspective === 'weeks') {
+    return {
+      key: `${date.getFullYear()}-${date.getMonth()}`,
+      label: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    };
+  }
+  return { key: String(date.getFullYear()), label: String(date.getFullYear()) };
 }
 
 function formatMonthLabel(date) {
@@ -232,6 +264,9 @@ module.exports = {
   startOfUnit,
   addUnit,
   formatUnitLabel,
+  formatWeekRangeLabel,
+  ordinal,
+  unitGroup,
   formatMonthLabel,
   formatShortDate,
   unitsToCoverRange,

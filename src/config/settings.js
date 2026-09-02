@@ -15,7 +15,7 @@ const DEFAULT_FIRM_STAGES = ['Won'];
 
 const DEFAULT_VIEW_DEFAULTS = {
   pipeline: { stages: [], statuses: [] },
-  management: { stages: [], perspective: 'months', units: 6 },
+  management: { stages: [], people: [], perspective: 'months', units: 6 },
 };
 
 function loadFileConfig() {
@@ -52,6 +52,8 @@ function getConfig() {
     people: {
       names: Array.isArray(fileConfig.people) && fileConfig.people.length ? fileConfig.people : DEFAULT_PEOPLE,
       dailyHours: fileConfig.personDailyHours && typeof fileConfig.personDailyHours === 'object' ? fileConfig.personDailyHours : {},
+      roles: fileConfig.personRoles && typeof fileConfig.personRoles === 'object' ? fileConfig.personRoles : {},
+      costs: fileConfig.personCosts && typeof fileConfig.personCosts === 'object' ? fileConfig.personCosts : {},
     },
     capacity: {
       firmStages: Array.isArray(fileConfig.firmStages) ? fileConfig.firmStages : DEFAULT_FIRM_STAGES,
@@ -80,10 +82,12 @@ function validateConfig({ requireProductionSecrets = false } = {}) {
   return cfg;
 }
 
-function updatePeopleConfig({ people, personDailyHours }) {
+function updatePeopleConfig({ people, personDailyHours, personRoles, personCosts }) {
   const fileConfig = loadFileConfig();
   if (Array.isArray(people)) fileConfig.people = people;
   if (personDailyHours && typeof personDailyHours === 'object') fileConfig.personDailyHours = personDailyHours;
+  if (personRoles && typeof personRoles === 'object') fileConfig.personRoles = personRoles;
+  if (personCosts && typeof personCosts === 'object') fileConfig.personCosts = personCosts;
   saveFileConfig(fileConfig);
 }
 
@@ -112,6 +116,7 @@ function getViewDefaults() {
     },
     management: {
       stages: toStringArray(management.stages),
+      people: toStringArray(management.people),
       perspective: management.perspective ? String(management.perspective) : DEFAULT_VIEW_DEFAULTS.management.perspective,
       units: Number.isFinite(units) && units > 0 ? units : DEFAULT_VIEW_DEFAULTS.management.units,
     },
