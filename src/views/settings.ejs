@@ -2,7 +2,7 @@
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
   <div>
     <h2><i class="bi bi-gear me-2"></i>Configuration</h2>
-    <p class="text-muted mb-0">People, roles, internal cost and daily capacity used for timeline and allocation calculations.</p>
+    <p class="text-muted mb-0">People, roles, internal cost, absence and daily capacity used for timeline and allocation calculations.</p>
   </div>
 </div>
 
@@ -19,15 +19,18 @@
             <thead>
               <tr>
                 <th>Person</th>
-                <th style="width: 260px;">Role</th>
-                <th style="width: 130px;">Daily hours</th>
-                <th style="width: 150px;">Internal cost</th>
+                <th style="width: 240px;">Role</th>
+                <th style="width: 110px;">Daily hours</th>
+                <th style="width: 140px;">Internal cost</th>
+                <th style="width: 130px;">Absence</th>
                 <th class="text-end" style="width: 160px;">Actions</th>
               </tr>
             </thead>
             <tbody>
               <% people.forEach(function(person) { %>
                 <% var rowFormId = 'person-form-' + person.name.replace(/[^a-zA-Z0-9]/g, '-') %>
+                <% var absenceRowId = 'absence-' + person.name.replace(/[^a-zA-Z0-9]/g, '-') %>
+                <% var isOpen = openPerson === person.name %>
                 <tr>
                   <td class="fw-semibold">
                     <%= person.name %>
@@ -54,6 +57,13 @@
                       <span class="input-group-text"><%= costCurrency %></span>
                     </div>
                   </td>
+                  <td>
+                    <button class="btn btn-sm <%= person.absenceDays ? 'btn-outline-warning' : 'btn-outline-secondary' %>"
+                            type="button" data-bs-toggle="collapse" data-bs-target="#<%= absenceRowId %>"
+                            aria-expanded="<%= isOpen ? 'true' : 'false' %>" aria-controls="<%= absenceRowId %>">
+                      <i class="bi bi-calendar-x me-1"></i><%= person.absenceDays ? person.absenceDays + 'd' : 'None' %>
+                    </button>
+                  </td>
                   <td class="text-end">
                     <div class="d-flex gap-2 justify-content-end">
                       <button class="btn btn-sm btn-outline-primary" type="submit" form="<%= rowFormId %>">Save</button>
@@ -64,9 +74,88 @@
                     </div>
                   </td>
                 </tr>
+                <tr class="absence-row">
+                  <td colspan="6" class="p-0 border-0">
+                    <div class="collapse <%= isOpen ? 'show' : '' %>" id="<%= absenceRowId %>">
+                      <div class="absence-panel">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                          <span class="fw-semibold small"><i class="bi bi-calendar-x me-1"></i>Absence for <%= person.name %></span>
+                          <span class="text-muted small">
+                            <%= person.absenceDays %> working day<%= person.absenceDays === 1 ? '' : 's' %> removed
+                            &middot; <%= Math.round(person.absenceDays * person.dailyHours * 100) / 100 %>h off capacity
+                          </span>
+                        </div>
+
+                        <% if (person.absences.length) { %>
+                          <div class="table-responsive mb-2">
+                            <table class="table table-sm align-middle mb-0 absence-table">
+                              <thead>
+                                <tr>
+                                  <th style="width: 170px;">Type</th>
+                                  <th style="width: 220px;">Dates</th>
+                                  <th style="width: 110px;">Working days</th>
+                                  <th>Note</th>
+                                  <th class="text-end" style="width: 90px;"></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <% person.absences.forEach(function(absence) { %>
+                                  <tr>
+                                    <td><span class="badge text-bg-light border"><%= absence.kind %></span></td>
+                                    <td class="text-muted small"><%= absence.startDate %> &rarr; <%= absence.endDate %></td>
+                                    <td><%= absence.businessDays %>d</td>
+                                    <td class="text-muted small"><%= absence.note || '—' %></td>
+                                    <td class="text-end">
+                                      <form method="post" action="/settings/people/absences/remove"
+                                            data-confirm="Remove this absence? <%= person.name %> becomes available again for <%= absence.startDate %> to <%= absence.endDate %>."
+                                            data-confirm-title="Remove absence" data-confirm-text="Remove">
+                                        <input type="hidden" name="personName" value="<%= person.name %>">
+                                        <input type="hidden" name="absenceId" value="<%= absence.id %>">
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
+                                      </form>
+                                    </td>
+                                  </tr>
+                                <% }) %>
+                              </tbody>
+                            </table>
+                          </div>
+                        <% } else { %>
+                          <p class="text-muted small mb-2">No absence recorded, so the full <%= person.dailyHours %>h/day counts as capacity.</p>
+                        <% } %>
+
+                        <form method="post" action="/settings/people/absences" class="row g-2 align-items-end">
+                          <input type="hidden" name="personName" value="<%= person.name %>">
+                          <div class="col-sm-3">
+                            <label class="form-label small mb-1" for="kind-<%= absenceRowId %>">Type</label>
+                            <select class="form-select form-select-sm" id="kind-<%= absenceRowId %>" name="kind">
+                              <% absenceKinds.forEach(function(kind) { %>
+                                <option value="<%= kind %>"><%= kind %></option>
+                              <% }) %>
+                            </select>
+                          </div>
+                          <div class="col-sm-2">
+                            <label class="form-label small mb-1" for="start-<%= absenceRowId %>">From</label>
+                            <input type="date" class="form-control form-control-sm" id="start-<%= absenceRowId %>" name="startDate" required>
+                          </div>
+                          <div class="col-sm-2">
+                            <label class="form-label small mb-1" for="end-<%= absenceRowId %>">To</label>
+                            <input type="date" class="form-control form-control-sm" id="end-<%= absenceRowId %>" name="endDate" required>
+                          </div>
+                          <div class="col-sm-3">
+                            <label class="form-label small mb-1" for="note-<%= absenceRowId %>">Note</label>
+                            <input class="form-control form-control-sm" id="note-<%= absenceRowId %>" name="note" maxlength="200" placeholder="Optional">
+                          </div>
+                          <div class="col-sm-2">
+                            <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1"></i>Add</button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
               <% }) %>
               <% if (!people.length) { %>
-                <tr><td colspan="5" class="text-center text-muted py-4">No people configured yet.</td></tr>
+                <tr><td colspan="6" class="text-center text-muted py-4">No people configured yet.</td></tr>
               <% } %>
             </tbody>
           </table>

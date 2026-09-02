@@ -112,6 +112,17 @@
         <span class="team-kpi-value <%= view.chargeability.predictedClass %>"><%= view.chargeability.predicted %>%</span>
       </div>
       <span class="text-muted small">real / predicted (incl. soft bookings)</span>
+      <% if (view.chargeability.absenceHours > 0) { %>
+        <span class="absence-impact small"
+              title="Absence removes working days from the window, so the same committed hours are measured against a smaller base.">
+          <i class="bi bi-calendar-x me-1"></i>
+          <%= view.chargeability.absenceHours %>h absence across <%= view.chargeability.absentPeople %>
+          <%= view.chargeability.absentPeople === 1 ? 'person' : 'people' %>
+          <% if (view.chargeability.absencePercentPoints > 0) { %>
+            (+<%= view.chargeability.absencePercentPoints %> pts)
+          <% } %>
+        </span>
+      <% } %>
     </div>
   </div>
   <div class="card-body">
@@ -151,7 +162,24 @@
                 <span class="soft-hint"><%= member.softHours %>h soft booked</span>
                 <span class="text-muted"><%= member.availableIfWonHours %>h if all won</span>
               </div>
-              <div class="text-muted small mt-1">Capacity <%= member.capacityHours %>h in window</div>
+              <div class="text-muted small mt-1">
+                Capacity <%= member.capacityHours %>h in window<% if (member.absentDays > 0) { %>
+                  <span class="absence-hint">(<%= member.grossCapacityHours %>h &minus; <%= member.absenceHours %>h absence)</span>
+                <% } %>
+              </div>
+              <% if (member.absentDays > 0) { %>
+                <div class="absence-impact small mt-2"
+                     title="<%= member.absences.map(function(a) { return a.kind + ' ' + a.startDate + ' to ' + a.endDate + ' (' + a.daysInWindow + 'd)'; }).join('\n') %>&#10;Absence removes days from the window, so the same committed hours are measured against a smaller base.">
+                  <i class="bi bi-calendar-x me-1"></i>
+                  Absence removes <strong><%= member.absenceHours %>h</strong> (<%= member.absentDays %>d)
+                  <% if (member.absencePercentPoints > 0) { %>
+                    &middot; utilization <%= member.chargeabilityReal %>% instead of
+                    <%= member.chargeabilityWithoutAbsence %>% (+<%= member.absencePercentPoints %> pts)
+                  <% } else { %>
+                    &middot; no committed work yet, so utilization is unchanged
+                  <% } %>
+                </div>
+              <% } %>
               <% if (member.heldHours > 0) { %>
                 <div class="hold-impact small mt-2"
                      title="<%= member.heldAssignments %> assignment<%= member.heldAssignments === 1 ? '' : 's' %> paused in this window. Without the hold this person would be at <%= member.chargeabilityWithoutHolds %>% instead of <%= member.chargeabilityReal %>%.">
@@ -422,14 +450,24 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                   var breakdown = segment.parts.map(function(part) {
                     return part.name + ': ' + part.hours + 'h = ' + part.percent + '%';
                   }).concat(['Free: ' + segment.freeHours + 'h = ' + segment.freePercent + '%']).join('\n');
+                  // A period spent entirely away has no capacity to take a share
+                  // of, so reporting 0% of nothing would only mislead.
+                  var fullyAbsent = segment.capacityHours === 0 && segment.absentDays > 0;
+                  var absenceDetail = segment.absentDays
+                    ? '\n' + segment.absences.map(function(a) {
+                        return a.kind + ' ' + a.startDate + ' to ' + a.endDate + ' (' + a.daysInWindow + 'd here)';
+                      }).join('\n')
+                    : '';
                 %>
-                <div class="timeline-free"
+                <div class="timeline-free<%= fullyAbsent ? ' is-absent' : '' %>"
                      style="left: <%= segment.geometry.left.toFixed(3) %>%; width: <%= segment.geometry.width.toFixed(3) %>%; top: <%= segment.geometry.top %>px;"
-                     title="<%= segment.groupLabel %> <%= segment.unitLabel %> &middot; <%= segment.capacityHours %>h capacity
-<%= breakdown %>
-Total: <%= (segment.usedPercent + segment.freePercent).toFixed(2) %>%<%= segment.softHours ? '\nSoft booked on top: ' + segment.softHours + 'h = ' + segment.softPercent + '%' : '' %>">
+                     title="<%= segment.groupLabel %> <%= segment.unitLabel %> &middot; <%= segment.capacityHours %>h capacity<%= segment.absentDays ? ' (' + segment.grossCapacityHours + 'h \u2212 ' + segment.absenceHours + 'h absence)' : '' %><%= fullyAbsent ? '\nAway for the whole period, so there is no capacity to share out.' : '\n' + breakdown + '\nTotal: ' + (segment.usedPercent + segment.freePercent).toFixed(2) + '%' %><%= segment.softHours ? '\nSoft booked on top: ' + segment.softHours + 'h = ' + segment.softPercent + '%' : '' %><%= absenceDetail %>">
                   <span class="timeline-free-label">
-                    <%= segment.unitLabel %> &middot; <%= segment.freeHours %>h free &middot; <%= segment.freePercent %>%<% if (segment.softHours) { %> &middot; <%= segment.softHours %>h soft<% } %>
+                    <% if (fullyAbsent) { %>
+                      <%= segment.unitLabel %> &middot; away <%= segment.absentDays %>d
+                    <% } else { %>
+                      <%= segment.unitLabel %> &middot; <%= segment.freeHours %>h free &middot; <%= segment.freePercent %>%<% if (segment.softHours) { %> &middot; <%= segment.softHours %>h soft<% } %><% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %>
+                    <% } %>
                   </span>
                 </div>
               <% }) %>
