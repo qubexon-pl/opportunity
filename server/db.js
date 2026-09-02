@@ -20,7 +20,10 @@ let poolPromise;
 
 async function getPool() {
   if (!poolPromise) {
-    poolPromise = sql.connect(config);
+    poolPromise = sql.connect(config).catch((error) => {
+      poolPromise = undefined;
+      throw error;
+    });
   }
   return poolPromise;
 }
