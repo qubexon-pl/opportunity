@@ -1,13 +1,9 @@
 # Node
 node_modules/
 
-# Env files
+# Env and local configuration
 .env
-server/.env
-client/.env
-
-# Build output
-client/dist
+config.local.json
 
 # OS
 .DS_Store

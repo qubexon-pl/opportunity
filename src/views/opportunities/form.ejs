@@ -1,0 +1,345 @@
+<%- include('../partials/header') %>
+<%
+  var isNew = mode === 'new';
+  var o = opportunity;
+  var notesList = typeof notes !== 'undefined' ? notes : [];
+  var stepsList = typeof nextSteps !== 'undefined' ? nextSteps : [];
+  var assignmentList = typeof assignments !== 'undefined' ? assignments : [];
+  var todayText = typeof today !== 'undefined' ? today : toDateText(new Date());
+  var actionUrl = isNew ? '/opportunities' : '/opportunities/' + o.Id;
+%>
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <h2>
+      <i class="bi <%= isNew ? 'bi-plus-circle' : 'bi-briefcase' %> me-2"></i>
+      <%= isNew ? 'Create opportunity' : o.Name %>
+    </h2>
+    <p class="text-muted mb-0"><%= isNew ? 'Add a new opportunity to the pipeline.' : (o.TechnologyStack || 'No technology stack') %></p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="/"><i class="bi bi-arrow-left me-1"></i>Back</a>
+    <button class="btn btn-primary" type="submit" form="opportunityForm">
+      <i class="bi bi-check-lg me-1"></i><%= isNew ? 'Create' : 'Save' %>
+    </button>
+    <% if (!isNew) { %>
+      <form method="post" action="/opportunities/<%= o.Id %>/delete" data-confirm="Delete this opportunity and all of its notes, steps, and assignments?" data-confirm-title="Delete opportunity">
+        <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>Delete</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<% if (!isNew) { %>
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+      <div class="card h-100 stat-card"><div class="card-body py-3">
+        <div class="summary-label">Stage</div>
+        <div class="fs-5 fw-bold"><%= o.Stage || '-' %></div>
+      </div></div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card h-100 stat-card"><div class="card-body py-3">
+        <div class="summary-label">Status</div>
+        <div class="fs-5 fw-bold"><%= o.Status || '-' %></div>
+      </div></div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card h-100 stat-card"><div class="card-body py-3">
+        <div class="summary-label">Opportunity hours</div>
+        <div class="fs-5 fw-bold"><%= o.OpportunityHours == null ? 0 : o.OpportunityHours %>h</div>
+      </div></div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card h-100 stat-card"><div class="card-body py-3">
+        <div class="summary-label">Assignments</div>
+        <div class="fs-5 fw-bold"><%= assignmentList.length %></div>
+      </div></div>
+    </div>
+  </div>
+<% } %>
+
+<form method="post" action="<%= actionUrl %>" id="opportunityForm">
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-info-circle me-2"></i>Basic information</div>
+        <div class="card-body row g-3">
+          <div class="col-12">
+            <label class="form-label" for="name">Opportunity name</label>
+            <input class="form-control" id="name" name="name" required maxlength="200" value="<%= o.Name || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="technologyStack">Technology stack</label>
+            <input class="form-control" id="technologyStack" name="technologyStack" maxlength="400" value="<%= o.TechnologyStack || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="description">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="4" maxlength="4000" placeholder="Describe the opportunity..."><%= o.Description || '' %></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="techOwner">Lead consultant</label>
+            <select class="form-select" id="techOwner" name="techOwner">
+              <option value="">Select person</option>
+              <% people.forEach(function(person) { %>
+                <option value="<%= person %>" <%= (o.TechOwner || '') === person ? 'selected' : '' %>><%= person %></option>
+              <% }) %>
+              <% if (o.TechOwner && people.indexOf(o.TechOwner) === -1) { %>
+                <option value="<%= o.TechOwner %>" selected><%= o.TechOwner %></option>
+              <% } %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="businessOwner">Business owner</label>
+            <input class="form-control" id="businessOwner" name="businessOwner" maxlength="200" value="<%= o.BusinessOwner || '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="firstContactDate">First contact date</label>
+            <input type="date" class="form-control" id="firstContactDate" name="firstContactDate" value="<%= toDateText(o.FirstContactDate) %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="tags">Tags</label>
+            <input class="form-control" id="tags" name="tags" maxlength="400" placeholder="comma separated" value="<%= o.Tags || '' %>">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-calendar3 me-2"></i>Planning and capacity</div>
+        <div class="card-body row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="stage">Stage</label>
+            <select class="form-select" id="stage" name="stage">
+              <% stages.forEach(function(stage) { %>
+                <option value="<%= stage %>" <%= (o.Stage || 'New') === stage ? 'selected' : '' %>><%= stage %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="status">Status</label>
+            <select class="form-select" id="status" name="status">
+              <% statuses.forEach(function(status) { %>
+                <option value="<%= status %>" <%= (o.Status || 'Open') === status ? 'selected' : '' %>><%= status %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="priority">Priority</label>
+            <select class="form-select" id="priority" name="priority">
+              <% [1,2,3,4,5].forEach(function(priority) { %>
+                <option value="<%= priority %>" <%= Number(o.Priority || 3) === priority ? 'selected' : '' %>><%= priority %></option>
+              <% }) %>
+            </select>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label" for="nextStepSummary">Next step summary</label>
+            <input class="form-control" id="nextStepSummary" name="nextStepSummary" maxlength="500" value="<%= o.NextStepSummary || '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="nextStepDueDate">Next step due date</label>
+            <input type="date" class="form-control" id="nextStepDueDate" name="nextStepDueDate" value="<%= toDateText(o.NextStepDueDate) %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="opportunityHours">Opportunity hours</label>
+            <input type="number" class="form-control" id="opportunityHours" name="opportunityHours" min="0.5" step="0.5" required placeholder="e.g. 120" value="<%= o.OpportunityHours == null ? '' : o.OpportunityHours %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="opportunityTimeline">Opportunity timeline</label>
+            <input class="form-control" id="opportunityTimeline" name="opportunityTimeline" maxlength="100" placeholder="e.g. 4 weeks" value="<%= o.OpportunityTimeline || '' %>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="plannedStartDate">Planned start</label>
+            <input type="date" class="form-control" id="plannedStartDate" name="plannedStartDate" value="<%= toDateText(o.PlannedStartDate) %>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="plannedEndDate">Planned end</label>
+            <input type="date" class="form-control" id="plannedEndDate" name="plannedEndDate" value="<%= toDateText(o.PlannedEndDate) %>">
+          </div>
+          <div class="col-12 small text-muted">
+            Calculated end date from hours: <strong id="plannedEndPreview"><%= plannedEndPreview || 'set start date and hours' %></strong>
+            <span class="ms-2">Estimated duration: <strong id="plannedDurationPreview"><%= plannedDurationPreview || '-' %></strong> working days</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<% if (!isNew) { %>
+  <div class="card mt-4" id="assignments">
+    <div class="card-header"><i class="bi bi-people me-2"></i>Assignments for timeline</div>
+    <div class="card-body">
+      <form method="post" action="/opportunities/<%= o.Id %>/assignments" class="allocation-form row g-2 align-items-end mb-4"
+            data-opportunity-hours="<%= o.OpportunityHours || 0 %>">
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label">Person</label>
+          <select class="form-select" name="personName" data-role="person" required>
+            <option value="">Select person</option>
+            <% people.forEach(function(person) { %>
+              <option value="<%= person %>" <%= (o.TechOwner || '') === person ? 'selected' : '' %>><%= person %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-3 col-6">
+          <label class="form-label">Start date</label>
+          <input type="date" class="form-control" name="plannedStartDate" data-role="start" required value="<%= toDateText(o.PlannedStartDate) || todayText %>">
+        </div>
+        <div class="col-lg-2 col-md-3 col-6">
+          <label class="form-label">End date</label>
+          <input type="date" class="form-control" name="plannedEndDate" data-role="end" required value="<%= toDateText(o.PlannedEndDate) || todayText %>">
+        </div>
+        <div class="col-lg-2 col-md-4 col-6">
+          <label class="form-label">Allocation mode</label>
+          <select class="form-select" data-role="mode">
+            <option value="percent">Percent of total hours</option>
+            <option value="total-hours">Total hours for period</option>
+            <option value="monthly-hours">Hours per month</option>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-4 col-6">
+          <label class="form-label" data-role="value-label">Allocation %</label>
+          <input type="number" class="form-control" data-role="value" min="0.5" step="0.5" value="50">
+        </div>
+        <div class="col-lg-1 col-md-4 col-12">
+          <button class="btn btn-primary w-100" type="submit">Add</button>
+        </div>
+        <div class="col-12">
+          <div class="allocation-preview small text-muted" data-role="preview">&nbsp;</div>
+        </div>
+        <input type="hidden" name="allocationPercent" data-role="percent-field">
+        <input type="hidden" name="allocatedHours" data-role="hours-field">
+      </form>
+
+      <% assignmentList.forEach(function(assignment) { %>
+        <div class="assignment-row">
+          <form method="post" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>" class="assignment-edit-grid">
+            <select class="form-select form-select-sm" name="personName">
+              <% people.forEach(function(person) { %>
+                <option value="<%= person %>" <%= assignment.PersonName === person ? 'selected' : '' %>><%= person %></option>
+              <% }) %>
+              <% if (assignment.PersonName && people.indexOf(assignment.PersonName) === -1) { %>
+                <option value="<%= assignment.PersonName %>" selected><%= assignment.PersonName %></option>
+              <% } %>
+            </select>
+            <input type="date" class="form-control form-control-sm" name="plannedStartDate" value="<%= toDateText(assignment.PlannedStartDate) %>">
+            <input type="date" class="form-control form-control-sm" name="plannedEndDate" value="<%= toDateText(assignment.PlannedEndDate) %>">
+            <input type="number" class="form-control form-control-sm" name="allocationPercent" min="1" max="100" step="0.01" value="<%= assignment.AllocationPercent || 0 %>" title="Allocation %">
+            <div class="small text-muted d-flex align-items-center"><%= round2(assignment.AllocatedHours || 0) %>h</div>
+            <div class="form-check d-flex align-items-center gap-2">
+              <input class="form-check-input" type="checkbox" id="visible-<%= assignment.Id %>" name="isTimelineVisible" <%= assignment.IsTimelineVisible ? 'checked' : '' %>>
+              <label class="form-check-label small" for="visible-<%= assignment.Id %>">Visible</label>
+            </div>
+            <button class="btn btn-sm btn-primary" type="submit">Save</button>
+          </form>
+          <div class="assignment-actions d-flex gap-2">
+            <form method="post" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>/stretch">
+              <input type="hidden" name="days" value="-7">
+              <input type="hidden" name="plannedStartDate" value="<%= toDateText(assignment.PlannedStartDate) %>">
+              <input type="hidden" name="plannedEndDate" value="<%= toDateText(assignment.PlannedEndDate) %>">
+              <button class="btn btn-sm btn-outline-secondary" type="submit">-7d</button>
+            </form>
+            <form method="post" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>/stretch">
+              <input type="hidden" name="days" value="7">
+              <input type="hidden" name="plannedStartDate" value="<%= toDateText(assignment.PlannedStartDate) %>">
+              <input type="hidden" name="plannedEndDate" value="<%= toDateText(assignment.PlannedEndDate) %>">
+              <button class="btn btn-sm btn-outline-secondary" type="submit">+7d</button>
+            </form>
+            <form method="post" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>/delete" data-confirm="Delete this assignment?" data-confirm-title="Delete assignment">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+            </form>
+          </div>
+        </div>
+      <% }) %>
+      <% if (!assignmentList.length) { %>
+        <p class="text-muted small mb-0">No assignments yet. Add at least one person for timeline planning.</p>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-lg-6" id="notes">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-journal-text me-2"></i>Notes</div>
+        <div class="card-body">
+          <form method="post" action="/opportunities/<%= o.Id %>/notes" class="row g-2 mb-3">
+            <div class="col-4">
+              <input type="date" class="form-control" name="noteDate" value="<%= todayText %>" required>
+            </div>
+            <div class="col-6">
+              <input class="form-control" name="content" placeholder="Add a note..." required>
+            </div>
+            <div class="col-2">
+              <button class="btn btn-primary w-100" type="submit">Add</button>
+            </div>
+          </form>
+
+          <% notesList.forEach(function(note) { %>
+            <div class="note-item">
+              <div class="d-flex justify-content-between align-items-start">
+                <small class="text-muted"><%= toDateText(note.NoteDate) %></small>
+                <form method="post" action="/opportunities/<%= o.Id %>/notes/<%= note.Id %>/delete" data-confirm="Delete this note?" data-confirm-title="Delete note">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                </form>
+              </div>
+              <div class="mt-2" style="white-space: pre-wrap;"><%= note.Content %></div>
+            </div>
+          <% }) %>
+          <% if (!notesList.length) { %>
+            <p class="text-muted small mb-0">No notes yet.</p>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6" id="steps">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-check2-square me-2"></i>Next steps</div>
+        <div class="card-body">
+          <form method="post" action="/opportunities/<%= o.Id %>/steps" class="row g-2 mb-3">
+            <div class="col-7">
+              <input class="form-control" name="title" placeholder="Next step..." required maxlength="250">
+            </div>
+            <div class="col-3">
+              <input type="date" class="form-control" name="dueDate">
+            </div>
+            <div class="col-2">
+              <button class="btn btn-primary w-100" type="submit">Add</button>
+            </div>
+          </form>
+
+          <% stepsList.forEach(function(step) { %>
+            <div class="note-item d-flex justify-content-between align-items-start">
+              <div class="d-flex gap-2">
+                <form method="post" action="/opportunities/<%= o.Id %>/steps/<%= step.Id %>/toggle">
+                  <input type="hidden" name="isDone" value="<%= step.IsDone ? 'false' : 'true' %>">
+                  <button class="btn btn-sm btn-link p-0" type="submit" title="Toggle done">
+                    <i class="bi <%= step.IsDone ? 'bi-check-square-fill text-success' : 'bi-square' %>"></i>
+                  </button>
+                </form>
+                <div>
+                  <div class="fw-semibold <%= step.IsDone ? 'text-decoration-line-through text-muted' : '' %>"><%= step.Title %></div>
+                  <small class="text-muted">Due: <%= toDateText(step.DueDate) || '-' %></small>
+                </div>
+              </div>
+              <form method="post" action="/opportunities/<%= o.Id %>/steps/<%= step.Id %>/delete" data-confirm="Delete this step?" data-confirm-title="Delete next step">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+              </form>
+            </div>
+          <% }) %>
+          <% if (!stepsList.length) { %>
+            <p class="text-muted small mb-0">No next steps yet.</p>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<script>
+  window.OPP_PEOPLE_DAILY_HOURS = <%- JSON.stringify((typeof peopleDailyHours !== 'undefined' && peopleDailyHours) || {}) %>;
+</script>
+<script src="/js/allocation.js"></script>
+<%- include('../partials/footer') %>

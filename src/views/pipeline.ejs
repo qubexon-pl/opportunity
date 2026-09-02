@@ -1,0 +1,186 @@
+<%- include('partials/header') %>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <h2><i class="bi bi-list-task me-2"></i>Opportunity pipeline</h2>
+    <p class="text-muted mb-0">Business development workspace &mdash; <%= opportunities.length %> opportunities.</p>
+  </div>
+</div>
+
+<% if (loadError) { %>
+  <div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    Could not load opportunities: <%= loadError %>
+  </div>
+<% } %>
+
+<%
+  var openCount = opportunities.filter(function(o) { return o.Status === 'Open'; }).length;
+  var wonCount = opportunities.filter(function(o) { return String(o.Stage || '').toLowerCase() === 'won'; }).length;
+  var totalHours = opportunities.reduce(function(acc, o) { return acc + Number(o.OpportunityHours || 0); }, 0);
+%>
+<div class="row g-3 mb-4">
+  <div class="col-sm-4 col-lg-2">
+    <div class="card text-center h-100 stat-card">
+      <div class="card-body py-3">
+        <div class="fs-3 fw-bold" style="color: var(--color-primary);"><%= opportunities.length %></div>
+        <div class="text-muted small">Opportunities</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4 col-lg-2">
+    <div class="card text-center h-100 stat-card">
+      <div class="card-body py-3">
+        <div class="fs-3 fw-bold text-success"><%= openCount %></div>
+        <div class="text-muted small">Open</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4 col-lg-2">
+    <div class="card text-center h-100 stat-card">
+      <div class="card-body py-3">
+        <div class="fs-3 fw-bold text-info"><%= wonCount %></div>
+        <div class="text-muted small">Won</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4 col-lg-2">
+    <div class="card text-center h-100 stat-card">
+      <div class="card-body py-3">
+        <div class="fs-3 fw-bold" style="color: var(--color-accent);"><%= Math.round(totalHours) %>h</div>
+        <div class="text-muted small">Total hours</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4 col-lg-2">
+    <div class="card text-center h-100 stat-card">
+      <div class="card-body py-3">
+        <div class="fs-3 fw-bold"><%= upcoming.items.length %></div>
+        <div class="text-muted small">Upcoming actions</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-funnel me-2"></i>Filters</div>
+  <div class="card-body">
+    <form method="get" action="/" class="row g-3 align-items-end">
+      <div class="col-lg-4 col-md-6">
+        <label class="form-label" for="q">Search</label>
+        <input class="form-control" id="q" name="q" type="search" value="<%= filters.q %>" placeholder="Name, owner, or tag">
+      </div>
+      <div class="col-lg-2 col-md-3 col-6">
+        <label class="form-label" for="stage">Stage</label>
+        <select class="form-select" id="stage" name="stage">
+          <option value="">All stages</option>
+          <% stages.forEach(function(stage) { %>
+            <option value="<%= stage %>" <%= filters.stage === stage ? 'selected' : '' %>><%= stage %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-3 col-6">
+        <label class="form-label" for="status">Status</label>
+        <select class="form-select" id="status" name="status">
+          <option value="">All statuses</option>
+          <% statuses.forEach(function(status) { %>
+            <option value="<%= status %>" <%= filters.status === status ? 'selected' : '' %>><%= status %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-3 col-6">
+        <label class="form-label" for="sort">Sort</label>
+        <select class="form-select" id="sort" name="sort">
+          <option value="updated" <%= filters.sort === 'updated' ? 'selected' : '' %>>Recently updated</option>
+          <option value="created" <%= filters.sort === 'created' ? 'selected' : '' %>>Recently created</option>
+          <option value="name" <%= filters.sort === 'name' ? 'selected' : '' %>>Name</option>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-3 col-6 d-flex gap-2">
+        <button class="btn btn-primary flex-grow-1" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
+        <a class="btn btn-outline-secondary" href="/" title="Clear filters"><i class="bi bi-x-lg"></i></a>
+      </div>
+      <input type="hidden" name="period" value="<%= upcomingPeriod %>">
+    </form>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-table me-2"></i>Pipeline (<%= opportunities.length %>)</span>
+    <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Filter rows..." oninput="filterTable(this, 'pipelineTable')">
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="pipelineTable">
+        <thead>
+          <tr>
+            <th>Opportunity</th>
+            <th>Lead consultant</th>
+            <th>Stage</th>
+            <th>Status</th>
+            <th class="text-end">Hours</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% opportunities.forEach(function(o) { %>
+            <tr>
+              <td>
+                <div class="pipeline-title"><%= o.Name %></div>
+                <div class="pipeline-subtitle"><%= o.TechnologyStack || 'No technology stack' %></div>
+              </td>
+              <td><%= o.TechOwner || 'Unassigned' %></td>
+              <td><span class="stage-badge <%= stageBadgeClass(o.Stage) %>"><%= o.Stage || 'Unspecified' %></span></td>
+              <td><%= o.Status || 'Unspecified' %></td>
+              <td class="text-end fw-semibold"><%= o.OpportunityHours == null ? 0 : o.OpportunityHours %>h</td>
+              <td class="text-end">
+                <a href="/opportunities/<%= o.Id %>" class="btn btn-sm btn-outline-primary">Open</a>
+              </td>
+            </tr>
+          <% }) %>
+          <% if (!opportunities.length) { %>
+            <tr><td colspan="6" class="text-center text-muted py-4">No opportunities match the current filters.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <i class="bi bi-calendar-event me-2"></i>Upcoming actions and decisions
+      <div class="text-muted small">Items due in selected period (open opportunities only)</div>
+    </div>
+    <form method="get" action="/" class="d-flex align-items-center gap-2">
+      <input type="hidden" name="q" value="<%= filters.q %>">
+      <input type="hidden" name="stage" value="<%= filters.stage %>">
+      <input type="hidden" name="status" value="<%= filters.status %>">
+      <input type="hidden" name="sort" value="<%= filters.sort %>">
+      <label class="form-label mb-0 text-nowrap" for="period">Period</label>
+      <select class="form-select form-select-sm" id="period" name="period" style="max-width: 170px;" onchange="this.form.submit()">
+        <% upcomingPeriods.forEach(function(option) { %>
+          <option value="<%= option.key %>" <%= upcomingPeriod === option.key ? 'selected' : '' %>><%= option.label %></option>
+        <% }) %>
+      </select>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="upcoming-window small mb-2"><%= upcoming.label %></div>
+    <% if (upcoming.items.length) { %>
+      <div class="upcoming-list">
+        <% upcoming.items.forEach(function(item) { %>
+          <a class="upcoming-item" href="/opportunities/<%= item.id %>">
+            <div class="upcoming-title"><%= item.name %></div>
+            <div class="upcoming-meta"><%= item.stage %> &middot; Due <%= item.dueText %></div>
+            <div class="upcoming-summary"><%= item.summary %></div>
+          </a>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <p class="text-muted small mb-0">No upcoming steps for this period.</p>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/footer') %>
