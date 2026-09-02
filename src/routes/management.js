@@ -14,6 +14,7 @@ const {
   stageAccentClass,
   capacityClass,
 } = require('../services/capacityService');
+const { listFirmStages } = require('../services/bookingService');
 const { isDatabaseUnavailable } = require('../db/pool');
 
 const router = express.Router();
@@ -58,6 +59,7 @@ router.get('/', async (req, res, next) => {
       people: listPeople(),
       projects: opportunities,
       view,
+      firmStages: listFirmStages(),
       loadError,
       stageStatusLabel,
       stageAccentClass,

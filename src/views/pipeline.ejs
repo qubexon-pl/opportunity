@@ -17,6 +17,7 @@
   var openCount = opportunities.filter(function(o) { return o.Status === 'Open'; }).length;
   var wonCount = opportunities.filter(function(o) { return String(o.Stage || '').toLowerCase() === 'won'; }).length;
   var totalHours = opportunities.reduce(function(acc, o) { return acc + Number(o.OpportunityHours || 0); }, 0);
+  var softCount = opportunities.filter(function(o) { return !isCommitted(o); }).length;
 %>
 <div class="row g-3 mb-4">
   <div class="col-sm-4 col-lg-2">
@@ -48,6 +49,14 @@
       <div class="card-body py-3">
         <div class="fs-3 fw-bold" style="color: var(--color-accent);"><%= Math.round(totalHours) %>h</div>
         <div class="text-muted small">Total hours</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4 col-lg-2">
+    <div class="card text-center h-100 stat-card">
+      <div class="card-body py-3">
+        <div class="fs-3 fw-bold" style="color: var(--color-accent);"><%= softCount %></div>
+        <div class="text-muted small">Soft booked</div>
       </div>
     </div>
   </div>
@@ -118,6 +127,7 @@
             <th>Lead consultant</th>
             <th>Stage</th>
             <th>Status</th>
+            <th>Capacity booking</th>
             <th class="text-end">Hours</th>
             <th class="text-end">Actions</th>
           </tr>
@@ -132,6 +142,19 @@
               <td><%= o.TechOwner || 'Unassigned' %></td>
               <td><span class="stage-badge <%= stageBadgeClass(o.Stage) %>"><%= o.Stage || 'Unspecified' %></span></td>
               <td><%= o.Status || 'Unspecified' %></td>
+              <td>
+                <form method="post" action="/opportunities/<%= o.Id %>/booking" class="booking-control">
+                  <select class="form-select form-select-sm" name="bookingMode" onchange="this.form.submit()"
+                          title="<%= bookingLabel(o) %>">
+                    <% bookingModes.forEach(function(option) { %>
+                      <option value="<%= option.key %>" <%= bookingMode(o) === option.key ? 'selected' : '' %>><%= option.label %></option>
+                    <% }) %>
+                  </select>
+                  <span class="booking-state <%= isCommitted(o) ? 'is-committed' : 'is-soft' %>">
+                    <%= isCommitted(o) ? 'Committed' : 'Soft' %>
+                  </span>
+                </form>
+              </td>
               <td class="text-end fw-semibold"><%= o.OpportunityHours == null ? 0 : o.OpportunityHours %>h</td>
               <td class="text-end">
                 <a href="/opportunities/<%= o.Id %>" class="btn btn-sm btn-outline-primary">Open</a>
@@ -139,7 +162,7 @@
             </tr>
           <% }) %>
           <% if (!opportunities.length) { %>
-            <tr><td colspan="6" class="text-center text-muted py-4">No opportunities match the current filters.</td></tr>
+            <tr><td colspan="7" class="text-center text-muted py-4">No opportunities match the current filters.</td></tr>
           <% } %>
         </tbody>
       </table>

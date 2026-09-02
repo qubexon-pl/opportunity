@@ -11,6 +11,8 @@ const DEFAULT_PEOPLE = [
   'Daniel Troska',
 ];
 
+const DEFAULT_FIRM_STAGES = ['Won'];
+
 function loadFileConfig() {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -46,6 +48,9 @@ function getConfig() {
       names: Array.isArray(fileConfig.people) && fileConfig.people.length ? fileConfig.people : DEFAULT_PEOPLE,
       dailyHours: fileConfig.personDailyHours && typeof fileConfig.personDailyHours === 'object' ? fileConfig.personDailyHours : {},
     },
+    capacity: {
+      firmStages: Array.isArray(fileConfig.firmStages) ? fileConfig.firmStages : DEFAULT_FIRM_STAGES,
+    },
   };
 }
 
@@ -77,6 +82,12 @@ function updatePeopleConfig({ people, personDailyHours }) {
   saveFileConfig(fileConfig);
 }
 
+function updateFirmStages(stages) {
+  const fileConfig = loadFileConfig();
+  fileConfig.firmStages = Array.isArray(stages) ? stages.map((stage) => String(stage)) : [];
+  saveFileConfig(fileConfig);
+}
+
 function isSqlConfigured() {
   const cfg = getConfig();
   return !!(cfg.sql.server && cfg.sql.database);
@@ -84,8 +95,10 @@ function isSqlConfigured() {
 
 module.exports = {
   DEFAULT_PEOPLE,
+  DEFAULT_FIRM_STAGES,
   getConfig,
   validateConfig,
   updatePeopleConfig,
+  updateFirmStages,
   isSqlConfigured,
 };

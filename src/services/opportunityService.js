@@ -25,6 +25,7 @@ const OpportunitySchema = z.object({
   plannedStartDate: z.string().optional().nullable(),
   plannedEndDate: z.string().optional().nullable(),
   allocationPercent: z.number().min(1).max(100).optional().nullable(),
+  countsTowardsCapacity: z.boolean().optional().nullable(),
 });
 
 const NoteSchema = z.object({
@@ -59,7 +60,8 @@ function bindOpportunity(request, body) {
     .input('OpportunityTimeline', sql.NVarChar(100), body.opportunityTimeline ?? null)
     .input('PlannedStartDate', sql.Date, body.plannedStartDate ?? null)
     .input('PlannedEndDate', sql.Date, body.plannedEndDate ?? null)
-    .input('AllocationPercent', sql.Float, body.allocationPercent ?? null);
+    .input('AllocationPercent', sql.Float, body.allocationPercent ?? null)
+    .input('CountsTowardsCapacity', sql.Bit, body.countsTowardsCapacity ?? null);
 }
 
 async function listOpportunities({ q = '', sort = 'updated', dir = 'desc', stage = '', status = '' } = {}) {
@@ -135,9 +137,9 @@ async function createOpportunity(payload) {
 
   await bindOpportunity(pool.request().input('Id', sql.UniqueIdentifier, newId), body).query(
     `INSERT INTO dbo.Opportunities
-       (Id, Name, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline, PlannedStartDate, PlannedEndDate, AllocationPercent)
+       (Id, Name, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline, PlannedStartDate, PlannedEndDate, AllocationPercent, CountsTowardsCapacity)
      VALUES
-       (@Id, @Name, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline, @PlannedStartDate, @PlannedEndDate, @AllocationPercent);`
+       (@Id, @Name, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @CountsTowardsCapacity);`
   );
 
   return newId;
@@ -166,11 +168,27 @@ async function updateOpportunity(rawId, payload) {
          OpportunityTimeline=@OpportunityTimeline,
          PlannedStartDate=@PlannedStartDate,
          PlannedEndDate=@PlannedEndDate,
-         AllocationPercent=@AllocationPercent
+         AllocationPercent=@AllocationPercent,
+         CountsTowardsCapacity=@CountsTowardsCapacity
      WHERE Id=@Id;
      SELECT @@ROWCOUNT as affected;`
   );
 
+  return result.recordset[0].affected > 0;
+}
+
+/** Updates only the capacity booking override (used by the pipeline inline control). */
+async function setBookingFlag(rawId, flag) {
+  const id = toGuid(rawId);
+  const pool = await getPool();
+  const result = await pool
+    .request()
+    .input('Id', sql.UniqueIdentifier, id)
+    .input('CountsTowardsCapacity', sql.Bit, flag === null || flag === undefined ? null : !!flag)
+    .query(
+      `UPDATE dbo.Opportunities SET CountsTowardsCapacity=@CountsTowardsCapacity WHERE Id=@Id;
+       SELECT @@ROWCOUNT as affected;`
+    );
   return result.recordset[0].affected > 0;
 }
 
@@ -264,6 +282,7 @@ module.exports = {
   getOpportunity,
   createOpportunity,
   updateOpportunity,
+  setBookingFlag,
   deleteOpportunity,
   addNote,
   deleteNote,

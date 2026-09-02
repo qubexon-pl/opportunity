@@ -1,6 +1,7 @@
 const express = require('express');
 const { listOpportunities, STAGES, STATUSES } = require('../services/opportunityService');
 const { buildUpcoming, stageBadgeClass, UPCOMING_PERIODS } = require('../services/capacityService');
+const { BOOKING_MODES, bookingMode, bookingLabel, countsTowardsCapacity, listFirmStages } = require('../services/bookingService');
 const { isDatabaseUnavailable } = require('../db/pool');
 
 const router = express.Router();
@@ -14,6 +15,15 @@ router.get('/', async (req, res, next) => {
     status: String(req.query.status || '').trim(),
   };
   const upcomingPeriod = String(req.query.period || 'this-week');
+  const firmStages = listFirmStages();
+
+  const bookingHelpers = {
+    bookingModes: BOOKING_MODES,
+    bookingMode,
+    bookingLabel: (opportunity) => bookingLabel(opportunity, firmStages),
+    isCommitted: (opportunity) => countsTowardsCapacity(opportunity, firmStages),
+    firmStages,
+  };
 
   try {
     const opportunities = await listOpportunities(filters);
@@ -28,6 +38,7 @@ router.get('/', async (req, res, next) => {
       upcomingPeriod,
       upcomingPeriods: UPCOMING_PERIODS,
       stageBadgeClass,
+      ...bookingHelpers,
       loadError: null,
     });
   } catch (err) {
@@ -42,11 +53,14 @@ router.get('/', async (req, res, next) => {
         upcomingPeriod,
         upcomingPeriods: UPCOMING_PERIODS,
         stageBadgeClass,
+        ...bookingHelpers,
         loadError: err.message || String(err),
       });
     }
     next(err);
   }
 });
+
+/** Inline capacity booking control on the pipeline. */
 
 module.exports = router;

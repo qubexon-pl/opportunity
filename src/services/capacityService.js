@@ -15,6 +15,7 @@ const {
   periodBounds,
 } = require('./dateService');
 const { listPeople, getPersonDailyHours } = require('./peopleService');
+const { countsTowardsCapacity, listFirmStages } = require('./bookingService');
 
 const TIMELINE_ROW_TOP_PADDING = 8;
 const TIMELINE_LANE_HEIGHT = 58;
@@ -78,6 +79,7 @@ function capacityClass(hours) {
 /** Joins assignments with their opportunity, filling in derived hours. */
 function buildAssignmentRows(opportunities, assignments) {
   const byId = new Map(opportunities.map((o) => [o.Id, o]));
+  const firmStages = listFirmStages();
 
   return assignments
     .map((assignment) => {
@@ -95,6 +97,7 @@ function buildAssignmentRows(opportunities, assignments) {
         StartDate: toDateText(assignment.PlannedStartDate),
         EndDate: toDateText(assignment.PlannedEndDate),
         IsTimelineVisible: !!assignment.IsTimelineVisible,
+        IsCommitted: countsTowardsCapacity(opportunity, firmStages),
       };
     })
     .filter(Boolean);
@@ -209,10 +212,14 @@ function monthlyFreeSegments(assignmentsForPerson, personName, window) {
 
     if (endExclusive > start) {
       const capacityHours = countBusinessDays(start, endExclusive) * getPersonDailyHours(personName);
-      const assignedHours = assignmentsForPerson.reduce(
-        (total, assignment) => total + assignmentHoursInWindow(assignment, start, endExclusive),
-        0
-      );
+      // Soft bookings never reduce free capacity; they are reported separately.
+      const assignedHours = assignmentsForPerson
+        .filter((assignment) => assignment.IsCommitted)
+        .reduce((total, assignment) => total + assignmentHoursInWindow(assignment, start, endExclusive), 0);
+      const softHours = assignmentsForPerson
+        .filter((assignment) => !assignment.IsCommitted)
+        .reduce((total, assignment) => total + assignmentHoursInWindow(assignment, start, endExclusive), 0);
+
       segments.push({
         key: `${monthCursor.getFullYear()}-${String(monthCursor.getMonth() + 1).padStart(2, '0')}`,
         monthLabel: formatMonthLabel(monthCursor),
@@ -220,6 +227,7 @@ function monthlyFreeSegments(assignmentsForPerson, personName, window) {
         endExclusive,
         capacityHours: round2(capacityHours),
         freeHours: round2(capacityHours - assignedHours),
+        softHours: round2(softHours),
       });
     }
 
@@ -238,11 +246,16 @@ function buildManagementPeople(assignmentRows, window) {
     const capacityHours = round2(businessDays * dailyHours);
     const assigned = assignmentRows.filter((assignment) => assignment.PersonName === person);
     const visible = assigned.filter((assignment) => assignment.IsTimelineVisible);
-    const activeHours = visible.reduce(
-      (total, assignment) => total + assignmentHoursInWindow(assignment, window.start, window.endExclusive),
-      0
-    );
+
+    const hoursIn = (rows) =>
+      rows.reduce((total, assignment) => total + assignmentHoursInWindow(assignment, window.start, window.endExclusive), 0);
+
+    // Only committed work consumes capacity; soft bookings are reported alongside it.
+    const activeHours = hoursIn(visible.filter((assignment) => assignment.IsCommitted));
+    const softHours = hoursIn(visible.filter((assignment) => !assignment.IsCommitted));
+
     const assignedPercent = capacityHours > 0 ? Math.min(100, Math.max(0, (activeHours / capacityHours) * 100)) : 0;
+    const softPercent = capacityHours > 0 ? Math.min(100 - assignedPercent, Math.max(0, (softHours / capacityHours) * 100)) : 0;
 
     return {
       person,
@@ -250,8 +263,11 @@ function buildManagementPeople(assignmentRows, window) {
       dailyHours,
       capacityHours,
       activeHours: round2(activeHours),
+      softHours: round2(softHours),
       availableHours: round2(capacityHours - activeHours),
+      availableIfWonHours: round2(capacityHours - activeHours - softHours),
       assignedPercent,
+      softPercent,
       availablePercent: Math.max(0, 100 - assignedPercent),
     };
   });
@@ -321,11 +337,12 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
 
   const total = assignmentRows.length;
   const visible = assignmentRows.filter((assignment) => assignment.IsTimelineVisible).length;
+  const committed = assignmentRows.filter((assignment) => assignment.IsCommitted).length;
 
   return {
     assignmentRows,
     people,
-    stats: { total, visible, hidden: total - visible },
+    stats: { total, visible, hidden: total - visible, committed, soft: total - committed },
     timeline: {
       range,
       units,

@@ -65,12 +65,47 @@
   background: var(--color-surface-offset);
   border: 1px solid var(--color-border);
   overflow: hidden;
+  display: flex;
 }
 
 .capacity-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--color-primary), var(--color-primary-hover));
 }
+
+/* Soft bookings are stacked after committed hours so the bar shows both. */
+.capacity-fill-soft {
+  height: 100%;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(13, 110, 253, .35),
+    rgba(13, 110, 253, .35) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+.soft-hint { color: var(--color-text-muted, #6c757d); font-style: italic; }
+
+.booking-control {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  justify-content: flex-start;
+}
+
+.booking-control .form-select { max-width: 8.5rem; }
+
+.booking-state {
+  font-size: .7rem;
+  font-weight: 600;
+  padding: .1rem .45rem;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.booking-state.is-committed { background: rgba(25, 135, 84, .14); color: #146c43; }
+.booking-state.is-soft { background: rgba(232, 185, 35, .2); color: #8a6300; }
 
 .capacity-available { color: var(--color-success); font-weight: 600; }
 .capacity-tight { color: #b35309; font-weight: 600; }
@@ -164,7 +199,6 @@
 .timeline-chip {
   position: absolute;
   height: 50px;
-  padding: .3rem .55rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--accent, var(--color-border));
   border-left: 4px solid var(--accent, var(--color-primary));
@@ -174,10 +208,52 @@
   text-decoration: none;
   color: inherit;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-items: stretch;
   transition: transform .12s ease, box-shadow .12s ease;
 }
+
+.timeline-chip.is-resizing { transition: none; box-shadow: var(--shadow-md); z-index: 5; }
+
+/* Soft bookings do not consume capacity, so they read as provisional. */
+.timeline-chip.is-soft {
+  border-style: dashed;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, .045),
+    rgba(0, 0, 0, .045) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+
+.timeline-chip-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: .3rem .55rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+}
+
+.timeline-chip-body:hover { color: inherit; }
+
+.timeline-chip-resizer {
+  flex: 0 0 8px;
+  cursor: ew-resize;
+  background: transparent;
+  transition: background .12s ease;
+}
+
+.timeline-chip-resizer:hover,
+.timeline-chip.is-resizing .timeline-chip-resizer {
+  background: var(--accent, var(--color-primary));
+  opacity: .5;
+}
+
+body.timeline-resizing { cursor: ew-resize; user-select: none; }
 
 .timeline-chip:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); color: inherit; }
 

@@ -135,6 +135,20 @@
           </div>
 
           <div class="col-12">
+            <label class="form-label" for="bookingMode">Capacity booking</label>
+            <select class="form-select" id="bookingMode" name="bookingMode">
+              <% bookingModes.forEach(function(option) { %>
+                <option value="<%= option.key %>" <%= bookingMode(o) === option.key ? 'selected' : '' %>><%= option.label %></option>
+              <% }) %>
+            </select>
+            <div class="form-text">
+              Currently: <strong><%= bookingLabel(o) %></strong>.
+              Committed stages: <%= firmStages.length ? firmStages.join(', ') : 'none' %>.
+              Soft bookings appear on the timeline but do not reduce available capacity.
+            </div>
+          </div>
+
+          <div class="col-12">
             <label class="form-label" for="nextStepSummary">Next step summary</label>
             <input class="form-control" id="nextStepSummary" name="nextStepSummary" maxlength="500" value="<%= o.NextStepSummary || '' %>">
           </div>

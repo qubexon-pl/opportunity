@@ -5,6 +5,7 @@ const {
   getOpportunity,
   createOpportunity,
   updateOpportunity,
+  setBookingFlag,
   deleteOpportunity,
   addNote,
   deleteNote,
@@ -16,6 +17,14 @@ const { addAssignment, updateAssignment, deleteAssignment } = require('../servic
 const { listPeople, getDailyHoursMap } = require('../services/peopleService');
 const { calculateEndDate, calculateDurationWorkDays, toDateText, round2 } = require('../services/dateService');
 const { stageStatusLabel, stageAccentClass, stageBadgeClass } = require('../services/capacityService');
+const {
+  BOOKING_MODES,
+  bookingMode,
+  bookingModeToFlag,
+  bookingLabel,
+  countsTowardsCapacity,
+  listFirmStages,
+} = require('../services/bookingService');
 
 const router = express.Router();
 
@@ -62,6 +71,7 @@ function opportunityPayload(body) {
     plannedStartDate,
     plannedEndDate,
     allocationPercent: num(body.allocationPercent),
+    countsTowardsCapacity: bookingModeToFlag(String(body.bookingMode || 'auto')),
   };
 }
 
@@ -84,10 +94,12 @@ function emptyForm() {
     PlannedStartDate: '',
     PlannedEndDate: '',
     AllocationPercent: 100,
+    CountsTowardsCapacity: null,
   };
 }
 
 function baseViewModel(extra) {
+  const firmStages = listFirmStages();
   return {
     stages: STAGES,
     statuses: STATUSES,
@@ -96,6 +108,11 @@ function baseViewModel(extra) {
     stageStatusLabel,
     stageAccentClass,
     stageBadgeClass,
+    bookingModes: BOOKING_MODES,
+    bookingMode,
+    bookingLabel: (opportunity) => bookingLabel(opportunity, firmStages),
+    isCommitted: (opportunity) => countsTowardsCapacity(opportunity, firmStages),
+    firmStages,
     toDateText,
     round2,
     ...extra,
@@ -190,6 +207,22 @@ router.post('/:id', async (req, res, next) => {
     }
     next(err);
   }
+});
+
+/** Inline capacity booking control (used by the pipeline and the detail form). */
+router.post('/:id/booking', async (req, res) => {
+  const back = req.get('referer') || '/';
+  try {
+    const mode = String(req.body.bookingMode || 'auto');
+    if (!BOOKING_MODES.some((option) => option.key === mode)) {
+      throw new Error('Unknown booking mode.');
+    }
+    await setBookingFlag(req.params.id, bookingModeToFlag(mode));
+    req.flash('success', 'Capacity booking updated.');
+  } catch (err) {
+    req.flash('error', friendlyError(err));
+  }
+  res.redirect(back);
 });
 
 router.post('/:id/delete', async (req, res, next) => {

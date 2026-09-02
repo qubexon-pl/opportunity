@@ -58,7 +58,7 @@ async function listAssignments({ includeHidden = true } = {}) {
       .request()
       .input('includeHidden', sql.Bit, !!includeHidden)
       .query(
-        `SELECT a.*, o.Name as OpportunityName, o.Stage, o.Status, o.OpportunityHours
+        `SELECT a.*, o.Name as OpportunityName, o.Stage, o.Status, o.OpportunityHours, o.CountsTowardsCapacity
          FROM dbo.OpportunityAssignments a
          INNER JOIN dbo.Opportunities o ON o.Id = a.OpportunityId
          WHERE (@includeHidden = 1 OR a.IsTimelineVisible = 1)

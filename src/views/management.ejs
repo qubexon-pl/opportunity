@@ -8,8 +8,9 @@
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <span class="badge text-bg-secondary">Assignments: <%= view.stats.total %></span>
-    <span class="badge text-bg-success">On timeline: <%= view.stats.visible %></span>
-    <span class="badge text-bg-warning">Hidden: <%= view.stats.hidden %></span>
+    <span class="badge text-bg-success">Committed: <%= view.stats.committed %></span>
+    <span class="badge text-bg-warning">Soft booked: <%= view.stats.soft %></span>
+    <span class="badge text-bg-light">Hidden: <%= view.stats.hidden %></span>
   </div>
 </div>
 
@@ -62,12 +63,17 @@
             <div class="fw-semibold"><%= member.person %></div>
             <span class="small text-muted"><%= member.dailyHours %>h/day</span>
           </div>
-          <div class="capacity-track">
+          <div class="capacity-track" title="<%= member.activeHours %>h committed, <%= member.softHours %>h soft booked">
             <div class="capacity-fill" style="width: <%= member.assignedPercent.toFixed(2) %>%;"></div>
+            <div class="capacity-fill-soft" style="width: <%= member.softPercent.toFixed(2) %>%;"></div>
           </div>
           <div class="d-flex justify-content-between small mt-2">
-            <span class="text-muted"><%= member.activeHours %>h assigned</span>
+            <span class="text-muted"><%= member.activeHours %>h committed</span>
             <span class="<%= capacityClass(member.availableHours) %>"><%= member.availableHours %>h free</span>
+          </div>
+          <div class="d-flex justify-content-between small mt-1">
+            <span class="soft-hint"><%= member.softHours %>h soft booked</span>
+            <span class="text-muted"><%= member.availableIfWonHours %>h if all won</span>
           </div>
           <div class="text-muted small mt-1">Capacity <%= member.capacityHours %>h in window</div>
         </div>
@@ -95,7 +101,9 @@
   </div>
   <div class="card-body">
     <div class="timeline-scroll">
-      <div class="timeline-grid">
+      <div class="timeline-grid" id="timelineGrid"
+           data-range-start="<%= view.timeline.startText %>"
+           data-range-end-exclusive="<%= view.timeline.endExclusiveText %>">
         <div class="timeline-head">
           <div class="timeline-person-head">Person</div>
           <div class="timeline-units" style="--timeline-units: <%= view.timeline.units.length %>;">
@@ -113,19 +121,32 @@
                 <% view.timeline.units.forEach(function(unit) { %><div class="timeline-gridline"></div><% }) %>
               </div>
               <% row.chips.forEach(function(chip) { %>
-                <a class="timeline-chip <%= chip.accentClass %>"
-                   href="/opportunities/<%= chip.OpportunityId %>#assignments"
-                   style="left: <%= chip.geometry.left.toFixed(3) %>%; width: <%= chip.geometry.width.toFixed(3) %>%; top: <%= chip.geometry.top %>px;"
-                   title="<%= chip.OpportunityName %> &middot; <%= chip.StartDate %> &rarr; <%= chip.EndDate %> &middot; <%= chip.AllocatedHours %>h">
-                  <span class="timeline-chip-title"><%= chip.OpportunityName %></span>
-                  <span class="timeline-chip-meta"><%= chip.AllocationPercent || 0 %>% &middot; <%= chip.AllocatedHours %>h &middot; <%= stageStatusLabel(chip.Stage) %></span>
-                </a>
+                <div class="timeline-chip <%= chip.accentClass %> <%= chip.IsCommitted ? 'is-committed' : 'is-soft' %>"
+                     data-assignment-id="<%= chip.Id %>"
+                     data-opportunity-id="<%= chip.OpportunityId %>"
+                     data-start="<%= chip.StartDate %>"
+                     data-end="<%= chip.EndDate %>"
+                     data-percent="<%= chip.AllocationPercent || 0 %>"
+                     data-person="<%= chip.PersonName %>"
+                     style="left: <%= chip.geometry.left.toFixed(3) %>%; width: <%= chip.geometry.width.toFixed(3) %>%; top: <%= chip.geometry.top %>px;"
+                     title="<%= chip.OpportunityName %> &middot; <%= chip.StartDate %> &rarr; <%= chip.EndDate %> &middot; <%= chip.AllocatedHours %>h<%= chip.IsCommitted ? '' : ' (soft booking)' %>">
+                  <span class="timeline-chip-resizer start" data-edge="start" title="Drag to change the start date"></span>
+                  <a class="timeline-chip-body" href="/opportunities/<%= chip.OpportunityId %>#assignments">
+                    <span class="timeline-chip-title">
+                      <% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %>
+                    </span>
+                    <span class="timeline-chip-meta"><%= chip.AllocationPercent || 0 %>% &middot; <%= chip.AllocatedHours %>h &middot; <%= stageStatusLabel(chip.Stage) %></span>
+                  </a>
+                  <span class="timeline-chip-resizer end" data-edge="end" title="Drag to change the end date"></span>
+                </div>
               <% }) %>
               <% row.freeChips.forEach(function(segment) { %>
                 <div class="timeline-free"
                      style="left: <%= segment.geometry.left.toFixed(3) %>%; width: <%= segment.geometry.width.toFixed(3) %>%; top: <%= segment.geometry.top %>px;"
-                     title="<%= segment.monthLabel %>: <%= segment.freeHours %>h free of <%= segment.capacityHours %>h">
-                  <span class="timeline-free-label"><%= segment.monthLabel %> &middot; <%= segment.freeHours %>h free</span>
+                     title="<%= segment.monthLabel %>: <%= segment.freeHours %>h free of <%= segment.capacityHours %>h<%= segment.softHours ? ' (' + segment.softHours + 'h soft booked)' : '' %>">
+                  <span class="timeline-free-label">
+                    <%= segment.monthLabel %> &middot; <%= segment.freeHours %>h free<% if (segment.softHours) { %> &middot; <%= segment.softHours %>h soft<% } %>
+                  </span>
                 </div>
               <% }) %>
               <% if (!row.chips.length && !row.freeChips.length) { %>
@@ -200,6 +221,7 @@
             <th>Window</th>
             <th class="text-end">Allocation</th>
             <th class="text-end">Hours</th>
+            <th class="text-end">Booking</th>
             <th class="text-end">Timeline</th>
           </tr>
         </thead>
@@ -213,6 +235,11 @@
               <td class="text-end"><%= assignment.AllocationPercent || 0 %>%</td>
               <td class="text-end"><%= assignment.AllocatedHours %>h</td>
               <td class="text-end">
+                <span class="booking-state <%= assignment.IsCommitted ? 'is-committed' : 'is-soft' %>">
+                  <%= assignment.IsCommitted ? 'Committed' : 'Soft' %>
+                </span>
+              </td>
+              <td class="text-end">
                 <form method="post" action="/management/assignments/<%= assignment.Id %>/visibility">
                   <input type="hidden" name="isTimelineVisible" value="<%= assignment.IsTimelineVisible ? 'false' : 'true' %>">
                   <button class="btn btn-sm <%= assignment.IsTimelineVisible ? 'btn-outline-secondary' : 'btn-outline-success' %>" type="submit">
@@ -223,11 +250,12 @@
             </tr>
           <% }) %>
           <% if (!view.assignmentRows.length) { %>
-            <tr><td colspan="7" class="text-center text-muted py-4">No assignments yet.</td></tr>
+            <tr><td colspan="8" class="text-center text-muted py-4">No assignments yet.</td></tr>
           <% } %>
         </tbody>
       </table>
     </div>
   </div>
 </div>
+<script src="/js/timeline.js"></script>
 <%- include('partials/footer') %>

@@ -1,6 +1,9 @@
 const express = require('express');
 const { listPeople, getPersonDailyHours, addPerson, removePerson, updateDailyHours } = require('../services/peopleService');
 const { HOURS_PER_DAY, MONTHLY_CAPACITY } = require('../services/dateService');
+const { STAGES } = require('../services/opportunityService');
+const { listFirmStages } = require('../services/bookingService');
+const { updateFirmStages } = require('../config/settings');
 
 const router = express.Router();
 
@@ -15,7 +18,23 @@ router.get('/', (req, res) => {
     people,
     defaultDailyHours: HOURS_PER_DAY,
     monthlyCapacity: MONTHLY_CAPACITY,
+    stages: STAGES,
+    firmStages: listFirmStages(),
   });
+});
+
+/** Chooses which stages consume real capacity; every other stage is a soft booking. */
+router.post('/capacity/stages', (req, res) => {
+  try {
+    const raw = req.body.firmStages;
+    const selected = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
+    const valid = selected.filter((stage) => STAGES.includes(String(stage)));
+    updateFirmStages(valid);
+    req.flash('success', valid.length ? `Committed stages: ${valid.join(', ')}.` : 'All stages are now soft bookings.');
+  } catch (err) {
+    req.flash('error', err.message || String(err));
+  }
+  res.redirect('/settings');
 });
 
 router.post('/people', (req, res) => {
