@@ -8,7 +8,9 @@ if (!isSqlConfigured()) {
   console.warn('[Server] AZURE_SQL_SERVER / AZURE_SQL_DATABASE are not configured. Copy .env.example to .env first.');
 }
 
-app.listen(port, '0.0.0.0', () => {
+// Bind dual-stack (IPv4 + IPv6). Binding to '0.0.0.0' makes Windows' IPv6-first
+// resolution of "localhost" fail over, adding ~2s of latency to every request.
+app.listen(port, () => {
   console.log(`\n  Opportunities App`);
   console.log(`  ─────────────────`);
   console.log(`  Running at:  http://localhost:${port}`);
