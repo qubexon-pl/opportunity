@@ -36,15 +36,25 @@
       if (syncing !== 'proxy') proxy.scrollLeft = scroller.scrollLeft;
     }
 
+    // The frozen header and person column overlap the rows once the board is
+    // scrolled. An accent edge appears only then, so it is clear the content is
+    // passing underneath rather than ending there.
+    function markFrozen() {
+      scroller.classList.toggle('is-scrolled-y', scroller.scrollTop > 1);
+      scroller.classList.toggle('is-scrolled-x', scroller.scrollLeft > 1);
+    }
+
     // A flag stops the two scrollbars from bouncing updates off each other.
     proxy.addEventListener('scroll', function () {
       if (syncing === 'scroller') return;
       syncing = 'proxy';
       scroller.scrollLeft = proxy.scrollLeft;
+      markFrozen();
       window.requestAnimationFrame(function () { syncing = null; });
     });
 
     scroller.addEventListener('scroll', function () {
+      markFrozen();
       if (syncing === 'proxy') return;
       syncing = 'scroller';
       proxy.scrollLeft = scroller.scrollLeft;
@@ -59,6 +69,7 @@
     if (window.ResizeObserver) new ResizeObserver(refresh).observe(scroller);
 
     refresh();
+    markFrozen();
   }
 
   document.addEventListener('DOMContentLoaded', function () {

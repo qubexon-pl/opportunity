@@ -202,6 +202,28 @@
 .timeline-floating-scroll > div { height: 1px; }
 
 /*
+ * Anything that has left the flow and now floats over the board says so with an
+ * accent edge, so it is never mistaken for content sitting in place. The border
+ * appears only while the element is actually detached, so a page at rest stays
+ * quiet.
+ */
+.timeline-floating-scroll.is-visible { border-top: 2px solid var(--color-primary); }
+
+.perspective-dock.is-stuck {
+  border-color: var(--color-primary);
+  border-width: 2px;
+}
+
+.timeline-scroll.is-scrolled-y .timeline-head {
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.timeline-scroll.is-scrolled-x .timeline-person,
+.timeline-scroll.is-scrolled-x .timeline-person-head {
+  border-right: 2px solid var(--color-primary);
+}
+
+/*
  * The filters stay within reach: the card sticks below the top bar, and
  * condenses to a single docked line once it has been scrolled past, so it costs
  * a strip of the board rather than a whole card. The full form is one click
@@ -426,13 +448,30 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
   overflow: hidden;
 }
 
+/*
+ * Hours above, share below. On one line the two were competing for a narrow
+ * bar and the percentage - the part that says whether the period is healthy -
+ * was the first thing to be cut off.
+ */
 .timeline-free-label {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.15;
+  min-width: 0;
   font-size: .72rem;
   color: var(--color-primary-strong);
+}
+
+.timeline-free-primary,
+.timeline-free-secondary {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.timeline-free-primary { font-weight: 600; }
+.timeline-free-secondary { font-size: .68rem; opacity: .85; }
 
 [data-theme="dark"] .timeline-free-label { color: var(--color-primary); }
 
