@@ -3,6 +3,7 @@ const {
   round2,
   toDate,
   toDateText,
+  parseDateOnlyUtc,
   countBusinessDays,
   countBusinessDaysInclusive,
   startOfUnit,
@@ -12,6 +13,7 @@ const {
   formatShortDate,
   unitsToCoverRange,
   periodBounds,
+  addBusinessDaysText,
 } = require('./dateService');
 const { listPeople, getPersonDailyHours, getPersonRole, getPersonCost, COST_CURRENCY } = require('./peopleService');
 const { absenceBusinessDays, absencesInWindow } = require('./absenceService');
@@ -146,7 +148,7 @@ function buildAssignmentRows(opportunities, assignments) {
   const byId = new Map(opportunities.map((o) => [o.Id, o]));
   const firmStages = listFirmStages();
 
-  return assignments
+  const rows = assignments
     .map((assignment) => {
       const opportunity = byId.get(assignment.OpportunityId);
       if (!opportunity) return null;
@@ -183,6 +185,43 @@ function buildAssignmentRows(opportunities, assignments) {
       };
     })
     .filter(Boolean);
+
+  return rows.map((row) => ({ ...row, scope: opportunityScope(rows, row.OpportunityId, row.OpportunityHours) }));
+}
+
+/**
+ * How much of an opportunity's scope its assignments have taken.
+ *
+ * Compared against the hours the bars actually carry, so broadening a bar on
+ * the timeline can push an opportunity over its own budget and say so. An
+ * opportunity with no stated hours cannot be over or under, so it is neutral.
+ */
+function opportunityScope(rows, opportunityId, opportunityHours) {
+  const mine = rows.filter((row) => row.OpportunityId === opportunityId);
+  const assignedHours = round2(mine.reduce((total, row) => total + Number(row.AllocatedHours || 0), 0));
+  const scopeHours = round2(Number(opportunityHours || 0));
+  const differenceHours = round2(assignedHours - scopeHours);
+
+  if (scopeHours <= 0) {
+    return {
+      assignedHours,
+      scopeHours,
+      differenceHours: 0,
+      percentOfScope: 0,
+      assignmentCount: mine.length,
+      state: 'unknown',
+    };
+  }
+
+  return {
+    assignedHours,
+    scopeHours,
+    differenceHours,
+    percentOfScope: round2((assignedHours / scopeHours) * 100),
+    assignmentCount: mine.length,
+    // A hair over from rounding is not an overrun worth flagging in red.
+    state: differenceHours > 0.01 ? 'over' : 'within',
+  };
 }
 
 /** Business days of an assignment's hold window that fall inside [from, toExclusive). */
@@ -424,6 +463,28 @@ function freeSegments(assignmentsForPerson, personName, window, perspective) {
   return segments;
 }
 
+/**
+ * A person's absences as bands across the timeline, so time away is visible
+ * against the assignment chips rather than only inside the free-bar tooltip.
+ *
+ * Bands are drawn over the whole row height because an absence applies to the
+ * person, not to one assignment: every chip it crosses is affected.
+ */
+function absenceBands(personName, range) {
+  const rangeEndInclusive = new Date(range.endExclusive.getTime() - DAY_MS);
+  return absencesInWindow(personName, range.start, range.endExclusive).map((absence) => {
+    // Clip the label dates to the visible range so a long absence that starts
+    // before the window still reads correctly.
+    const geometry = chipGeometry(range, absence.startDate, absence.endDate, 0);
+    return {
+      ...absence,
+      geometry,
+      startsBefore: absence.startDate < toDateText(range.start),
+      endsAfter: absence.endDate > toDateText(rangeEndInclusive),
+    };
+  }).filter((band) => band.geometry.width > 0);
+}
+
 function buildManagementPeople(assignmentRows, window) {
   const assignedPeople = assignmentRows.map((assignment) => assignment.PersonName).filter(Boolean);
 
@@ -556,6 +617,7 @@ function buildManagementView({
   perspective,
   unitsToShow,
   stageFilter,
+  statusFilter,
   personFilter,
   sort,
   dir,
@@ -577,8 +639,17 @@ function buildManagementView({
     peopleDir
   );
 
+  // Status narrows which assignments are in play at all, so it applies before
+  // the stage filter, which only decides what the timeline draws.
+  const selectedStatuses = (Array.isArray(statusFilter) ? statusFilter : statusFilter ? [statusFilter] : [])
+    .map((status) => String(status).toLowerCase())
+    .filter(Boolean);
+  const matchesStatus = (assignment) =>
+    !selectedStatuses.length || selectedStatuses.includes(String(assignment.Status || '').toLowerCase());
+
   const visibleRows = assignmentRows.filter(
-    (assignment) => !selectedPeople.length || selectedPeople.includes(assignment.PersonName)
+    (assignment) =>
+      (!selectedPeople.length || selectedPeople.includes(assignment.PersonName)) && matchesStatus(assignment)
   );
   const scheduled = visibleRows.filter((assignment) => assignment.IsTimelineVisible);
 
@@ -652,8 +723,11 @@ function buildManagementView({
       softHours: member.softHours,
       freeHours: member.availableHours,
       heldHours: member.heldHours,
+      absenceHours: member.absenceHours,
+      absentDays: member.absentDays,
       chips,
       freeChips,
+      absenceBands: absenceBands(member.person, range),
       height: rowHeight(forPerson.length, showFreeBars),
     };
   });
@@ -664,7 +738,9 @@ function buildManagementView({
   const onHold = visibleRows.filter((assignment) => assignment.IsOnHold).length;
 
   return {
-    assignmentRows: sortBy(assignmentRows, ASSIGNMENT_SORT_FIELDS, sort, dir),
+    // The table shows what the page filters select, so "Assignments" always
+    // means the same set the timeline above is drawing from.
+    assignmentRows: sortBy(visibleRows, ASSIGNMENT_SORT_FIELDS, sort, dir),
     sort: resolveSort(ASSIGNMENT_SORT_FIELDS, sort, dir),
     peopleSort: resolveSort(PEOPLE_SORT_FIELDS, peopleSort, peopleDir),
     people,
@@ -725,6 +801,86 @@ function buildUpcoming(opportunities, periodKey, nextSteps) {
     .map((item) => ({ ...item, dueText: toDateText(item.due) }));
 
   return { items, label: `${formatShortDate(start)} - ${formatShortDate(endInclusive)}` };
+}
+
+/**
+ * Absences that land inside the delivery windows of an opportunity's assignments.
+ *
+ * The point of view here is the project, not the person: an absence only matters
+ * to an opportunity if the person is away on days that assignment was counting
+ * on. Days lost are converted to hours at the assignment's own delivery rate
+ * (its hours spread over its working days), because that is what actually slips.
+ *
+ * Nothing here changes a stored figure. It is advice: the assignment still owes
+ * its hours, so either the window has to stretch or the hours have to move to
+ * someone else.
+ */
+function buildOpportunityAbsenceImpact(opportunity, assignments) {
+  const scopeHours = Number((opportunity && opportunity.OpportunityHours) || 0);
+
+  const items = (Array.isArray(assignments) ? assignments : [])
+    .map((assignment) => {
+      const startText = toDateText(assignment.PlannedStartDate);
+      const endText = toDateText(assignment.PlannedEndDate);
+      const start = parseDateOnlyUtc(startText);
+      const end = parseDateOnlyUtc(endText);
+      if (!start || !end || end < start) return null;
+
+      const endExclusive = new Date(end.getTime() + DAY_MS);
+      const absences = absencesInWindow(assignment.PersonName, start, endExclusive);
+      if (!absences.length) return null;
+
+      const businessDays = countBusinessDaysInclusive(startText, endText);
+      const absentDays = Math.min(businessDays, absenceBusinessDays(assignment.PersonName, start, endExclusive));
+      if (!businessDays || !absentDays) return null;
+
+      const allocatedHours = round2(Number(assignment.AllocatedHours || 0));
+      const hoursAtRisk = round2(allocatedHours * (absentDays / businessDays));
+      const workingDays = businessDays - absentDays;
+
+      return {
+        assignmentId: assignment.Id,
+        person: assignment.PersonName,
+        startDate: startText,
+        endDate: endText,
+        businessDays,
+        absentDays,
+        workingDays,
+        allocatedHours,
+        hoursAtRisk,
+        percentOfAssignment: allocatedHours > 0 ? round2((hoursAtRisk / allocatedHours) * 100) : 0,
+        percentOfScope: scopeHours > 0 ? round2((hoursAtRisk / scopeHours) * 100) : 0,
+        // Recovering the lost days means running that many working days longer.
+        suggestedEndDate: addBusinessDaysText(endText, absentDays),
+        // No working days left at all means the window cannot deliver anything.
+        blocksDelivery: workingDays === 0,
+        absences,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.hoursAtRisk - a.hoursAtRisk || a.startDate.localeCompare(b.startDate));
+
+  const hoursAtRisk = round2(items.reduce((total, item) => total + item.hoursAtRisk, 0));
+  const daysLost = items.reduce((total, item) => total + item.absentDays, 0);
+  const latestSuggestedEnd = items.reduce(
+    (latest, item) => (item.suggestedEndDate > latest ? item.suggestedEndDate : latest),
+    ''
+  );
+  const plannedEnd = toDateText(opportunity && opportunity.PlannedEndDate);
+
+  return {
+    items,
+    hoursAtRisk,
+    daysLost,
+    peopleAffected: [...new Set(items.map((item) => item.person))],
+    percentOfScope: scopeHours > 0 ? round2((hoursAtRisk / scopeHours) * 100) : 0,
+    scopeHours: round2(scopeHours),
+    blocksDelivery: items.some((item) => item.blocksDelivery),
+    plannedEndDate: plannedEnd,
+    latestSuggestedEnd,
+    // Only a real slip past the planned end is worth calling out as a date risk.
+    shiftsPlannedEnd: !!(plannedEnd && latestSuggestedEnd && latestSuggestedEnd > plannedEnd),
+  };
 }
 
 /**
@@ -834,4 +990,6 @@ module.exports = {
   buildManagementView,
   buildPersonDetail,
   buildUpcoming,
+  buildOpportunityAbsenceImpact,
+  opportunityScope,
 };

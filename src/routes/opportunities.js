@@ -16,7 +16,7 @@ const {
 const { addAssignment, updateAssignment, deleteAssignment, ALLOCATION_MODES } = require('../services/assignmentService');
 const { listPeople, getDailyHoursMap } = require('../services/peopleService');
 const { calculateEndDate, calculateDurationWorkDays, toDateText, round2 } = require('../services/dateService');
-const { stageStatusLabel, stageAccentClass, stageBadgeClass } = require('../services/capacityService');
+const { stageStatusLabel, stageAccentClass, stageBadgeClass, buildOpportunityAbsenceImpact } = require('../services/capacityService');
 const {
   BOOKING_MODES,
   bookingMode,
@@ -192,6 +192,7 @@ router.get('/:id', async (req, res, next) => {
         notes: detail.notes,
         nextSteps: detail.nextSteps,
         assignments: detail.assignments,
+        absenceImpact: buildOpportunityAbsenceImpact(opportunity, detail.assignments),
         plannedEndPreview: calculateEndDate(toDateText(opportunity.PlannedStartDate), opportunity.OpportunityHours, 100),
         plannedDurationPreview: calculateDurationWorkDays(opportunity.OpportunityHours, 100),
         today: toDateText(new Date()),

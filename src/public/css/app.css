@@ -646,3 +646,147 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
 .period-absent > td {
   background: rgba(255, 193, 7, 0.06);
 }
+/* --- Timeline absence bands --------------------------------------------- */
+/* Drawn across the full row: an absence belongs to the person, so every
+   assignment chip it crosses is affected. */
+.timeline-absence {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Context only: it must never sit above a chip or swallow a resize drag, so
+     it stays in the natural paint order (before the chips) and takes no input. */
+  pointer-events: none;
+  border-left: 2px solid rgba(214, 158, 46, 0.75);
+  border-right: 2px solid rgba(214, 158, 46, 0.75);
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(214, 158, 46, 0.16),
+    rgba(214, 158, 46, 0.16) 6px,
+    rgba(214, 158, 46, 0.04) 6px,
+    rgba(214, 158, 46, 0.04) 12px
+  );
+}
+
+.timeline-absence-label {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  right: 4px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: #8a6100;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.legend-chip.legend-absence {
+  cursor: help;
+  border-color: rgba(214, 158, 46, 0.75);
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(214, 158, 46, 0.18),
+    rgba(214, 158, 46, 0.18) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+
+/* --- Over/under assignment against opportunity scope --------------------- */
+.scope-arrow {
+  margin-left: 0.35rem;
+  cursor: help;
+}
+
+.scope-over {
+  color: var(--bs-danger, #dc3545);
+}
+
+.scope-within {
+  color: var(--bs-success, #198754);
+}
+
+.scope-hint {
+  cursor: help;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Opportunity tags ---------------------------------------------------- */
+.opportunity-tag {
+  display: inline-block;
+  margin-left: 0.3rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 120, 140, 0.35);
+  background: rgba(120, 120, 140, 0.1);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.5;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* --- Pipeline stage totals ---------------------------------------------- */
+.stage-total {
+  height: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid rgba(120, 120, 140, 0.5);
+  background: rgba(120, 120, 140, 0.06);
+}
+
+.stage-total-won {
+  border-left-color: #198754;
+}
+
+.stage-total-lost {
+  border-left-color: #dc3545;
+}
+
+.stage-total-other {
+  border-left-color: var(--color-accent, #6f42c1);
+}
+
+.stage-total-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.75;
+}
+
+.stage-total-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.stage-total-hours {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-total-table td,
+.stage-total-table th {
+  vertical-align: middle;
+}
+
+/* --- Opportunity absence impact ----------------------------------------- */
+.absence-impact-card {
+  border-left: 4px solid rgba(214, 158, 46, 0.85);
+}
+
+.absence-impact-card.is-at-risk {
+  border-left-color: #dc3545;
+}
+
+.absence-impact-table td,
+.absence-impact-table th {
+  vertical-align: top;
+}
+
+.absence-kind {
+  font-weight: 600;
+}

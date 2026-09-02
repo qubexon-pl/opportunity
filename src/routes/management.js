@@ -21,7 +21,7 @@ const {
 const { listFirmStages } = require('../services/bookingService');
 const { getViewDefaults, updateViewDefaults } = require('../config/settings');
 const { queryList, filterAgainst } = require('../services/filterService');
-const { STAGES } = require('../services/opportunityService');
+const { STAGES, STATUSES } = require('../services/opportunityService');
 const { isDatabaseUnavailable } = require('../db/pool');
 
 const router = express.Router();
@@ -69,6 +69,9 @@ router.get('/', async (req, res, next) => {
   const stageFilters = applied
     ? filterAgainst(queryList(req.query.stage), TIMELINE_FILTER_OPTIONS)
     : filterAgainst(defaults.stages, TIMELINE_FILTER_OPTIONS);
+  const statusFilters = applied
+    ? filterAgainst(queryList(req.query.status), STATUSES)
+    : filterAgainst(defaults.statuses, STATUSES);
   const requestedPeople = applied ? queryList(req.query.person) : defaults.people;
 
   try {
@@ -98,6 +101,7 @@ router.get('/', async (req, res, next) => {
       perspective,
       unitsToShow,
       stageFilter: stageFilters,
+      statusFilter: statusFilters,
       personFilter: personFilters,
       sort: req.query.sort,
       dir: req.query.dir,
@@ -106,6 +110,7 @@ router.get('/', async (req, res, next) => {
     });
 
     const sameStages = JSON.stringify([...stageFilters].sort()) === JSON.stringify([...defaults.stages].sort());
+    const sameStatuses = JSON.stringify([...statusFilters].sort()) === JSON.stringify([...defaults.statuses].sort());
     const samePeople = JSON.stringify([...personFilters].sort()) === JSON.stringify([...defaults.people].sort());
 
     // Sort links have to carry the whole filter state, otherwise clicking a
@@ -115,6 +120,7 @@ router.get('/', async (req, res, next) => {
       ['perspective', perspective],
       ['units', String(unitsToShow)],
       ...stageFilters.map((stage) => ['stage', stage]),
+      ...statusFilters.map((status) => ['status', status]),
       ...personFilters.map((name) => ['person', name]),
     ];
     const current = {
@@ -136,6 +142,8 @@ router.get('/', async (req, res, next) => {
       perspective,
       unitsToShow,
       stageFilters,
+      statusFilters,
+      statusOptions: STATUSES,
       personFilters,
       personOptions,
       timelineFilterOptions: TIMELINE_FILTER_OPTIONS,
@@ -150,7 +158,7 @@ router.get('/', async (req, res, next) => {
       queryWith,
       firmStages: listFirmStages(),
       savedDefaults: defaults,
-      filtersMatchDefault: sameStages && samePeople && perspective === defaults.perspective && unitsToShow === defaults.units,
+      filtersMatchDefault: sameStages && sameStatuses && samePeople && perspective === defaults.perspective && unitsToShow === defaults.units,
       loadError,
       stageStatusLabel,
       stageAccentClass,
@@ -216,6 +224,7 @@ router.post('/defaults', (req, res) => {
   try {
     updateViewDefaults('management', {
       stages: filterAgainst(queryList(req.body.stage), TIMELINE_FILTER_OPTIONS),
+      statuses: filterAgainst(queryList(req.body.status), STATUSES),
       people: queryList(req.body.person).map((name) => String(name)),
       perspective: normalizePerspective(req.body.perspective, 'months'),
       units: normalizeUnits(req.body.units, 6),

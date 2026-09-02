@@ -247,6 +247,30 @@ function periodBounds(key) {
   return { start, endInclusive: end };
 }
 
+/**
+ * The date N working days after `dateText`, as text.
+ *
+ * Used to suggest how far a delivery date has to move to recover days a team
+ * member is away for, so the shift is expressed in working days rather than
+ * calendar days. Kept separate from `addBusinessDays`, which works on local-time
+ * Date objects; stored dates are UTC midnight and must be stepped in UTC.
+ */
+function addBusinessDaysText(dateText, days) {
+  const start = parseDateOnlyUtc(String(dateText || '').slice(0, 10));
+  const toAdd = Math.max(0, Math.round(Number(days) || 0));
+  if (!start) return '';
+  if (toAdd === 0) return toDateText(start);
+
+  const cursor = new Date(start);
+  let added = 0;
+  while (added < toAdd) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    const day = cursor.getUTCDay();
+    if (day !== 0 && day !== 6) added += 1;
+  }
+  return toDateText(cursor);
+}
+
 module.exports = {
   MONTHLY_CAPACITY,
   WORK_DAYS_PER_MONTH,
@@ -259,6 +283,7 @@ module.exports = {
   countBusinessDaysInclusive,
   countMonthsInclusive,
   addBusinessDays,
+  addBusinessDaysText,
   calculateDurationWorkDays,
   calculateEndDate,
   calculateAllocatedHours,

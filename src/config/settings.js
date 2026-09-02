@@ -15,7 +15,7 @@ const DEFAULT_FIRM_STAGES = ['Won'];
 
 const DEFAULT_VIEW_DEFAULTS = {
   pipeline: { stages: [], statuses: [] },
-  management: { stages: [], people: [], perspective: 'months', units: 6 },
+  management: { stages: [], statuses: [], people: [], perspective: 'months', units: 6 },
 };
 
 function loadFileConfig() {
@@ -118,6 +118,7 @@ function getViewDefaults() {
     },
     management: {
       stages: toStringArray(management.stages),
+      statuses: toStringArray(management.statuses),
       people: toStringArray(management.people),
       perspective: management.perspective ? String(management.perspective) : DEFAULT_VIEW_DEFAULTS.management.perspective,
       units: Number.isFinite(units) && units > 0 ? units : DEFAULT_VIEW_DEFAULTS.management.units,
