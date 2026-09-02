@@ -1,0 +1,37 @@
+<%
+  /*
+   * Dropdown multi-select: a button that summarises the selection and opens a
+   * checkbox list. Each checkbox posts under the same name, so the server sees
+   * exactly what a <select multiple> would have sent.
+   *
+   * locals: name, label, options [{value, label}], selected [], allLabel, id
+   */
+  var msId = typeof id !== 'undefined' && id ? id : 'ms-' + name;
+  var msSelected = selected || [];
+  var msAllLabel = typeof allLabel !== 'undefined' && allLabel ? allLabel : 'All';
+  var msSummary = msSelected.length === 0
+    ? msAllLabel
+    : msSelected.length === 1
+      ? msSelected[0]
+      : msSelected.length + ' selected';
+%>
+<label class="form-label" for="<%= msId %>-toggle"><%= label %></label>
+<div class="dropdown multiselect" data-multiselect data-all-label="<%= msAllLabel %>">
+  <button class="form-select text-start multiselect-toggle" type="button" id="<%= msId %>-toggle"
+          data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+    <span data-role="summary"><%= msSummary %></span>
+  </button>
+  <div class="dropdown-menu multiselect-menu p-2" aria-labelledby="<%= msId %>-toggle">
+    <div class="d-flex justify-content-between align-items-center gap-2 mb-2 px-1">
+      <span class="text-muted small"><%= label %></span>
+      <button type="button" class="btn btn-link btn-sm p-0" data-role="clear">Clear</button>
+    </div>
+    <% (options || []).forEach(function(option, index) { %>
+      <div class="form-check multiselect-option">
+        <input class="form-check-input" type="checkbox" name="<%= name %>" value="<%= option.value %>"
+               id="<%= msId %>-<%= index %>" <%= msSelected.indexOf(option.value) !== -1 ? 'checked' : '' %>>
+        <label class="form-check-label" for="<%= msId %>-<%= index %>"><%= option.label %></label>
+      </div>
+    <% }) %>
+  </div>
+</div>

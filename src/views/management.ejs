@@ -39,14 +39,16 @@
         <input type="number" class="form-control" id="units" name="units" min="1" max="24" value="<%= unitsToShow %>">
       </div>
       <div class="col-lg-3 col-md-4 col-6">
-        <label class="form-label" for="stage">Stage filter</label>
-        <select class="form-select filter-multi" id="stage" name="stage" multiple size="6">
-          <option value="free" <%= stageFilters.indexOf('free') !== -1 ? 'selected' : '' %>>Free capacity</option>
-          <% stageLegend.forEach(function(item) { %>
-            <option value="<%= item.label %>" <%= stageFilters.indexOf(item.label) !== -1 ? 'selected' : '' %>><%= item.label %></option>
-          <% }) %>
-        </select>
-        <div class="form-text">None selected = all stages</div>
+        <%- include('partials/multiselect', {
+          id: 'filter-timeline-stage',
+          name: 'stage',
+          label: 'Stage filter',
+          allLabel: 'All stages',
+          selected: stageFilters,
+          options: [{ value: 'free', label: 'Free capacity' }].concat(stageLegend.map(function(item) {
+            return { value: item.label, label: item.label };
+          }))
+        }) %>
       </div>
       <div class="col-lg-3 col-md-4 col-6 d-flex gap-2">
         <button class="btn btn-primary flex-grow-1" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
@@ -68,129 +70,61 @@
   </div>
 </div>
 
-<div class="row g-3 mb-4">
-  <% view.people.forEach(function(member) { %>
-    <div class="col-xl-3 col-lg-4 col-md-6">
-      <div class="card h-100 capacity-card">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-start mb-2">
-            <div class="fw-semibold"><%= member.person %></div>
-            <span class="small text-muted"><%= member.dailyHours %>h/day</span>
-          </div>
-          <div class="capacity-track" title="<%= member.activeHours %>h committed, <%= member.softHours %>h soft booked">
-            <div class="capacity-fill" style="width: <%= member.assignedPercent.toFixed(2) %>%;"></div>
-            <div class="capacity-fill-soft" style="width: <%= member.softPercent.toFixed(2) %>%;"></div>
-          </div>
-          <div class="d-flex justify-content-between small mt-2">
-            <span class="text-muted"><%= member.activeHours %>h committed</span>
-            <span class="<%= capacityClass(member.availableHours) %>"><%= member.availableHours %>h free</span>
-          </div>
-          <div class="d-flex justify-content-between small mt-1">
-            <span class="soft-hint"><%= member.softHours %>h soft booked</span>
-            <span class="text-muted"><%= member.availableIfWonHours %>h if all won</span>
-          </div>
-          <div class="text-muted small mt-1">Capacity <%= member.capacityHours %>h in window</div>
-        </div>
-      </div>
-    </div>
-  <% }) %>
-  <% if (!view.people.length) { %>
-    <div class="col-12"><div class="alert alert-info mb-0">No people configured. Add people in <a href="/settings">Configuration</a>.</div></div>
-  <% } %>
-</div>
-
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <span><i class="bi bi-bar-chart-steps me-2"></i>Timeline</span>
-    <div class="timeline-legend d-flex flex-wrap gap-2">
-      <%
-        // Legend chips toggle a stage in or out of the current multi-selection.
-        var baseQuery = 'applied=1&perspective=' + encodeURIComponent(perspective) + '&units=' + encodeURIComponent(unitsToShow);
-        function toggleHref(value) {
-          var next = stageFilters.indexOf(value) !== -1
-            ? stageFilters.filter(function(s) { return s !== value; })
-            : stageFilters.concat([value]);
-          var qs = baseQuery;
-          next.forEach(function(s) { qs += '&stage=' + encodeURIComponent(s); });
-          return '/management?' + qs;
-        }
-      %>
-      <a class="legend-chip <%= stageFilters.length === 0 ? 'is-active' : '' %>" href="/management?<%= baseQuery %>">All</a>
-      <% stageLegend.forEach(function(item) { %>
-        <a class="legend-chip accent-<%= item.key %> <%= stageFilters.indexOf(item.label) !== -1 ? 'is-active' : '' %>"
-           href="<%= toggleHref(item.label) %>"
-           title="<%= item.meaning %>"><%= item.label %></a>
-      <% }) %>
-      <a class="legend-chip legend-free <%= stageFilters.indexOf('free') !== -1 ? 'is-active' : '' %>"
-         href="<%= toggleHref('free') %>">Free capacity</a>
+    <span><i class="bi bi-people me-2"></i>People summary</span>
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div class="team-kpi">
+        <span class="team-kpi-label">Team chargeability</span>
+        <span class="team-kpi-value <%= view.chargeability.realClass %>"><%= view.chargeability.real %>%</span>
+        <span class="team-kpi-sep">/</span>
+        <span class="team-kpi-value <%= view.chargeability.predictedClass %>"><%= view.chargeability.predicted %>%</span>
+      </div>
+      <span class="text-muted small">real / predicted (incl. soft bookings)</span>
     </div>
   </div>
   <div class="card-body">
-    <div class="timeline-scroll">
-      <div class="timeline-grid" id="timelineGrid"
-           data-range-start="<%= view.timeline.startText %>"
-           data-range-end-exclusive="<%= view.timeline.endExclusiveText %>">
-        <div class="timeline-head">
-          <div class="timeline-person-head">Person</div>
-          <div class="timeline-units" style="--timeline-units: <%= view.timeline.units.length %>;">
-            <% view.timeline.units.forEach(function(unit) { %>
-              <div class="timeline-unit"><%= unit.label %></div>
-            <% }) %>
-          </div>
-        </div>
-
-        <% view.timeline.rows.forEach(function(row) { %>
-          <div class="timeline-row" style="height: <%= row.height %>px;">
-            <div class="timeline-person"><%= row.person %></div>
-            <div class="timeline-lane" style="--timeline-units: <%= view.timeline.units.length %>;">
-              <div class="timeline-gridlines">
-                <% view.timeline.units.forEach(function(unit) { %><div class="timeline-gridline"></div><% }) %>
+    <div class="row g-3">
+      <% view.people.forEach(function(member) { %>
+        <div class="col-xl-3 col-lg-4 col-md-6">
+          <div class="card h-100 capacity-card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <div class="fw-semibold"><%= member.person %></div>
+                <span class="small text-muted"><%= member.dailyHours %>h/day</span>
               </div>
-              <% row.chips.forEach(function(chip) { %>
-                <div class="timeline-chip <%= chip.accentClass %> <%= chip.IsCommitted ? 'is-committed' : 'is-soft' %> <%= chip.IsOnHold ? 'is-on-hold' : '' %>"
-                     data-assignment-id="<%= chip.Id %>"
-                     data-opportunity-id="<%= chip.OpportunityId %>"
-                     data-start="<%= chip.StartDate %>"
-                     data-end="<%= chip.EndDate %>"
-                     data-percent="<%= chip.AllocationPercent || 0 %>"
-                     data-person="<%= chip.PersonName %>"
-                     style="left: <%= chip.geometry.left.toFixed(3) %>%; width: <%= chip.geometry.width.toFixed(3) %>%; top: <%= chip.geometry.top %>px;"
-                     title="<%= chip.OpportunityName %> &middot; <%= chip.StartDate %> &rarr; <%= chip.EndDate %> &middot; <%= chip.AllocatedHours %>h<%= chip.IsCommitted ? '' : ' (soft booking)' %>">
-                  <span class="timeline-chip-resizer start" data-edge="start" title="Drag to change the start date"></span>
-                  <% if (chip.hold) { %>
-                    <span class="timeline-chip-hold"
-                          style="left: <%= chip.hold.left.toFixed(3) %>%; width: <%= chip.hold.width.toFixed(3) %>%;"
-                          title="On hold <%= chip.HoldStartDate %> &rarr; <%= chip.HoldEndDate %> (capacity free)"></span>
-                  <% } %>
-                  <a class="timeline-chip-body" href="/opportunities/<%= chip.OpportunityId %>#assignments">
-                    <span class="timeline-chip-title">
-                      <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %>
-                    </span>
-                    <span class="timeline-chip-meta"><%= chip.AllocationPercent || 0 %>% &middot; <%= chip.AllocatedHours %>h &middot; <%= stageStatusLabel(chip.Stage) %></span>
-                  </a>
-                  <span class="timeline-chip-resizer end" data-edge="end" title="Drag to change the end date"></span>
+
+              <div class="kpi-pair" title="Chargeability = booked hours divided by capacity in the selected window">
+                <div class="kpi">
+                  <div class="kpi-value <%= member.chargeabilityClass %>"><%= member.chargeabilityReal %>%</div>
+                  <div class="kpi-label">Real</div>
                 </div>
-              <% }) %>
-              <% row.freeChips.forEach(function(segment) { %>
-                <div class="timeline-free"
-                     style="left: <%= segment.geometry.left.toFixed(3) %>%; width: <%= segment.geometry.width.toFixed(3) %>%; top: <%= segment.geometry.top %>px;"
-                     title="<%= segment.monthLabel %>: <%= segment.freeHours %>h free of <%= segment.capacityHours %>h<%= segment.softHours ? ' (' + segment.softHours + 'h soft booked)' : '' %>">
-                  <span class="timeline-free-label">
-                    <%= segment.monthLabel %> &middot; <%= segment.freeHours %>h free<% if (segment.softHours) { %> &middot; <%= segment.softHours %>h soft<% } %>
-                  </span>
+                <div class="kpi">
+                  <div class="kpi-value <%= member.chargeabilityPredictedClass %>"><%= member.chargeabilityPredicted %>%</div>
+                  <div class="kpi-label">Predicted</div>
                 </div>
-              <% }) %>
-              <% if (!row.chips.length && !row.freeChips.length) { %>
-                <div class="timeline-empty">No scheduled work in this window</div>
-              <% } %>
+              </div>
+
+              <div class="capacity-track" title="<%= member.activeHours %>h committed, <%= member.softHours %>h soft booked">
+                <div class="capacity-fill" style="width: <%= member.assignedPercent.toFixed(2) %>%;"></div>
+                <div class="capacity-fill-soft" style="width: <%= member.softPercent.toFixed(2) %>%;"></div>
+              </div>
+              <div class="d-flex justify-content-between small mt-2">
+                <span class="text-muted"><%= member.activeHours %>h committed</span>
+                <span class="<%= capacityClass(member.availableHours) %>"><%= member.availableHours %>h free</span>
+              </div>
+              <div class="d-flex justify-content-between small mt-1">
+                <span class="soft-hint"><%= member.softHours %>h soft booked</span>
+                <span class="text-muted"><%= member.availableIfWonHours %>h if all won</span>
+              </div>
+              <div class="text-muted small mt-1">Capacity <%= member.capacityHours %>h in window</div>
             </div>
           </div>
-        <% }) %>
-
-        <% if (!view.timeline.rows.length) { %>
-          <div class="p-4 text-center text-muted">Nothing to display for the selected filters.</div>
-        <% } %>
-      </div>
+        </div>
+      <% }) %>
+      <% if (!view.people.length) { %>
+        <div class="col-12"><div class="alert alert-info mb-0">No people configured. Add people in <a href="/settings">Configuration</a>.</div></div>
+      <% } %>
     </div>
   </div>
 </div>
@@ -293,5 +227,105 @@
     </div>
   </div>
 </div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-bar-chart-steps me-2"></i>Timeline</span>
+    <div class="timeline-legend d-flex flex-wrap gap-2">
+      <%
+        // Legend chips toggle a stage in or out of the current multi-selection.
+        var baseQuery = 'applied=1&perspective=' + encodeURIComponent(perspective) + '&units=' + encodeURIComponent(unitsToShow);
+        function toggleHref(value) {
+          var next = stageFilters.indexOf(value) !== -1
+            ? stageFilters.filter(function(s) { return s !== value; })
+            : stageFilters.concat([value]);
+          var qs = baseQuery;
+          next.forEach(function(s) { qs += '&stage=' + encodeURIComponent(s); });
+          return '/management?' + qs;
+        }
+      %>
+      <a class="legend-chip <%= stageFilters.length === 0 ? 'is-active' : '' %>" href="/management?<%= baseQuery %>">All</a>
+      <% stageLegend.forEach(function(item) { %>
+        <a class="legend-chip accent-<%= item.key %> <%= stageFilters.indexOf(item.label) !== -1 ? 'is-active' : '' %>"
+           href="<%= toggleHref(item.label) %>"
+           title="<%= item.meaning %>"><%= item.label %></a>
+      <% }) %>
+      <a class="legend-chip legend-free <%= stageFilters.indexOf('free') !== -1 ? 'is-active' : '' %>"
+         href="<%= toggleHref('free') %>">Free capacity</a>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="timeline-scroll">
+      <div class="timeline-grid" id="timelineGrid"
+           data-range-start="<%= view.timeline.startText %>"
+           data-range-end-exclusive="<%= view.timeline.endExclusiveText %>"
+           data-hours-per-day="<%= hoursPerDay %>">
+        <div class="timeline-head">
+          <div class="timeline-person-head">Person</div>
+          <div class="timeline-units" style="--timeline-units: <%= view.timeline.units.length %>;">
+            <% view.timeline.units.forEach(function(unit) { %>
+              <div class="timeline-unit"><%= unit.label %></div>
+            <% }) %>
+          </div>
+        </div>
+
+        <% view.timeline.rows.forEach(function(row) { %>
+          <div class="timeline-row" style="height: <%= row.height %>px;">
+            <div class="timeline-person"><%= row.person %></div>
+            <div class="timeline-lane" style="--timeline-units: <%= view.timeline.units.length %>;">
+              <div class="timeline-gridlines">
+                <% view.timeline.units.forEach(function(unit) { %><div class="timeline-gridline"></div><% }) %>
+              </div>
+              <% row.chips.forEach(function(chip) { %>
+                <div class="timeline-chip <%= chip.accentClass %> <%= chip.IsCommitted ? 'is-committed' : 'is-soft' %> <%= chip.IsOnHold ? 'is-on-hold' : '' %>"
+                     data-assignment-id="<%= chip.Id %>"
+                     data-opportunity-id="<%= chip.OpportunityId %>"
+                     data-start="<%= chip.StartDate %>"
+                     data-end="<%= chip.EndDate %>"
+                     data-percent="<%= chip.AllocationPercent || 0 %>"
+                     data-hours="<%= chip.AllocatedHours %>"
+                     data-stage-label="<%= stageStatusLabel(chip.Stage) %>"
+                     data-person="<%= chip.PersonName %>"
+                     style="left: <%= chip.geometry.left.toFixed(3) %>%; width: <%= chip.geometry.width.toFixed(3) %>%; top: <%= chip.geometry.top %>px;"
+                     title="<%= chip.OpportunityName %> &middot; <%= chip.StartDate %> &rarr; <%= chip.EndDate %> &middot; <%= chip.AllocatedHours %>h<%= chip.IsCommitted ? '' : ' (soft booking)' %>">
+                  <span class="timeline-chip-resizer start" data-edge="start" title="Drag to change the start date"></span>
+                  <% if (chip.hold) { %>
+                    <span class="timeline-chip-hold"
+                          style="left: <%= chip.hold.left.toFixed(3) %>%; width: <%= chip.hold.width.toFixed(3) %>%;"
+                          title="On hold <%= chip.HoldStartDate %> &rarr; <%= chip.HoldEndDate %> (capacity free)"></span>
+                  <% } %>
+                  <a class="timeline-chip-body" href="/opportunities/<%= chip.OpportunityId %>#assignments">
+                    <span class="timeline-chip-title">
+                      <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %>
+                    </span>
+                    <span class="timeline-chip-meta" data-role="meta"><%= chip.AllocationPercent || 0 %>% &middot; <%= chip.AllocatedHours %>h &middot; <%= stageStatusLabel(chip.Stage) %></span>
+                  </a>
+                  <span class="timeline-chip-resizer end" data-edge="end" title="Drag to change the end date"></span>
+                </div>
+              <% }) %>
+              <% row.freeChips.forEach(function(segment) { %>
+                <div class="timeline-free"
+                     style="left: <%= segment.geometry.left.toFixed(3) %>%; width: <%= segment.geometry.width.toFixed(3) %>%; top: <%= segment.geometry.top %>px;"
+                     title="<%= segment.monthLabel %>: <%= segment.freeHours %>h free of <%= segment.capacityHours %>h<%= segment.softHours ? ' (' + segment.softHours + 'h soft booked)' : '' %>">
+                  <span class="timeline-free-label">
+                    <%= segment.monthLabel %> &middot; <%= segment.freeHours %>h free<% if (segment.softHours) { %> &middot; <%= segment.softHours %>h soft<% } %>
+                  </span>
+                </div>
+              <% }) %>
+              <% if (!row.chips.length && !row.freeChips.length) { %>
+                <div class="timeline-empty">No scheduled work in this window</div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+
+        <% if (!view.timeline.rows.length) { %>
+          <div class="p-4 text-center text-muted">Nothing to display for the selected filters.</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/js/timeline.js"></script>
 <%- include('partials/footer') %>

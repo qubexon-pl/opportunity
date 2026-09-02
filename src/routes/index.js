@@ -1,5 +1,5 @@
 const express = require('express');
-const { listOpportunities, STAGES, STATUSES } = require('../services/opportunityService');
+const { listOpportunities, listOpenNextSteps, STAGES, STATUSES } = require('../services/opportunityService');
 const { buildUpcoming, stageBadgeClass, UPCOMING_PERIODS } = require('../services/capacityService');
 const { BOOKING_MODES, bookingMode, bookingLabel, countsTowardsCapacity, listFirmStages } = require('../services/bookingService');
 const { getViewDefaults, updateViewDefaults } = require('../config/settings');
@@ -54,11 +54,13 @@ router.get('/', async (req, res, next) => {
 
   try {
     const opportunities = await listOpportunities(filters);
+    // A missing next-step read should never take the whole pipeline down.
+    const nextSteps = await listOpenNextSteps().catch(() => []);
 
     res.render('pipeline', {
       ...baseModel,
       opportunities,
-      upcoming: buildUpcoming(opportunities, upcomingPeriod),
+      upcoming: buildUpcoming(opportunities, upcomingPeriod, nextSteps),
       loadError: null,
     });
   } catch (err) {

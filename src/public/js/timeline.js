@@ -11,6 +11,9 @@
   var rangeEndMs = Date.parse(grid.dataset.rangeEndExclusive + 'T00:00:00Z');
   if (!isFinite(rangeStartMs) || !isFinite(rangeEndMs) || rangeEndMs <= rangeStartMs) return;
 
+  var hoursPerDay = Number(grid.dataset.hoursPerDay);
+  if (!isFinite(hoursPerDay) || hoursPerDay <= 0) hoursPerDay = 8;
+
   var totalDays = Math.round((rangeEndMs - rangeStartMs) / DAY_MS);
   var suppressClickUntil = 0;
   var drag = null;
@@ -24,6 +27,53 @@
     return isFinite(ms) ? ms : null;
   }
 
+  function round2(value) {
+    return Math.round(value * 100) / 100;
+  }
+
+  /* Inclusive working-day count, matching countBusinessDaysInclusive on the server. */
+  function businessDays(startMs, endMs) {
+    if (endMs < startMs) return 0;
+    var days = 0;
+    for (var ms = startMs; ms <= endMs; ms += DAY_MS) {
+      var weekday = new Date(ms).getUTCDay();
+      if (weekday !== 0 && weekday !== 6) days += 1;
+    }
+    return days;
+  }
+
+  /*
+   * Mirrors calculateAllocatedHoursByDuration: the allocation percentage stays put
+   * and the hours follow the length of the window.
+   */
+  function hoursFor(chip, startMs, endMs) {
+    var percent = Number(chip.dataset.percent) || 0;
+    return round2(businessDays(startMs, endMs) * hoursPerDay * (percent / 100));
+  }
+
+  /* Live readout inside the bar so the effect of a resize is visible while dragging. */
+  function paintLabel(chip, startMs, endMs) {
+    var meta = chip.querySelector('[data-role="meta"]');
+    if (!meta) return;
+
+    var percent = Number(chip.dataset.percent) || 0;
+    var days = businessDays(startMs, endMs);
+    var hours = hoursFor(chip, startMs, endMs);
+    var stage = chip.dataset.stageLabel || '';
+
+    meta.textContent = percent + '% \u00b7 ' + hours + 'h \u00b7 ' + days + 'd' + (stage ? ' \u00b7 ' + stage : '');
+    chip.title = (chip.dataset.person || '') + ' \u00b7 ' + toDateText(startMs) + ' \u2192 ' + toDateText(endMs) +
+      ' \u00b7 ' + hours + 'h over ' + days + ' working days';
+  }
+
+  function restoreLabel(chip) {
+    var meta = chip.querySelector('[data-role="meta"]');
+    if (!meta) return;
+    var percent = Number(chip.dataset.percent) || 0;
+    var stage = chip.dataset.stageLabel || '';
+    meta.textContent = percent + '% \u00b7 ' + (chip.dataset.hours || 0) + 'h' + (stage ? ' \u00b7 ' + stage : '');
+  }
+
   /* Position the chip live while dragging, mirroring the server geometry maths. */
   function paint(chip, startMs, endMs) {
     var span = rangeEndMs - rangeStartMs;
@@ -31,6 +81,7 @@
     var right = ((Math.min(endMs + DAY_MS, rangeEndMs) - rangeStartMs) / span) * 100;
     chip.style.left = Math.max(0, left).toFixed(3) + '%';
     chip.style.width = Math.max(0.4, right - left).toFixed(3) + '%';
+    paintLabel(chip, startMs, endMs);
   }
 
   function beginDrag(event) {
@@ -81,12 +132,16 @@
     suppressClickUntil = Date.now() + 350;
 
     var changed = current.startMs !== current.originalStartMs || current.endMs !== current.originalEndMs;
-    if (!changed) return;
+    if (!changed) {
+      restoreLabel(current.chip);
+      return;
+    }
 
     var payload = {
       plannedStartDate: toDateText(current.startMs),
       plannedEndDate: toDateText(current.endMs),
     };
+    var nextHours = hoursFor(current.chip, current.startMs, current.endMs);
 
     fetch('/api/assignments/' + encodeURIComponent(current.chip.dataset.assignmentId), {
       method: 'PATCH',
@@ -96,7 +151,10 @@
       .then(function (response) {
         if (!response.ok) throw new Error('Save failed with status ' + response.status);
         if (typeof showToast === 'function') {
-          showToast('Assignment moved to ' + payload.plannedStartDate + ' - ' + payload.plannedEndDate, 'success');
+          showToast(
+            payload.plannedStartDate + ' - ' + payload.plannedEndDate + ' \u00b7 ' + nextHours + 'h allocated',
+            'success'
+          );
         }
         if (typeof reloadPageWithMessage === 'function') {
           reloadPageWithMessage('Recalculating allocation...', 400);
@@ -106,6 +164,7 @@
       })
       .catch(function (error) {
         paint(current.chip, current.originalStartMs, current.originalEndMs);
+        restoreLabel(current.chip);
         if (typeof showToast === 'function') showToast(error.message, 'error');
       });
   }

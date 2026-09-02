@@ -76,6 +76,14 @@ function capacityClass(hours) {
   return 'capacity-available';
 }
 
+/** Traffic-light band for a chargeability percentage. */
+function chargeabilityClass(percent) {
+  if (percent > 100) return 'kpi-over';
+  if (percent >= 75) return 'kpi-good';
+  if (percent >= 50) return 'kpi-fair';
+  return 'kpi-low';
+}
+
 /** Joins assignments with their opportunity, filling in derived hours. */
 function buildAssignmentRows(opportunities, assignments) {
   const byId = new Map(opportunities.map((o) => [o.Id, o]));
@@ -283,6 +291,10 @@ function buildManagementPeople(assignmentRows, window) {
     const assignedPercent = capacityHours > 0 ? Math.min(100, Math.max(0, (activeHours / capacityHours) * 100)) : 0;
     const softPercent = capacityHours > 0 ? Math.min(100 - assignedPercent, Math.max(0, (softHours / capacityHours) * 100)) : 0;
 
+    // Chargeability is reported uncapped so over-allocation stays visible.
+    const chargeabilityReal = capacityHours > 0 ? round2((activeHours / capacityHours) * 100) : 0;
+    const chargeabilityPredicted = capacityHours > 0 ? round2(((activeHours + softHours) / capacityHours) * 100) : 0;
+
     return {
       person,
       assigned,
@@ -295,8 +307,35 @@ function buildManagementPeople(assignmentRows, window) {
       assignedPercent,
       softPercent,
       availablePercent: Math.max(0, 100 - assignedPercent),
+      chargeabilityReal,
+      chargeabilityPredicted,
+      chargeabilityClass: chargeabilityClass(chargeabilityReal),
+      chargeabilityPredictedClass: chargeabilityClass(chargeabilityPredicted),
     };
   });
+}
+
+/**
+ * Team-wide chargeability, weighted by capacity rather than averaged per head so
+ * part-time people do not distort the number.
+ */
+function summariseChargeability(people) {
+  const capacityHours = people.reduce((total, member) => total + member.capacityHours, 0);
+  const activeHours = people.reduce((total, member) => total + member.activeHours, 0);
+  const softHours = people.reduce((total, member) => total + member.softHours, 0);
+
+  const real = capacityHours > 0 ? round2((activeHours / capacityHours) * 100) : 0;
+  const predicted = capacityHours > 0 ? round2(((activeHours + softHours) / capacityHours) * 100) : 0;
+
+  return {
+    capacityHours: round2(capacityHours),
+    activeHours: round2(activeHours),
+    softHours: round2(softHours),
+    real,
+    predicted,
+    realClass: chargeabilityClass(real),
+    predictedClass: chargeabilityClass(predicted),
+  };
 }
 
 /** Hold overlay position expressed relative to the chip it sits on. */
@@ -394,6 +433,7 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
   return {
     assignmentRows,
     people,
+    chargeability: summariseChargeability(people),
     stats: { total, visible, hidden: total - visible, committed, soft: total - committed, onHold },
     timeline: {
       range,
@@ -409,19 +449,37 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
 }
 
 /** Next steps due inside the selected period, for open opportunities only. */
-function buildUpcoming(opportunities, periodKey) {
+function buildUpcoming(opportunities, periodKey, nextSteps) {
   const { start, endInclusive } = periodBounds(periodKey);
   const endMs = endInclusive.getTime();
 
-  const items = opportunities
-    .filter((item) => item.Status !== 'Closed')
+  const open = opportunities.filter((item) => item.Status !== 'Closed');
+  const openIds = new Set(open.map((item) => String(item.Id)));
+
+  // The dedicated next-step list is the source of truth; the legacy summary
+  // columns are still read so data captured before they were removed shows up.
+  const fromSteps = (Array.isArray(nextSteps) ? nextSteps : [])
+    .filter((step) => openIds.size === 0 || openIds.has(String(step.OpportunityId)))
+    .map((step) => ({
+      id: step.OpportunityId,
+      name: step.OpportunityName,
+      stage: step.Stage || 'Unspecified',
+      summary: step.Title || 'Untitled next step',
+      due: toDate(step.DueDate),
+    }));
+
+  const withStepIds = new Set(fromSteps.map((item) => String(item.id)));
+  const fromLegacy = open
+    .filter((item) => item.NextStepSummary && !withStepIds.has(String(item.Id)))
     .map((item) => ({
       id: item.Id,
       name: item.Name,
       stage: item.Stage || 'Unspecified',
-      summary: item.NextStepSummary || 'No next step summary',
+      summary: item.NextStepSummary,
       due: toDate(item.NextStepDueDate),
-    }))
+    }));
+
+  const items = [...fromSteps, ...fromLegacy]
     .filter((item) => item.due && item.due >= start && item.due.getTime() <= endMs)
     .sort((a, b) => a.due.getTime() - b.due.getTime())
     .map((item) => ({ ...item, dueText: toDateText(item.due) }));
@@ -438,6 +496,7 @@ module.exports = {
   stageAccentClass,
   stageBadgeClass,
   capacityClass,
+  chargeabilityClass,
   buildAssignmentRows,
   assignmentHoursInWindow,
   buildManagementView,

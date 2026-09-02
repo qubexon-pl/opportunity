@@ -80,22 +80,24 @@
         <input class="form-control" id="q" name="q" type="search" value="<%= filters.q %>" placeholder="Name, owner, or tag">
       </div>
       <div class="col-lg-2 col-md-3 col-6">
-        <label class="form-label" for="stage">Stage</label>
-        <select class="form-select filter-multi" id="stage" name="stage" multiple size="5">
-          <% stages.forEach(function(stage) { %>
-            <option value="<%= stage %>" <%= filters.stage.indexOf(stage) !== -1 ? 'selected' : '' %>><%= stage %></option>
-          <% }) %>
-        </select>
-        <div class="form-text">None selected = all stages</div>
+        <%- include('partials/multiselect', {
+          id: 'filter-stage',
+          name: 'stage',
+          label: 'Stage',
+          allLabel: 'All stages',
+          selected: filters.stage,
+          options: stages.map(function(stage) { return { value: stage, label: stage }; })
+        }) %>
       </div>
       <div class="col-lg-2 col-md-3 col-6">
-        <label class="form-label" for="status">Status</label>
-        <select class="form-select filter-multi" id="status" name="status" multiple size="5">
-          <% statuses.forEach(function(status) { %>
-            <option value="<%= status %>" <%= filters.status.indexOf(status) !== -1 ? 'selected' : '' %>><%= status %></option>
-          <% }) %>
-        </select>
-        <div class="form-text">None selected = all statuses</div>
+        <%- include('partials/multiselect', {
+          id: 'filter-status',
+          name: 'status',
+          label: 'Status',
+          allLabel: 'All statuses',
+          selected: filters.status,
+          options: statuses.map(function(status) { return { value: status, label: status }; })
+        }) %>
       </div>
       <div class="col-lg-2 col-md-3 col-6">
         <label class="form-label" for="sort">Sort</label>

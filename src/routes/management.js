@@ -9,6 +9,7 @@ const {
 const {
   TIMELINE_UNIT_OPTIONS,
   STAGE_LEGEND,
+  HOURS_PER_DAY,
   buildManagementView,
   stageStatusLabel,
   stageAccentClass,
@@ -76,6 +77,7 @@ router.get('/', async (req, res, next) => {
     res.render('management', {
       title: 'Team capacity',
       monthlyCapacity: MONTHLY_CAPACITY,
+      hoursPerDay: HOURS_PER_DAY,
       perspective,
       unitsToShow,
       stageFilters,
