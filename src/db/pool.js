@@ -30,10 +30,21 @@ async function getPool() {
   }
 
   if (!poolPromise) {
-    poolPromise = sql.connect(buildConfig()).catch((error) => {
-      poolPromise = undefined;
-      throw error;
-    });
+    poolPromise = sql
+      .connect(buildConfig())
+      .then(async (pool) => {
+        // Bring the schema up to date before anything queries it, so a missing
+        // column never surfaces as a failed save.
+        const { runMigrations } = require('./migrate');
+        await runMigrations(pool).catch((err) => {
+          console.warn('[migrate] skipped:', err.message || err);
+        });
+        return pool;
+      })
+      .catch((error) => {
+        poolPromise = undefined;
+        throw error;
+      });
   }
   return poolPromise;
 }

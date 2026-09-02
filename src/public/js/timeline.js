@@ -149,7 +149,18 @@
       body: JSON.stringify(payload),
     })
       .then(function (response) {
-        if (!response.ok) throw new Error('Save failed with status ' + response.status);
+        // The API explains refusals in an { error } body; show that rather than a bare status.
+        if (!response.ok) {
+          return response
+            .json()
+            .catch(function () { return null; })
+            .then(function (data) {
+              throw new Error((data && data.error) || 'Could not save the new dates (HTTP ' + response.status + ').');
+            });
+        }
+        return null;
+      })
+      .then(function () {
         if (typeof showToast === 'function') {
           showToast(
             payload.plannedStartDate + ' - ' + payload.plannedEndDate + ' \u00b7 ' + nextHours + 'h allocated',
