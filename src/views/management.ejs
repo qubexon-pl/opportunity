@@ -522,11 +522,16 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                      title="<%= segment.groupLabel %> <%= segment.unitLabel %> &middot; <%= segment.capacityHours %>h capacity<%= segment.absentDays ? ' (' + segment.grossCapacityHours + 'h \u2212 ' + segment.absenceHours + 'h absence)' : '' %><%= fullyAbsent ? '\nAway for the whole period, so there is no capacity to share out.' : '\n' + breakdown + '\nTotal: ' + (segment.usedPercent + segment.freePercent).toFixed(2) + '%' %><%= segment.isOver ? '\nOver capacity by ' + segment.overHours + 'h: more is committed here than there are hours to give.' : '' %><%= segment.softHours ? '\nSoft booked on top: ' + segment.softHours + 'h = ' + segment.softPercent + '%' : '' %><%= absenceDetail %>">
                   <span class="timeline-free-label">
                     <% if (fullyAbsent) { %>
-                      Away <%= segment.absentDays %>d
+                      <span class="timeline-free-primary">Away <%= segment.absentDays %>d</span>
+                      <span class="timeline-free-secondary">no capacity</span>
                     <% } else if (segment.isOver) { %>
-                      <i class="bi bi-exclamation-triangle-fill me-1"></i><%= segment.overHours %>h over &middot; <%= segment.usedPercent %>%<% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %>
+                      <span class="timeline-free-primary">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i><%= segment.overHours %>h over
+                      </span>
+                      <span class="timeline-free-secondary"><%= segment.usedPercent %>%<% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %></span>
                     <% } else { %>
-                      <%= segment.freeHours %>h free &middot; <%= segment.freePercent %>%<% if (segment.softHours) { %> &middot; <%= segment.softHours %>h soft<% } %><% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %>
+                      <span class="timeline-free-primary"><%= segment.freeHours %>h free</span>
+                      <span class="timeline-free-secondary"><%= segment.freePercent %>%<% if (segment.softHours) { %> &middot; <%= segment.softHours %>h soft<% } %><% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %></span>
                     <% } %>
                   </span>
                 </div>
