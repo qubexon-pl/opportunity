@@ -385,7 +385,7 @@
   </div>
 </div>
 
-<div class="card mb-4">
+<div class="card mb-4" id="timelineCard">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <span><i class="bi bi-bar-chart-steps me-2"></i>Timeline</span>
     <div class="timeline-legend d-flex flex-wrap gap-2">
@@ -415,6 +415,12 @@
          href="<%= toggleHref('free') %>">Free capacity</a>
       <span class="legend-chip legend-absence" title="Days a person is away. Capacity is removed for these days, so free capacity drops with it.">Absence</span>
     </div>
+    <button class="btn btn-sm btn-outline-secondary timeline-fullpage-toggle" type="button"
+            data-timeline-fullpage
+            aria-pressed="false"
+            title="Show the timeline full page (F)">
+      <i class="bi bi-arrows-fullscreen me-1"></i><span data-timeline-fullpage-label>Full page</span>
+    </button>
   </div>
   <div class="card-body">
     <div class="timeline-scroll">
