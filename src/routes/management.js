@@ -9,6 +9,7 @@ const {
 const {
   TIMELINE_UNIT_OPTIONS,
   STAGE_LEGEND,
+  HOURS_PER_DAY,
   buildManagementView,
   stageStatusLabel,
   stageAccentClass,
@@ -53,6 +54,7 @@ router.get('/', async (req, res, next) => {
   const stageFilters = applied
     ? filterAgainst(queryList(req.query.stage), TIMELINE_FILTER_OPTIONS)
     : filterAgainst(defaults.stages, TIMELINE_FILTER_OPTIONS);
+  const requestedPeople = applied ? queryList(req.query.person) : defaults.people;
 
   try {
     let loadError = null;
@@ -69,16 +71,33 @@ router.get('/', async (req, res, next) => {
       loadError = err.message || String(err);
     }
 
-    const view = buildManagementView({ opportunities, assignments, perspective, unitsToShow, stageFilter: stageFilters });
+    // People with assignments can be filtered even if they are no longer configured.
+    const personOptions = [
+      ...new Set([...listPeople(), ...assignments.map((assignment) => assignment.PersonName).filter(Boolean)]),
+    ].sort((a, b) => a.localeCompare(b));
+    const personFilters = filterAgainst(requestedPeople, personOptions);
+
+    const view = buildManagementView({
+      opportunities,
+      assignments,
+      perspective,
+      unitsToShow,
+      stageFilter: stageFilters,
+      personFilter: personFilters,
+    });
 
     const sameStages = JSON.stringify([...stageFilters].sort()) === JSON.stringify([...defaults.stages].sort());
+    const samePeople = JSON.stringify([...personFilters].sort()) === JSON.stringify([...defaults.people].sort());
 
     res.render('management', {
       title: 'Team capacity',
       monthlyCapacity: MONTHLY_CAPACITY,
+      hoursPerDay: HOURS_PER_DAY,
       perspective,
       unitsToShow,
       stageFilters,
+      personFilters,
+      personOptions,
       timelineFilterOptions: TIMELINE_FILTER_OPTIONS,
       timelineUnitOptions: TIMELINE_UNIT_OPTIONS,
       stageLegend: STAGE_LEGEND,
@@ -87,7 +106,7 @@ router.get('/', async (req, res, next) => {
       view,
       firmStages: listFirmStages(),
       savedDefaults: defaults,
-      filtersMatchDefault: sameStages && perspective === defaults.perspective && unitsToShow === defaults.units,
+      filtersMatchDefault: sameStages && samePeople && perspective === defaults.perspective && unitsToShow === defaults.units,
       loadError,
       stageStatusLabel,
       stageAccentClass,
@@ -105,6 +124,7 @@ router.post('/defaults', (req, res) => {
   try {
     updateViewDefaults('management', {
       stages: filterAgainst(queryList(req.body.stage), TIMELINE_FILTER_OPTIONS),
+      people: queryList(req.body.person).map((name) => String(name)),
       perspective: normalizePerspective(req.body.perspective, 'months'),
       units: normalizeUnits(req.body.units, 6),
     });

@@ -1,5 +1,15 @@
 const express = require('express');
-const { listPeople, getPersonDailyHours, addPerson, removePerson, updateDailyHours } = require('../services/peopleService');
+const {
+  PERSON_ROLES,
+  COST_CURRENCY,
+  listPeople,
+  getPersonDailyHours,
+  getPersonRole,
+  getPersonCost,
+  addPerson,
+  removePerson,
+  updatePersonProfile,
+} = require('../services/peopleService');
 const { HOURS_PER_DAY, MONTHLY_CAPACITY } = require('../services/dateService');
 const { STAGES } = require('../services/opportunityService');
 const { listFirmStages } = require('../services/bookingService');
@@ -11,11 +21,15 @@ router.get('/', (req, res) => {
   const people = listPeople().map((person) => ({
     name: person,
     dailyHours: getPersonDailyHours(person),
+    role: getPersonRole(person),
+    cost: getPersonCost(person),
   }));
 
   res.render('settings', {
     title: 'Configuration',
     people,
+    personRoles: PERSON_ROLES,
+    costCurrency: COST_CURRENCY,
     defaultDailyHours: HOURS_PER_DAY,
     monthlyCapacity: MONTHLY_CAPACITY,
     stages: STAGES,
@@ -39,7 +53,7 @@ router.post('/capacity/stages', (req, res) => {
 
 router.post('/people', (req, res) => {
   try {
-    addPerson(req.body.personName, req.body.dailyHours);
+    addPerson(req.body.personName, req.body.dailyHours, req.body.role, req.body.internalCost);
     req.flash('success', `${String(req.body.personName).trim()} added.`);
   } catch (err) {
     req.flash('error', err.message || String(err));
@@ -47,10 +61,14 @@ router.post('/people', (req, res) => {
   res.redirect('/settings');
 });
 
-router.post('/people/hours', (req, res) => {
+router.post('/people/profile', (req, res) => {
   try {
-    updateDailyHours(req.body.personName, req.body.dailyHours);
-    req.flash('success', 'Daily capacity updated.');
+    updatePersonProfile(req.body.personName, {
+      dailyHours: req.body.dailyHours,
+      role: req.body.role,
+      cost: req.body.internalCost,
+    });
+    req.flash('success', `${String(req.body.personName).trim()} updated.`);
   } catch (err) {
     req.flash('error', err.message || String(err));
   }

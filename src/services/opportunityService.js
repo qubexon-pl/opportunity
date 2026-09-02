@@ -290,12 +290,29 @@ async function deleteStep(rawStepId) {
   return result.recordset[0].affected > 0;
 }
 
+/**
+ * Open next steps across every opportunity. This is what drives the pipeline's
+ * "Upcoming actions" card now that the duplicated summary fields are gone.
+ */
+async function listOpenNextSteps() {
+  const pool = await getPool();
+  const result = await pool.request().query(
+    `SELECT s.Id, s.OpportunityId, s.Title, s.DueDate, o.Name as OpportunityName, o.Stage, o.Status
+     FROM dbo.OpportunityNextSteps s
+     INNER JOIN dbo.Opportunities o ON o.Id = s.OpportunityId
+     WHERE s.IsDone = 0 AND s.DueDate IS NOT NULL AND o.Status <> 'Closed'
+     ORDER BY s.DueDate ASC;`
+  );
+  return result.recordset;
+}
+
 module.exports = {
   STAGES,
   STATUSES,
   OpportunitySchema,
   toGuid,
   listOpportunities,
+  listOpenNextSteps,
   getOpportunity,
   createOpportunity,
   updateOpportunity,

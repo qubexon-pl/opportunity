@@ -157,10 +157,55 @@
 .legend-chip.is-active { border-color: var(--color-primary); color: var(--color-primary); font-weight: 600; }
 .legend-free::before { background: repeating-linear-gradient(45deg, var(--color-primary) 0 3px, transparent 3px 6px); }
 
-.timeline-scroll { overflow-x: auto; }
-.timeline-grid { min-width: 900px; }
+.timeline-scroll { overflow-x: auto; }.timeline-grid { min-width: 900px; }
+
+/*
+ * Floating horizontal scrollbar: mirrors the timeline's scroll position and is
+ * pinned to the bottom of the viewport while the timeline is on screen, so the
+ * user does not have to scroll to the end of the page to pan sideways.
+ */
+.timeline-floating-scroll {
+  position: fixed;
+  bottom: 0;
+  z-index: 1030;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--color-surface, #fff);
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, .08);
+  display: none;
+}
+
+.timeline-floating-scroll.is-visible { display: block; }
+.timeline-floating-scroll > div { height: 1px; }
+
+.person-role {
+  font-size: .74rem;
+  line-height: 1.2;
+  margin-top: .1rem;
+}
 
 .timeline-head { display: flex; border-bottom: 1px solid var(--color-border); }
+
+.timeline-head-stack { flex: 1; display: flex; flex-direction: column; }
+
+/* Month (or year) band sitting above the unit columns. */
+.timeline-groups { display: grid; grid-template-columns: repeat(var(--timeline-units, 1), 1fr); }
+
+.timeline-group {
+  grid-column: span var(--group-span, 1);
+  padding: .35rem .5rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--color-text);
+  border-left: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-surface-offset, #f8f9fa);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.timeline-group:first-child { border-left: none; }
 
 .timeline-person-head,
 .timeline-person {
@@ -171,6 +216,8 @@
   border-right: 1px solid var(--color-border);
   color: var(--color-text);
 }
+
+.timeline-person-head { display: flex; align-items: flex-end; }
 
 .timeline-units { flex: 1; display: grid; grid-template-columns: repeat(var(--timeline-units, 1), 1fr); }
 
@@ -325,31 +372,128 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
 
 /* --- Assignments and detail ---------------------------------------------- */
 
-.assignment-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .75rem;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: .9rem 0;
-  border-top: 1px solid var(--color-divider);
+/* An allocation is a card so schedule, allocation and hold read as separate blocks. */
+.assignment-card {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md, .5rem);
+  background: var(--color-surface-2);
+  padding: 1rem;
+  margin-bottom: 1rem;
 }
 
-/* The edit form mirrors the create form so an allocation is changed the same way it was made. */
-.assignment-edit-form {
-  flex: 1 1 640px;
-  margin: 0;
+.assignment-card.is-on-hold { border-left: 4px solid #0d6efd; }
+
+.assignment-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: .65rem;
+  margin-bottom: .85rem;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.assignment-person { font-size: 1rem; font-weight: 600; }
+
+.assignment-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .9rem;
+  font-size: .82rem;
+  color: var(--color-text-muted, #6c757d);
+}
+
+.assignment-group + .assignment-group { margin-top: .9rem; }
+
+.assignment-group-title {
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle, #8a94a6);
+  margin-bottom: .35rem;
 }
 
 .assignment-edit-form .form-label { margin-bottom: .15rem; }
 
-.assignment-actions { padding-top: 1.6rem; }
+/* Save sits in the middle of the window controls so the primary action is obvious. */
+.assignment-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+  justify-content: center;
+  padding-top: .9rem;
+  margin-top: .9rem;
+  border-top: 1px solid var(--color-divider);
+}
 
-.allocation-preview { min-height: 1.2rem; }
+.assignment-toolbar .btn-primary { min-width: 7rem; }
 
-/* Multi-value filter lists. */
-.filter-multi { min-height: 6.5rem; padding: .25rem; }
-.filter-multi option { padding: .15rem .35rem; border-radius: var(--radius-sm); }
+.allocation-preview {
+  min-height: 1.4rem;
+  font-size: .82rem;
+  color: var(--color-primary-strong, #0a58ca);
+  background: var(--color-primary-soft, rgba(13, 110, 253, .08));
+  border-radius: var(--radius-sm, .25rem);
+  padding: .35rem .6rem;
+}
+
+.allocation-preview.is-warning {
+  color: #8a4b00;
+  background: rgba(255, 193, 7, .16);
+}
+
+/* --- Dropdown multi-select ----------------------------------------------- */
+
+.multiselect .multiselect-toggle { cursor: pointer; }
+.multiselect.has-selection .multiselect-toggle { font-weight: 600; }
+
+.multiselect-menu {
+  min-width: 100%;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.multiselect-option { padding: .15rem .35rem; border-radius: var(--radius-sm, .25rem); }
+.multiselect-option:hover { background: var(--color-primary-soft, rgba(13, 110, 253, .08)); }
+.multiselect-option .form-check-label { cursor: pointer; width: 100%; }
+
+/* --- Chargeability KPIs --------------------------------------------------- */
+
+.kpi-pair {
+  display: flex;
+  gap: .5rem;
+  margin-bottom: .6rem;
+}
+
+.kpi {
+  flex: 1 1 0;
+  text-align: center;
+  padding: .35rem .25rem;
+  border-radius: var(--radius-sm, .25rem);
+  background: var(--color-surface-offset);
+}
+
+.kpi-value { font-size: 1.15rem; font-weight: 700; line-height: 1.15; }
+
+.kpi-label {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--color-text-subtle, #8a94a6);
+}
+
+.team-kpi { display: flex; align-items: baseline; gap: .35rem; }
+.team-kpi-label { font-size: .75rem; color: var(--color-text-muted, #6c757d); }
+.team-kpi-value { font-size: 1.05rem; font-weight: 700; }
+.team-kpi-sep { color: var(--color-text-subtle, #8a94a6); }
+
+.kpi-over { color: #dc3545; }
+.kpi-good { color: #198754; }
+.kpi-fair { color: #fd7e14; }
+.kpi-low { color: #6c757d; }
 
 .hold-hint { color: #0a58ca; }
 

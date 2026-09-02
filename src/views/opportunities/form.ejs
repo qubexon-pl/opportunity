@@ -148,14 +148,6 @@
             </div>
           </div>
 
-          <div class="col-12">
-            <label class="form-label" for="nextStepSummary">Next step summary</label>
-            <input class="form-control" id="nextStepSummary" name="nextStepSummary" maxlength="500" value="<%= o.NextStepSummary || '' %>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="nextStepDueDate">Next step due date</label>
-            <input type="date" class="form-control" id="nextStepDueDate" name="nextStepDueDate" value="<%= toDateText(o.NextStepDueDate) %>">
-          </div>
           <div class="col-md-6">
             <label class="form-label" for="opportunityHours">Opportunity hours</label>
             <input type="number" class="form-control" id="opportunityHours" name="opportunityHours" min="0.5" step="0.5" required placeholder="e.g. 120" value="<%= o.OpportunityHours == null ? '' : o.OpportunityHours %>">
@@ -176,6 +168,9 @@
             Calculated end date from hours: <strong id="plannedEndPreview"><%= plannedEndPreview || 'set start date and hours' %></strong>
             <span class="ms-2">Estimated duration: <strong id="plannedDurationPreview"><%= plannedDurationPreview || '-' %></strong> working days</span>
           </div>
+          <%# Next steps are managed in their own card; these carry the stored legacy values through a save. %>
+          <input type="hidden" name="nextStepSummary" value="<%= o.NextStepSummary || '' %>">
+          <input type="hidden" name="nextStepDueDate" value="<%= toDateText(o.NextStepDueDate) %>">
         </div>
       </div>
     </div>
@@ -207,7 +202,7 @@
         </div>
         <div class="col-lg-2 col-md-4 col-6">
           <label class="form-label">Allocation mode</label>
-          <select class="form-select" data-role="mode">
+          <select class="form-select" name="allocationMode" data-role="mode">
             <option value="percent">Percent of total hours</option>
             <option value="total-hours">Total hours for period</option>
             <option value="monthly-hours">Hours per month</option>
@@ -221,93 +216,146 @@
           <button class="btn btn-primary w-100" type="submit">Add</button>
         </div>
         <div class="col-12">
-          <div class="allocation-preview small text-muted" data-role="preview">&nbsp;</div>
+          <div class="allocation-preview" data-role="preview">&nbsp;</div>
         </div>
         <input type="hidden" name="allocationPercent" data-role="percent-field">
         <input type="hidden" name="allocatedHours" data-role="hours-field">
       </form>
 
       <% assignmentList.forEach(function(assignment) { %>
-        <div class="assignment-row">
-          <form method="post" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>"
-                class="allocation-form assignment-edit-form row g-2 align-items-end"
-                data-opportunity-hours="<%= o.OpportunityHours || 0 %>">
-            <div class="col-lg-3 col-md-6">
-              <label class="form-label small">Person</label>
-              <select class="form-select form-select-sm" name="personName" data-role="person">
-                <% people.forEach(function(person) { %>
-                  <option value="<%= person %>" <%= assignment.PersonName === person ? 'selected' : '' %>><%= person %></option>
-                <% }) %>
-                <% if (assignment.PersonName && people.indexOf(assignment.PersonName) === -1) { %>
-                  <option value="<%= assignment.PersonName %>" selected><%= assignment.PersonName %></option>
-                <% } %>
-              </select>
+        <%
+          var formId = 'assignment-form-' + assignment.Id;
+          var startText = toDateText(assignment.PlannedStartDate);
+          var endText = toDateText(assignment.PlannedEndDate);
+          var onHold = !!(assignment.HoldStartDate && assignment.HoldEndDate);
+          var allocationModes = ['percent', 'total-hours', 'monthly-hours'];
+          var allocationMode = allocationModes.indexOf(assignment.AllocationMode) === -1 ? 'percent' : assignment.AllocationMode;
+        %>
+        <div class="assignment-card <%= onHold ? 'is-on-hold' : '' %>">
+          <div class="assignment-card-head">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="assignment-person"><%= assignment.PersonName %></span>
+              <% if (onHold) { %>
+                <span class="badge text-bg-info"><i class="bi bi-pause-circle me-1"></i>On hold</span>
+              <% } %>
+              <% if (!assignment.IsTimelineVisible) { %>
+                <span class="badge text-bg-light"><i class="bi bi-eye-slash me-1"></i>Hidden</span>
+              <% } %>
             </div>
-            <div class="col-lg-2 col-md-3 col-6">
-              <label class="form-label small">Start date</label>
-              <input type="date" class="form-control form-control-sm" name="plannedStartDate" data-role="start" value="<%= toDateText(assignment.PlannedStartDate) %>">
+            <div class="assignment-facts">
+              <span><strong><%= assignment.AllocationPercent || 0 %>%</strong> allocation</span>
+              <span><strong><%= round2(assignment.AllocatedHours || 0) %>h</strong> assigned</span>
+              <span class="text-nowrap"><%= startText || '-' %> &rarr; <%= endText || '-' %></span>
             </div>
-            <div class="col-lg-2 col-md-3 col-6">
-              <label class="form-label small">End date</label>
-              <input type="date" class="form-control form-control-sm" name="plannedEndDate" data-role="end" value="<%= toDateText(assignment.PlannedEndDate) %>">
-            </div>
-            <div class="col-lg-2 col-md-4 col-6">
-              <label class="form-label small">Allocation mode</label>
-              <select class="form-select form-select-sm" data-role="mode">
-                <option value="percent">Percent of total hours</option>
-                <option value="total-hours">Total hours for period</option>
-                <option value="monthly-hours">Hours per month</option>
-              </select>
-            </div>
-            <div class="col-lg-2 col-md-4 col-6">
-              <label class="form-label small" data-role="value-label">Allocation %</label>
-              <input type="number" class="form-control form-control-sm" data-role="value" min="0.5" step="0.5" value="<%= assignment.AllocationPercent || 0 %>">
-            </div>
-            <div class="col-lg-1 col-md-4 col-6 d-flex align-items-end">
-              <button class="btn btn-sm btn-primary w-100" type="submit">Save</button>
-            </div>
+          </div>
 
-            <div class="col-lg-2 col-md-3 col-6">
-              <label class="form-label small">Hold from</label>
-              <input type="date" class="form-control form-control-sm" name="holdStartDate" value="<%= toDateText(assignment.HoldStartDate) %>">
-            </div>
-            <div class="col-lg-2 col-md-3 col-6">
-              <label class="form-label small">Hold until</label>
-              <input type="date" class="form-control form-control-sm" name="holdEndDate" value="<%= toDateText(assignment.HoldEndDate) %>">
-            </div>
-            <div class="col-lg-4 col-md-6 d-flex align-items-end">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="visible-<%= assignment.Id %>" name="isTimelineVisible" <%= assignment.IsTimelineVisible ? 'checked' : '' %>>
-                <label class="form-check-label small" for="visible-<%= assignment.Id %>">Visible on timeline</label>
+          <form method="post" id="<%= formId %>"
+                action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>"
+                class="allocation-form assignment-edit-form"
+                data-opportunity-hours="<%= o.OpportunityHours || 0 %>"
+                data-allocated-hours="<%= assignment.AllocatedHours || 0 %>"
+                data-allocation-percent="<%= assignment.AllocationPercent || 0 %>">
+            <div class="assignment-group">
+              <div class="assignment-group-title"><i class="bi bi-calendar-range me-1"></i>Schedule</div>
+              <div class="row g-2">
+                <div class="col-lg-4 col-md-6">
+                  <label class="form-label small">Person</label>
+                  <select class="form-select form-select-sm" name="personName" data-role="person">
+                    <% people.forEach(function(person) { %>
+                      <option value="<%= person %>" <%= assignment.PersonName === person ? 'selected' : '' %>><%= person %></option>
+                    <% }) %>
+                    <% if (assignment.PersonName && people.indexOf(assignment.PersonName) === -1) { %>
+                      <option value="<%= assignment.PersonName %>" selected><%= assignment.PersonName %></option>
+                    <% } %>
+                  </select>
+                </div>
+                <div class="col-lg-4 col-md-3 col-6">
+                  <label class="form-label small">Start date</label>
+                  <input type="date" class="form-control form-control-sm" name="plannedStartDate" data-role="start" value="<%= startText %>">
+                </div>
+                <div class="col-lg-4 col-md-3 col-6">
+                  <label class="form-label small">End date</label>
+                  <input type="date" class="form-control form-control-sm" name="plannedEndDate" data-role="end" value="<%= endText %>">
+                </div>
               </div>
             </div>
-            <div class="col-lg-4 col-md-6 small text-muted d-flex align-items-end justify-content-lg-end">
-              Currently <%= round2(assignment.AllocatedHours || 0) %>h assigned
+
+            <div class="assignment-group">
+              <div class="assignment-group-title"><i class="bi bi-speedometer2 me-1"></i>Allocation</div>
+              <div class="row g-2">
+                <div class="col-lg-4 col-md-6">
+                  <label class="form-label small">Allocation mode</label>
+                  <select class="form-select form-select-sm" name="allocationMode" data-role="mode">
+                    <option value="percent" <%= allocationMode === 'percent' ? 'selected' : '' %>>Percent of total hours</option>
+                    <option value="total-hours" <%= allocationMode === 'total-hours' ? 'selected' : '' %>>Total hours for period</option>
+                    <option value="monthly-hours" <%= allocationMode === 'monthly-hours' ? 'selected' : '' %>>Hours per month</option>
+                  </select>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                  <label class="form-label small" data-role="value-label">Allocation %</label>
+                  <input type="number" class="form-control form-control-sm" data-role="value" min="0.5" step="0.5" value="<%= assignment.AllocationPercent || 0 %>">
+                </div>
+                <div class="col-lg-4 d-flex align-items-end">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="visible-<%= assignment.Id %>" name="isTimelineVisible" <%= assignment.IsTimelineVisible ? 'checked' : '' %>>
+                    <label class="form-check-label small" for="visible-<%= assignment.Id %>">Visible on timeline</label>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <div class="allocation-preview" data-role="preview">&nbsp;</div>
+                </div>
+              </div>
             </div>
 
-            <div class="col-12">
-              <div class="allocation-preview small text-muted" data-role="preview">&nbsp;</div>
-              <div class="form-text">Leave both hold dates empty for no hold. A hold frees capacity for that period.</div>
+            <div class="assignment-group">
+              <div class="assignment-group-title"><i class="bi bi-pause-circle me-1"></i>Hold &mdash; frees capacity for the period</div>
+              <div class="row g-2">
+                <div class="col-lg-4 col-md-6 col-6">
+                  <label class="form-label small">Hold from</label>
+                  <input type="date" class="form-control form-control-sm" name="holdStartDate" value="<%= toDateText(assignment.HoldStartDate) %>">
+                </div>
+                <div class="col-lg-4 col-md-6 col-6">
+                  <label class="form-label small">Hold until</label>
+                  <input type="date" class="form-control form-control-sm" name="holdEndDate" value="<%= toDateText(assignment.HoldEndDate) %>">
+                </div>
+                <div class="col-lg-4 d-flex align-items-end">
+                  <div class="form-text mb-1">Leave both empty for no hold. Assigned hours stay unchanged.</div>
+                </div>
+              </div>
             </div>
+
             <input type="hidden" name="allocationPercent" data-role="percent-field">
             <input type="hidden" name="allocatedHours" data-role="hours-field">
           </form>
-          <div class="assignment-actions d-flex gap-2">
-            <form method="post" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>/stretch">
-              <input type="hidden" name="days" value="-7">
-              <input type="hidden" name="plannedStartDate" value="<%= toDateText(assignment.PlannedStartDate) %>">
-              <input type="hidden" name="plannedEndDate" value="<%= toDateText(assignment.PlannedEndDate) %>">
-              <button class="btn btn-sm btn-outline-secondary" type="submit">-7d</button>
-            </form>
-            <form method="post" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>/stretch">
-              <input type="hidden" name="days" value="7">
-              <input type="hidden" name="plannedStartDate" value="<%= toDateText(assignment.PlannedStartDate) %>">
-              <input type="hidden" name="plannedEndDate" value="<%= toDateText(assignment.PlannedEndDate) %>">
-              <button class="btn btn-sm btn-outline-secondary" type="submit">+7d</button>
-            </form>
-            <form method="post" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>/delete" data-confirm="Delete this assignment?" data-confirm-title="Delete assignment">
-              <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-            </form>
+
+          <%# Kept outside the edit form; the buttons reach them via the form attribute. %>
+          <form method="post" id="stretch-minus-<%= assignment.Id %>" class="d-none" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>/stretch">
+            <input type="hidden" name="days" value="-7">
+            <input type="hidden" name="plannedStartDate" value="<%= startText %>">
+            <input type="hidden" name="plannedEndDate" value="<%= endText %>">
+          </form>
+          <form method="post" id="stretch-plus-<%= assignment.Id %>" class="d-none" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>/stretch">
+            <input type="hidden" name="days" value="7">
+            <input type="hidden" name="plannedStartDate" value="<%= startText %>">
+            <input type="hidden" name="plannedEndDate" value="<%= endText %>">
+          </form>
+          <form method="post" id="assignment-delete-<%= assignment.Id %>" class="d-none"
+                action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>/delete"
+                data-confirm="Delete this assignment?" data-confirm-title="Delete assignment"></form>
+
+          <div class="assignment-toolbar">
+            <button class="btn btn-sm btn-outline-secondary" type="submit" form="stretch-minus-<%= assignment.Id %>" title="Shorten the window by a week">
+              <i class="bi bi-dash-lg"></i> 7d
+            </button>
+            <button class="btn btn-primary" type="submit" form="<%= formId %>">
+              <i class="bi bi-check2 me-1"></i>Save
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" type="submit" form="stretch-plus-<%= assignment.Id %>" title="Extend the window by a week">
+              <i class="bi bi-plus-lg"></i> 7d
+            </button>
+            <button class="btn btn-sm btn-outline-danger" type="submit" form="assignment-delete-<%= assignment.Id %>">
+              <i class="bi bi-trash me-1"></i>Delete
+            </button>
           </div>
         </div>
       <% }) %>

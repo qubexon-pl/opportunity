@@ -6,6 +6,16 @@ const { round2, toDateText, calculateAllocatedHours, calculateAllocatedHoursByDu
 
 const MIGRATION_HINT = 'Missing database migration: run src/sql/004_create_opportunity_assignments.sql';
 const HOLD_MIGRATION_HINT = 'Missing database migration: run src/sql/006_add_assignment_hold_window.sql';
+const MODE_MIGRATION_HINT = 'Missing database migration: run src/sql/007_add_assignment_allocation_mode.sql';
+
+/** How the user expressed the allocation. Legacy rows have no mode and read back as a percentage. */
+const ALLOCATION_MODES = ['percent', 'total-hours', 'monthly-hours'];
+const DEFAULT_ALLOCATION_MODE = 'percent';
+
+function normalizeAllocationMode(value) {
+  const mode = String(value ?? '').trim();
+  return ALLOCATION_MODES.includes(mode) ? mode : null;
+}
 
 /** Optional date: an empty string clears the value, undefined leaves it untouched. */
 const OptionalDate = z.union([z.string().length(10), z.literal(''), z.null()]).optional();
@@ -14,8 +24,9 @@ const AssignmentBaseSchema = z.object({
   personName: z.string().min(1).max(200),
   plannedStartDate: z.string().min(10).max(10),
   plannedEndDate: z.string().min(10).max(10),
-  allocationPercent: z.number().gt(0).max(100).optional(),
+  allocationPercent: z.number().gt(0).max(100, 'cannot exceed 100% of the opportunity total hours').optional(),
   allocatedHours: z.number().gt(0).max(100000).optional(),
+  allocationMode: z.enum(['percent', 'total-hours', 'monthly-hours']).optional(),
   isTimelineVisible: z.boolean().optional(),
   holdStartDate: OptionalDate,
   holdEndDate: OptionalDate,
@@ -76,6 +87,7 @@ function normalizeHold(startValue, endValue) {
 function rethrowAssignmentError(err) {
   if (isMissingAssignmentsTable(err)) throw new Error(MIGRATION_HINT);
   if (isMissingColumn(err, 'HoldStartDate') || isMissingColumn(err, 'HoldEndDate')) throw new Error(HOLD_MIGRATION_HINT);
+  if (isMissingColumn(err, 'AllocationMode')) throw new Error(MODE_MIGRATION_HINT);
   throw err;
 }
 
@@ -118,6 +130,7 @@ async function addAssignment(rawOpportunityId, payload) {
   const opportunityHours = Number(opp.recordset[0].OpportunityHours || 0);
   const load = deriveAssignmentLoad(opportunityHours, body.allocatedHours, body.allocationPercent);
   const hold = normalizeHold(body.holdStartDate, body.holdEndDate);
+  const allocationMode = normalizeAllocationMode(body.allocationMode);
   const newId = crypto.randomUUID();
 
   try {
@@ -130,20 +143,21 @@ async function addAssignment(rawOpportunityId, payload) {
       .input('PlannedEndDate', sql.Date, body.plannedEndDate)
       .input('AllocationPercent', sql.Float, load.allocationPercent)
       .input('AllocatedHours', sql.Float, load.allocatedHours)
+      .input('AllocationMode', sql.NVarChar(20), allocationMode)
       .input('IsTimelineVisible', sql.Bit, body.isTimelineVisible ?? true)
       .input('HoldStartDate', sql.Date, hold.holdStartDate)
       .input('HoldEndDate', sql.Date, hold.holdEndDate)
       .query(
         `INSERT INTO dbo.OpportunityAssignments
-           (Id, OpportunityId, PersonName, PlannedStartDate, PlannedEndDate, AllocationPercent, AllocatedHours, IsTimelineVisible, HoldStartDate, HoldEndDate)
+           (Id, OpportunityId, PersonName, PlannedStartDate, PlannedEndDate, AllocationPercent, AllocatedHours, AllocationMode, IsTimelineVisible, HoldStartDate, HoldEndDate)
          VALUES
-           (@Id, @OpportunityId, @PersonName, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @AllocatedHours, @IsTimelineVisible, @HoldStartDate, @HoldEndDate);`
+           (@Id, @OpportunityId, @PersonName, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @AllocatedHours, @AllocationMode, @IsTimelineVisible, @HoldStartDate, @HoldEndDate);`
       );
   } catch (err) {
     rethrowAssignmentError(err);
   }
 
-  return { id: newId, ...load, ...hold };
+  return { id: newId, allocationMode, ...load, ...hold };
 }
 
 async function updateAssignment(rawAssignmentId, payload) {
@@ -182,6 +196,11 @@ async function updateAssignment(rawAssignmentId, payload) {
     isTimelineVisible: body.isTimelineVisible ?? !!row.IsTimelineVisible,
   };
 
+  // An omitted mode keeps whatever the assignment was created with.
+  const allocationMode = body.allocationMode === undefined
+    ? normalizeAllocationMode(row.AllocationMode)
+    : normalizeAllocationMode(body.allocationMode);
+
   // An omitted hold field keeps the stored window; an empty string clears it.
   const hold = normalizeHold(
     body.holdStartDate === undefined ? toDateText(row.HoldStartDate) : body.holdStartDate,
@@ -218,6 +237,7 @@ async function updateAssignment(rawAssignmentId, payload) {
     .input('PlannedEndDate', sql.Date, next.plannedEndDate)
     .input('AllocationPercent', sql.Float, load.allocationPercent)
     .input('AllocatedHours', sql.Float, load.allocatedHours)
+    .input('AllocationMode', sql.NVarChar(20), allocationMode)
     .input('IsTimelineVisible', sql.Bit, next.isTimelineVisible)
     .input('HoldStartDate', sql.Date, hold.holdStartDate)
     .input('HoldEndDate', sql.Date, hold.holdEndDate)
@@ -228,6 +248,7 @@ async function updateAssignment(rawAssignmentId, payload) {
            PlannedEndDate=@PlannedEndDate,
            AllocationPercent=@AllocationPercent,
            AllocatedHours=@AllocatedHours,
+           AllocationMode=@AllocationMode,
            IsTimelineVisible=@IsTimelineVisible,
            HoldStartDate=@HoldStartDate,
            HoldEndDate=@HoldEndDate,
@@ -238,7 +259,7 @@ async function updateAssignment(rawAssignmentId, payload) {
     .catch(rethrowAssignmentError);
 
   if (result.recordset[0].affected === 0) throw new Error('Assignment not found.');
-  return { ...load, ...hold };
+  return { allocationMode, ...load, ...hold };
 }
 
 async function deleteAssignment(rawAssignmentId) {
@@ -258,9 +279,12 @@ async function deleteAssignment(rawAssignmentId) {
 }
 
 module.exports = {
+  ALLOCATION_MODES,
+  DEFAULT_ALLOCATION_MODE,
   AssignmentCreateSchema,
   AssignmentUpdateSchema,
   deriveAssignmentLoad,
+  normalizeAllocationMode,
   normalizeHold,
   listAssignments,
   addAssignment,

@@ -13,7 +13,7 @@ const {
   setStepDone,
   deleteStep,
 } = require('../services/opportunityService');
-const { addAssignment, updateAssignment, deleteAssignment } = require('../services/assignmentService');
+const { addAssignment, updateAssignment, deleteAssignment, ALLOCATION_MODES } = require('../services/assignmentService');
 const { listPeople, getDailyHoursMap } = require('../services/peopleService');
 const { calculateEndDate, calculateDurationWorkDays, toDateText, round2 } = require('../services/dateService');
 const { stageStatusLabel, stageAccentClass, stageBadgeClass } = require('../services/capacityService');
@@ -47,6 +47,12 @@ function bool(value) {
 function positiveNum(value) {
   const parsed = num(value);
   return parsed !== null && parsed > 0 ? parsed : undefined;
+}
+
+/** Keeps an unrecognised allocation mode out of the service payload. */
+function allocationMode(value) {
+  const mode = String(value ?? '').trim();
+  return ALLOCATION_MODES.includes(mode) ? mode : undefined;
 }
 
 /** Maps the opportunity form body onto the service payload shape. */
@@ -309,6 +315,7 @@ router.post('/:id/assignments', async (req, res, next) => {
       plannedEndDate: String(req.body.plannedEndDate || '').slice(0, 10),
       allocationPercent: positiveNum(req.body.allocationPercent),
       allocatedHours: positiveNum(req.body.allocatedHours),
+      allocationMode: allocationMode(req.body.allocationMode),
       isTimelineVisible: true,
       holdStartDate: String(req.body.holdStartDate || '').slice(0, 10),
       holdEndDate: String(req.body.holdEndDate || '').slice(0, 10),
@@ -328,6 +335,7 @@ router.post('/:id/assignments/:assignmentId', async (req, res, next) => {
       plannedEndDate: String(req.body.plannedEndDate || '').slice(0, 10),
       allocationPercent: positiveNum(req.body.allocationPercent),
       allocatedHours: positiveNum(req.body.allocatedHours),
+      allocationMode: allocationMode(req.body.allocationMode),
       isTimelineVisible: bool(req.body.isTimelineVisible),
       holdStartDate: String(req.body.holdStartDate || '').slice(0, 10),
       holdEndDate: String(req.body.holdEndDate || '').slice(0, 10),

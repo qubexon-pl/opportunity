@@ -7,14 +7,12 @@ const {
   startOfUnit,
   addUnit,
   formatUnitLabel,
-  formatMonthLabel,
+  unitGroup,
   formatShortDate,
-  startOfMonth,
-  addMonths,
   unitsToCoverRange,
   periodBounds,
 } = require('./dateService');
-const { listPeople, getPersonDailyHours } = require('./peopleService');
+const { listPeople, getPersonDailyHours, getPersonRole } = require('./peopleService');
 const { countsTowardsCapacity, listFirmStages } = require('./bookingService');
 
 const TIMELINE_ROW_TOP_PADDING = 8;
@@ -74,6 +72,14 @@ function capacityClass(hours) {
   if (hours < 0) return 'capacity-over';
   if (hours < 40) return 'capacity-tight';
   return 'capacity-available';
+}
+
+/** Traffic-light band for a chargeability percentage. */
+function chargeabilityClass(percent) {
+  if (percent > 100) return 'kpi-over';
+  if (percent >= 75) return 'kpi-good';
+  if (percent >= 50) return 'kpi-fair';
+  return 'kpi-low';
 }
 
 /** Joins assignments with their opportunity, filling in derived hours. */
@@ -177,11 +183,30 @@ function timelineRange(scheduled, perspective, unitsToShow) {
 function buildTimelineUnits(range, perspective) {
   return Array.from({ length: range.units }).map((_, index) => {
     const unitStart = addUnit(range.start, perspective, index);
+    const group = unitGroup(unitStart, perspective);
     return {
       key: `${perspective}-${toDateText(unitStart)}`,
       label: formatUnitLabel(unitStart, perspective),
+      groupKey: group.key,
+      groupLabel: group.label,
     };
   });
+}
+
+/**
+ * Collapses the unit list into the header band shown above the columns, so
+ * consecutive weeks in the same month sit under one "June 2026" heading.
+ */
+function buildTimelineGroups(units) {
+  return units.reduce((groups, unit) => {
+    const last = groups[groups.length - 1];
+    if (last && last.key === unit.groupKey) {
+      last.span += 1;
+      return groups;
+    }
+    groups.push({ key: unit.groupKey, label: unit.groupLabel, span: 1 });
+    return groups;
+  }, []);
 }
 
 function chipGeometry(range, startValue, endValue, laneIndex) {
@@ -227,14 +252,18 @@ function rowHeight(assignmentCount, includeFreeLane) {
   return Math.max(TIMELINE_LANE_HEIGHT + TIMELINE_ROW_TOP_PADDING, lanes * TIMELINE_LANE_HEIGHT + TIMELINE_ROW_TOP_PADDING);
 }
 
-function monthlyFreeSegments(assignmentsForPerson, personName, window) {
+/**
+ * Free capacity bars, one per column of the selected perspective, so the
+ * "free" figures line up with whatever period the timeline is showing.
+ */
+function freeSegments(assignmentsForPerson, personName, window, perspective) {
   const segments = [];
-  let monthCursor = startOfMonth(window.start);
+  let cursor = startOfUnit(window.start, perspective);
 
-  while (monthCursor < window.endExclusive) {
-    const nextMonth = addMonths(monthCursor, 1);
-    const start = new Date(Math.max(monthCursor.getTime(), window.start.getTime()));
-    const endExclusive = new Date(Math.min(nextMonth.getTime(), window.endExclusive.getTime()));
+  while (cursor < window.endExclusive) {
+    const nextUnit = addUnit(cursor, perspective, 1);
+    const start = new Date(Math.max(cursor.getTime(), window.start.getTime()));
+    const endExclusive = new Date(Math.min(nextUnit.getTime(), window.endExclusive.getTime()));
 
     if (endExclusive > start) {
       const capacityHours = countBusinessDays(start, endExclusive) * getPersonDailyHours(personName);
@@ -247,8 +276,9 @@ function monthlyFreeSegments(assignmentsForPerson, personName, window) {
         .reduce((total, assignment) => total + assignmentHoursInWindow(assignment, start, endExclusive), 0);
 
       segments.push({
-        key: `${monthCursor.getFullYear()}-${String(monthCursor.getMonth() + 1).padStart(2, '0')}`,
-        monthLabel: formatMonthLabel(monthCursor),
+        key: `${perspective}-${toDateText(cursor)}`,
+        unitLabel: formatUnitLabel(cursor, perspective),
+        groupLabel: unitGroup(cursor, perspective).label,
         start,
         endExclusive,
         capacityHours: round2(capacityHours),
@@ -257,7 +287,7 @@ function monthlyFreeSegments(assignmentsForPerson, personName, window) {
       });
     }
 
-    monthCursor = nextMonth;
+    cursor = nextUnit;
   }
 
   return segments;
@@ -283,8 +313,13 @@ function buildManagementPeople(assignmentRows, window) {
     const assignedPercent = capacityHours > 0 ? Math.min(100, Math.max(0, (activeHours / capacityHours) * 100)) : 0;
     const softPercent = capacityHours > 0 ? Math.min(100 - assignedPercent, Math.max(0, (softHours / capacityHours) * 100)) : 0;
 
+    // Chargeability is reported uncapped so over-allocation stays visible.
+    const chargeabilityReal = capacityHours > 0 ? round2((activeHours / capacityHours) * 100) : 0;
+    const chargeabilityPredicted = capacityHours > 0 ? round2(((activeHours + softHours) / capacityHours) * 100) : 0;
+
     return {
       person,
+      role: getPersonRole(person),
       assigned,
       dailyHours,
       capacityHours,
@@ -295,8 +330,35 @@ function buildManagementPeople(assignmentRows, window) {
       assignedPercent,
       softPercent,
       availablePercent: Math.max(0, 100 - assignedPercent),
+      chargeabilityReal,
+      chargeabilityPredicted,
+      chargeabilityClass: chargeabilityClass(chargeabilityReal),
+      chargeabilityPredictedClass: chargeabilityClass(chargeabilityPredicted),
     };
   });
+}
+
+/**
+ * Team-wide chargeability, weighted by capacity rather than averaged per head so
+ * part-time people do not distort the number.
+ */
+function summariseChargeability(people) {
+  const capacityHours = people.reduce((total, member) => total + member.capacityHours, 0);
+  const activeHours = people.reduce((total, member) => total + member.activeHours, 0);
+  const softHours = people.reduce((total, member) => total + member.softHours, 0);
+
+  const real = capacityHours > 0 ? round2((activeHours / capacityHours) * 100) : 0;
+  const predicted = capacityHours > 0 ? round2(((activeHours + softHours) / capacityHours) * 100) : 0;
+
+  return {
+    capacityHours: round2(capacityHours),
+    activeHours: round2(activeHours),
+    softHours: round2(softHours),
+    real,
+    predicted,
+    realClass: chargeabilityClass(real),
+    predictedClass: chargeabilityClass(predicted),
+  };
 }
 
 /** Hold overlay position expressed relative to the chip it sits on. */
@@ -319,12 +381,21 @@ function holdOverlay(range, assignment, chipBox) {
  * Builds the full view model for the Management page: capacity cards, assignment table,
  * and the positioned timeline chips.
  */
-function buildManagementView({ opportunities, assignments, perspective, unitsToShow, stageFilter }) {
+function buildManagementView({ opportunities, assignments, perspective, unitsToShow, stageFilter, personFilter }) {
   const assignmentRows = buildAssignmentRows(opportunities, assignments);
   const window = capacityWindow(perspective, unitsToShow);
-  const people = buildManagementPeople(assignmentRows, window);
+  const allPeople = buildManagementPeople(assignmentRows, window);
 
-  const scheduled = assignmentRows.filter((assignment) => assignment.IsTimelineVisible);
+  // An empty person filter means everyone; an unknown name simply matches nobody.
+  const selectedPeople = (Array.isArray(personFilter) ? personFilter : personFilter ? [personFilter] : [])
+    .map((name) => String(name))
+    .filter(Boolean);
+  const people = selectedPeople.length ? allPeople.filter((member) => selectedPeople.includes(member.person)) : allPeople;
+
+  const visibleRows = assignmentRows.filter(
+    (assignment) => !selectedPeople.length || selectedPeople.includes(assignment.PersonName)
+  );
+  const scheduled = visibleRows.filter((assignment) => assignment.IsTimelineVisible);
 
   // The filter accepts several stages at once; "free" is a pseudo-stage for the free bars.
   const selected = (Array.isArray(stageFilter) ? stageFilter : stageFilter ? [stageFilter] : [])
@@ -341,6 +412,7 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
 
   const range = timelineRange(scheduled, perspective, unitsToShow);
   const units = buildTimelineUnits(range, perspective);
+  const unitGroups = buildTimelineGroups(units);
 
   const byPersonAll = new Map();
   const byPersonDisplayed = new Map();
@@ -372,7 +444,7 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
     });
 
     const freeChips = showFreeBars
-      ? monthlyFreeSegments(allForPerson, member.person, window).map((segment) => ({
+      ? freeSegments(allForPerson, member.person, window, perspective).map((segment) => ({
           ...segment,
           geometry: freeGeometry(range, segment.start, segment.endExclusive, forPerson.length),
         }))
@@ -380,25 +452,30 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
 
     return {
       person: member.person,
+      role: member.role,
       chips,
       freeChips,
       height: rowHeight(forPerson.length, showFreeBars),
     };
   });
 
-  const total = assignmentRows.length;
-  const visible = assignmentRows.filter((assignment) => assignment.IsTimelineVisible).length;
-  const committed = assignmentRows.filter((assignment) => assignment.IsCommitted).length;
-  const onHold = assignmentRows.filter((assignment) => assignment.IsOnHold).length;
+  const total = visibleRows.length;
+  const visible = visibleRows.filter((assignment) => assignment.IsTimelineVisible).length;
+  const committed = visibleRows.filter((assignment) => assignment.IsCommitted).length;
+  const onHold = visibleRows.filter((assignment) => assignment.IsOnHold).length;
 
   return {
     assignmentRows,
     people,
+    allPeople,
+    chargeability: summariseChargeability(people),
     stats: { total, visible, hidden: total - visible, committed, soft: total - committed, onHold },
     timeline: {
       range,
       units,
+      unitGroups,
       rows,
+      perspective,
       showFreeBars,
       startText: toDateText(range.start),
       endExclusiveText: toDateText(range.endExclusive),
@@ -409,19 +486,37 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
 }
 
 /** Next steps due inside the selected period, for open opportunities only. */
-function buildUpcoming(opportunities, periodKey) {
+function buildUpcoming(opportunities, periodKey, nextSteps) {
   const { start, endInclusive } = periodBounds(periodKey);
   const endMs = endInclusive.getTime();
 
-  const items = opportunities
-    .filter((item) => item.Status !== 'Closed')
+  const open = opportunities.filter((item) => item.Status !== 'Closed');
+  const openIds = new Set(open.map((item) => String(item.Id)));
+
+  // The dedicated next-step list is the source of truth; the legacy summary
+  // columns are still read so data captured before they were removed shows up.
+  const fromSteps = (Array.isArray(nextSteps) ? nextSteps : [])
+    .filter((step) => openIds.size === 0 || openIds.has(String(step.OpportunityId)))
+    .map((step) => ({
+      id: step.OpportunityId,
+      name: step.OpportunityName,
+      stage: step.Stage || 'Unspecified',
+      summary: step.Title || 'Untitled next step',
+      due: toDate(step.DueDate),
+    }));
+
+  const withStepIds = new Set(fromSteps.map((item) => String(item.id)));
+  const fromLegacy = open
+    .filter((item) => item.NextStepSummary && !withStepIds.has(String(item.Id)))
     .map((item) => ({
       id: item.Id,
       name: item.Name,
       stage: item.Stage || 'Unspecified',
-      summary: item.NextStepSummary || 'No next step summary',
+      summary: item.NextStepSummary,
       due: toDate(item.NextStepDueDate),
-    }))
+    }));
+
+  const items = [...fromSteps, ...fromLegacy]
     .filter((item) => item.due && item.due >= start && item.due.getTime() <= endMs)
     .sort((a, b) => a.due.getTime() - b.due.getTime())
     .map((item) => ({ ...item, dueText: toDateText(item.due) }));
@@ -438,6 +533,7 @@ module.exports = {
   stageAccentClass,
   stageBadgeClass,
   capacityClass,
+  chargeabilityClass,
   buildAssignmentRows,
   assignmentHoursInWindow,
   buildManagementView,
