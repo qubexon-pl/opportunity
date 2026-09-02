@@ -52,6 +52,16 @@
       </div>
       <div class="col-lg-3 col-md-4 col-6">
         <%- include('partials/multiselect', {
+          id: 'filter-timeline-status',
+          name: 'status',
+          label: 'Status filter',
+          allLabel: 'All statuses',
+          selected: statusFilters,
+          options: statusOptions.map(function(status) { return { value: status, label: status }; })
+        }) %>
+      </div>
+      <div class="col-lg-3 col-md-4 col-6">
+        <%- include('partials/multiselect', {
           id: 'filter-timeline-person',
           name: 'person',
           label: 'Person',
@@ -69,6 +79,7 @@
       <input type="hidden" name="perspective" value="<%= perspective %>">
       <input type="hidden" name="units" value="<%= unitsToShow %>">
       <% stageFilters.forEach(function(stage) { %><input type="hidden" name="stage" value="<%= stage %>"><% }) %>
+      <% statusFilters.forEach(function(status) { %><input type="hidden" name="status" value="<%= status %>"><% }) %>
       <% personFilters.forEach(function(name) { %><input type="hidden" name="person" value="<%= name %>"><% }) %>
       <button class="btn btn-sm btn-outline-primary" type="submit" <%= filtersMatchDefault ? 'disabled' : '' %>>
         <i class="bi bi-pin-angle me-1"></i>Save as my default
@@ -76,6 +87,7 @@
       <span class="text-muted small">
         Current default: <%= savedDefaults.perspective %> &middot; <%= savedDefaults.units %> units &middot;
         <%= savedDefaults.stages.length ? savedDefaults.stages.join(', ') : 'all stages' %> &middot;
+        <%= savedDefaults.statuses.length ? savedDefaults.statuses.join(', ') : 'all statuses' %> &middot;
         <%= savedDefaults.people.length ? savedDefaults.people.join(', ') : 'all people' %>
       </span>
     </form>
@@ -91,6 +103,7 @@
         <input type="hidden" name="perspective" value="<%= perspective %>">
         <input type="hidden" name="units" value="<%= unitsToShow %>">
         <% stageFilters.forEach(function(stage) { %><input type="hidden" name="stage" value="<%= stage %>"><% }) %>
+        <% statusFilters.forEach(function(status) { %><input type="hidden" name="status" value="<%= status %>"><% }) %>
         <% personFilters.forEach(function(name) { %><input type="hidden" name="person" value="<%= name %>"><% }) %>
         <input type="hidden" name="sort" value="<%= view.sort.key %>">
         <input type="hidden" name="dir" value="<%= view.sort.dir %>">
@@ -301,7 +314,28 @@
               <td class="fw-semibold">
                 <a class="person-link" href="/management/people/<%= encodeURIComponent(assignment.PersonName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>"><%= assignment.PersonName %></a>
               </td>
-              <td><a href="/opportunities/<%= assignment.OpportunityId %>#assignments"><%= assignment.OpportunityName %></a></td>
+              <td>
+                <%
+                  var scope = assignment.scope;
+                  var scopeIcon = scope.state === 'over' ? 'bi-arrow-up-right' : scope.state === 'within' ? 'bi-arrow-down-right' : '';
+                  var scopeClass = scope.state === 'over' ? 'scope-over' : scope.state === 'within' ? 'scope-within' : '';
+                  var scopeTitle = scope.state === 'unknown'
+                    ? 'This opportunity has no stated hours, so there is nothing to compare the assignments against.'
+                    : scope.assignedHours + 'h assigned across ' + scope.assignmentCount + ' allocation' + (scope.assignmentCount === 1 ? '' : 's')
+                      + ' of the ' + scope.scopeHours + 'h project scope (' + scope.percentOfScope + '%).\n'
+                      + (scope.state === 'over'
+                          ? 'Over scope by ' + scope.differenceHours + 'h.'
+                          : 'Within scope, ' + Math.abs(scope.differenceHours) + 'h still unassigned.');
+                %>
+                <a href="/opportunities/<%= assignment.OpportunityId %>#assignments"><%= assignment.OpportunityName %></a>
+                <% if (scopeIcon) { %>
+                  <i class="bi <%= scopeIcon %> scope-arrow <%= scopeClass %>" title="<%= scopeTitle %>"></i>
+                  <div class="scope-hint small <%= scopeClass %>" title="<%= scopeTitle %>">
+                    <%= scope.assignedHours %>h / <%= scope.scopeHours %>h
+                    <%= scope.state === 'over' ? '(+' + scope.differenceHours + 'h over)' : '(' + Math.abs(scope.differenceHours) + 'h left)' %>
+                  </div>
+                <% } %>
+              </td>
               <td><span class="stage-dot <%= stageAccentClass(assignment.Stage) %>"></span><%= assignment.Stage || '-' %> <span class="text-muted small">(<%= stageStatusLabel(assignment.Stage) %>)</span></td>
               <td class="text-nowrap">
                 <%= assignment.StartDate || '-' %> &rarr; <%= assignment.EndDate || '-' %>
@@ -341,7 +375,11 @@
     <div class="timeline-legend d-flex flex-wrap gap-2">
       <%
         // Legend chips toggle a stage in or out of the current multi-selection.
+        // The other filters have to ride along, otherwise clicking a stage would
+        // silently clear the status and person selection.
         var baseQuery = 'applied=1&perspective=' + encodeURIComponent(perspective) + '&units=' + encodeURIComponent(unitsToShow);
+        statusFilters.forEach(function(s) { baseQuery += '&status=' + encodeURIComponent(s); });
+        personFilters.forEach(function(p) { baseQuery += '&person=' + encodeURIComponent(p); });
         function toggleHref(value) {
           var next = stageFilters.indexOf(value) !== -1
             ? stageFilters.filter(function(s) { return s !== value; })
@@ -359,6 +397,7 @@
       <% }) %>
       <a class="legend-chip legend-free <%= stageFilters.indexOf('free') !== -1 ? 'is-active' : '' %>"
          href="<%= toggleHref('free') %>">Free capacity</a>
+      <span class="legend-chip legend-absence" title="Days a person is away. Capacity is removed for these days, so free capacity drops with it.">Absence</span>
     </div>
   </div>
   <div class="card-body">
@@ -393,7 +432,10 @@
 Committed: <%= row.committedHours %>h
 Free: <%= row.freeHours %>h
 Committed + free = <%= (row.committedHours + row.freeHours).toFixed(2) %>h
-Soft booked on top: <%= row.softHours %>h<%= row.heldHours ? '\nReleased by holds: ' + row.heldHours + 'h' : '' %>">
+Soft booked on top: <%= row.softHours %>h<%= row.heldHours ? '\nReleased by holds: ' + row.heldHours + 'h' : '' %><%
+%><% if (row.absentDays) { %>
+Away <%= row.absentDays %>d, which removes <%= row.absenceHours %>h of capacity:<% row.absenceBands.forEach(function(band) { %>
+  <%= band.kind %> <%= band.startDate %> &rarr; <%= band.endDate %> (<%= band.daysInWindow %>d in view)<% }) %><% } %>">
               <a class="person-link" href="/management/people/<%= encodeURIComponent(row.person) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>"><%= row.person %></a>
               <span class="timeline-person-load"><%= row.committedHours %>h / <%= row.capacityHours %>h</span>
             </div>
@@ -401,6 +443,18 @@ Soft booked on top: <%= row.softHours %>h<%= row.heldHours ? '\nReleased by hold
               <div class="timeline-gridlines">
                 <% view.timeline.units.forEach(function(unit) { %><div class="timeline-gridline"></div><% }) %>
               </div>
+              <% row.absenceBands.forEach(function(band) { %>
+                <%
+                  // Drawn across the whole row because an absence belongs to the
+                  // person, not to one assignment: every chip it crosses is hit.
+                  var bandLabel = band.kind + ' ' + band.daysInWindow + 'd';
+                %>
+                <div class="timeline-absence"
+                     style="left: <%= band.geometry.left.toFixed(3) %>%; width: <%= band.geometry.width.toFixed(3) %>%;"
+                     aria-hidden="true">
+                  <span class="timeline-absence-label"><%= bandLabel %></span>
+                </div>
+              <% }) %>
               <% row.chips.forEach(function(chip) { %>
                 <div class="timeline-chip <%= chip.accentClass %> <%= chip.IsCommitted ? 'is-committed' : 'is-soft' %> <%= chip.IsOnHold ? 'is-on-hold' : '' %>"
                      data-assignment-id="<%= chip.Id %>"

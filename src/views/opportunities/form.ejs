@@ -5,6 +5,7 @@
   var notesList = typeof notes !== 'undefined' ? notes : [];
   var stepsList = typeof nextSteps !== 'undefined' ? nextSteps : [];
   var assignmentList = typeof assignments !== 'undefined' ? assignments : [];
+  var absence = typeof absenceImpact !== 'undefined' && absenceImpact ? absenceImpact : null;
   var todayText = typeof today !== 'undefined' ? today : toDateText(new Date());
   var actionUrl = isNew ? '/opportunities' : '/opportunities/' + o.Id;
 %>
@@ -178,6 +179,87 @@
 </form>
 
 <% if (!isNew) { %>
+  <% if (absence && absence.items.length) { %>
+    <div class="card mt-4 absence-impact-card <%= absence.shiftsPlannedEnd || absence.blocksDelivery ? 'is-at-risk' : '' %>" id="absence-impact">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="bi bi-calendar-x me-2"></i>Planned absence affecting this timeline</span>
+        <span class="badge <%= absence.shiftsPlannedEnd || absence.blocksDelivery ? 'text-bg-danger' : 'text-bg-warning' %>">
+          <%= absence.daysLost %> working <%= absence.daysLost === 1 ? 'day' : 'days' %> lost &middot; <%= absence.hoursAtRisk %>h at risk
+        </span>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">
+          <%= absence.peopleAffected.length === 1 ? absence.peopleAffected[0] + ' is' : absence.peopleAffected.length + ' people are' %>
+          away on days this project was counting on.
+          The allocation still owes its hours, so either the window stretches or the hours move to someone else.
+          <% if (absence.scopeHours > 0) { %>
+            That is <strong><%= absence.percentOfScope %>%</strong> of the <%= absence.scopeHours %>h project scope.
+          <% } %>
+        </p>
+
+        <% if (absence.blocksDelivery) { %>
+          <div class="alert alert-danger py-2 small mb-3">
+            <i class="bi bi-exclamation-octagon me-1"></i>
+            At least one allocation has no working days left at all once absence is taken out &mdash; it cannot deliver in its current window.
+          </div>
+        <% } else if (absence.shiftsPlannedEnd) { %>
+          <div class="alert alert-warning py-2 small mb-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Recovering the lost days runs past the planned end of <strong><%= absence.plannedEndDate %></strong>,
+            to <strong><%= absence.latestSuggestedEnd %></strong>.
+          </div>
+        <% } %>
+
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0 absence-impact-table">
+            <thead>
+              <tr>
+                <th>Person</th>
+                <th>Allocation window</th>
+                <th class="text-end">Working days</th>
+                <th class="text-end">Hours at risk</th>
+                <th>Absence</th>
+                <th>To recover</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% absence.items.forEach(function(item) { %>
+                <tr class="<%= item.blocksDelivery ? 'table-danger' : '' %>">
+                  <td class="fw-semibold"><%= item.person %></td>
+                  <td class="text-nowrap"><%= item.startDate %> &rarr; <%= item.endDate %></td>
+                  <td class="text-end">
+                    <%= item.workingDays %> of <%= item.businessDays %>
+                    <div class="absence-hint small">&minus;<%= item.absentDays %>d away</div>
+                  </td>
+                  <td class="text-end">
+                    <strong><%= item.hoursAtRisk %>h</strong> of <%= item.allocatedHours %>h
+                    <div class="text-muted small"><%= item.percentOfAssignment %>% of the allocation</div>
+                  </td>
+                  <td class="small">
+                    <% item.absences.forEach(function(a) { %>
+                      <div><span class="absence-kind"><%= a.kind %></span> <%= a.startDate %> &rarr; <%= a.endDate %> <span class="text-muted">(<%= a.daysInWindow %>d here)</span></div>
+                    <% }) %>
+                  </td>
+                  <td class="small text-nowrap">
+                    <% if (item.blocksDelivery) { %>
+                      <span class="text-danger">Reschedule &mdash; no working days left</span>
+                    <% } else { %>
+                      End <%= item.suggestedEndDate %>
+                      <div class="text-muted">+<%= item.absentDays %> working <%= item.absentDays === 1 ? 'day' : 'days' %></div>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-muted small mb-0 mt-3">
+          Absence is recorded per person in <a href="/settings">Configuration</a>. Nothing here has been changed automatically.
+        </p>
+      </div>
+    </div>
+  <% } %>
+
   <div class="card mt-4" id="assignments">
     <div class="card-header"><i class="bi bi-people me-2"></i>Assignments for timeline</div>
     <div class="card-body">

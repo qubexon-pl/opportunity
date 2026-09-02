@@ -18,6 +18,39 @@
   var wonCount = opportunities.filter(function(o) { return String(o.Stage || '').toLowerCase() === 'won'; }).length;
   var totalHours = opportunities.reduce(function(acc, o) { return acc + Number(o.OpportunityHours || 0); }, 0);
   var softCount = opportunities.filter(function(o) { return !isCommitted(o); }).length;
+
+  // Stage totals, so the summary says how much is actually won and lost rather
+  // than only how many opportunities exist. "Other" is everything still in play.
+  var stageTotals = stages.map(function(stage) {
+    var rows = opportunities.filter(function(o) { return String(o.Stage || '') === stage; });
+    return {
+      stage: stage,
+      key: String(stage).toLowerCase(),
+      count: rows.length,
+      hours: Math.round(rows.reduce(function(acc, o) { return acc + Number(o.OpportunityHours || 0); }, 0)),
+    };
+  });
+  var unspecified = opportunities.filter(function(o) { return stages.indexOf(String(o.Stage || '')) === -1; });
+  if (unspecified.length) {
+    stageTotals.push({
+      stage: 'Unspecified',
+      key: 'new',
+      count: unspecified.length,
+      hours: Math.round(unspecified.reduce(function(acc, o) { return acc + Number(o.OpportunityHours || 0); }, 0)),
+    });
+  }
+  function totalsFor(predicate) {
+    var rows = stageTotals.filter(predicate);
+    return {
+      count: rows.reduce(function(acc, r) { return acc + r.count; }, 0),
+      hours: rows.reduce(function(acc, r) { return acc + r.hours; }, 0),
+    };
+  }
+  var wonTotals = totalsFor(function(r) { return r.key === 'won'; });
+  var lostTotals = totalsFor(function(r) { return r.key === 'lost'; });
+  var otherTotals = totalsFor(function(r) { return r.key !== 'won' && r.key !== 'lost'; });
+  var decided = wonTotals.count + lostTotals.count;
+  var winRate = decided > 0 ? Math.round((wonTotals.count / decided) * 1000) / 10 : null;
 %>
 <div class="row g-3 mb-4">
   <div class="col-sm-4 col-lg-2">
@@ -66,6 +99,73 @@
         <div class="fs-3 fw-bold"><%= upcoming.items.length %></div>
         <div class="text-muted small">Upcoming actions</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-pie-chart me-2"></i>Stage totals</span>
+    <% if (winRate !== null) { %>
+      <span class="text-muted small">
+        Win rate <strong><%= winRate %>%</strong> of the <%= decided %> decided
+        (<%= wonTotals.count %> won, <%= lostTotals.count %> lost)
+      </span>
+    <% } %>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <div class="stage-total stage-total-won">
+          <div class="stage-total-label">Won</div>
+          <div class="stage-total-value"><%= wonTotals.count %></div>
+          <div class="stage-total-hours"><%= wonTotals.hours %>h</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stage-total stage-total-lost">
+          <div class="stage-total-label">Lost</div>
+          <div class="stage-total-value"><%= lostTotals.count %></div>
+          <div class="stage-total-hours"><%= lostTotals.hours %>h</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stage-total stage-total-other">
+          <div class="stage-total-label">Other stages &mdash; still in play</div>
+          <div class="stage-total-value"><%= otherTotals.count %></div>
+          <div class="stage-total-hours"><%= otherTotals.hours %>h</div>
+        </div>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0 stage-total-table">
+        <thead>
+          <tr>
+            <th>Stage</th>
+            <th class="text-end">Opportunities</th>
+            <th class="text-end">Hours</th>
+            <th class="text-end">Share of hours</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% stageTotals.forEach(function(row) { %>
+            <tr class="<%= row.count === 0 ? 'text-muted' : '' %>">
+              <td><span class="stage-badge <%= stageBadgeClass(row.stage) %>"><%= row.stage %></span></td>
+              <td class="text-end"><%= row.count %></td>
+              <td class="text-end"><%= row.hours %>h</td>
+              <td class="text-end"><%= totalHours > 0 ? Math.round((row.hours / totalHours) * 1000) / 10 : 0 %>%</td>
+            </tr>
+          <% }) %>
+        </tbody>
+        <tfoot>
+          <tr class="fw-semibold">
+            <td>All stages</td>
+            <td class="text-end"><%= opportunities.length %></td>
+            <td class="text-end"><%= Math.round(totalHours) %>h</td>
+            <td class="text-end">100%</td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   </div>
 </div>
@@ -192,7 +292,13 @@
           <% opportunities.forEach(function(o) { %>
             <tr>
               <td>
-                <div class="pipeline-title"><%= o.Name %></div>
+                <div class="pipeline-title">
+                  <%= o.Name %>
+                  <%
+                    var tagList = String(o.Tags || '').split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+                  %>
+                  <% tagList.forEach(function(tag) { %><span class="opportunity-tag"><%= tag %></span><% }) %>
+                </div>
                 <div class="pipeline-subtitle"><%= o.TechnologyStack || 'No technology stack' %></div>
               </td>
               <td><%= o.TechOwner || 'Unassigned' %></td>
