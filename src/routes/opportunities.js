@@ -43,6 +43,12 @@ function bool(value) {
   return value === 'on' || value === 'true' || value === true;
 }
 
+/** Allocation inputs only make sense above zero; anything else means "not supplied". */
+function positiveNum(value) {
+  const parsed = num(value);
+  return parsed !== null && parsed > 0 ? parsed : undefined;
+}
+
 /** Maps the opportunity form body onto the service payload shape. */
 function opportunityPayload(body) {
   const opportunityHours = num(body.opportunityHours);
@@ -301,9 +307,11 @@ router.post('/:id/assignments', async (req, res, next) => {
       personName: String(req.body.personName || '').trim(),
       plannedStartDate: String(req.body.plannedStartDate || '').slice(0, 10),
       plannedEndDate: String(req.body.plannedEndDate || '').slice(0, 10),
-      allocationPercent: num(req.body.allocationPercent) ?? undefined,
-      allocatedHours: num(req.body.allocatedHours) ?? undefined,
+      allocationPercent: positiveNum(req.body.allocationPercent),
+      allocatedHours: positiveNum(req.body.allocatedHours),
       isTimelineVisible: true,
+      holdStartDate: String(req.body.holdStartDate || '').slice(0, 10),
+      holdEndDate: String(req.body.holdEndDate || '').slice(0, 10),
     });
     req.flash('success', 'Assignment added.');
   } catch (err) {
@@ -318,8 +326,11 @@ router.post('/:id/assignments/:assignmentId', async (req, res, next) => {
       personName: String(req.body.personName || '').trim(),
       plannedStartDate: String(req.body.plannedStartDate || '').slice(0, 10),
       plannedEndDate: String(req.body.plannedEndDate || '').slice(0, 10),
-      allocationPercent: num(req.body.allocationPercent) ?? undefined,
+      allocationPercent: positiveNum(req.body.allocationPercent),
+      allocatedHours: positiveNum(req.body.allocatedHours),
       isTimelineVisible: bool(req.body.isTimelineVisible),
+      holdStartDate: String(req.body.holdStartDate || '').slice(0, 10),
+      holdEndDate: String(req.body.holdEndDate || '').slice(0, 10),
     });
     req.flash('success', 'Assignment saved.');
   } catch (err) {

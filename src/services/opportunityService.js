@@ -64,24 +64,41 @@ function bindOpportunity(request, body) {
     .input('CountsTowardsCapacity', sql.Bit, body.countsTowardsCapacity ?? null);
 }
 
+/** Builds a parameterised IN clause, keeping user values out of the SQL text. */
+function buildInClause(request, column, values, prefix, sqlType) {
+  if (!values.length) return '';
+  const names = values.map((value, index) => {
+    const name = `${prefix}${index}`;
+    request.input(name, sqlType, value);
+    return `@${name}`;
+  });
+  return ` AND ${column} IN (${names.join(', ')})`;
+}
+
+function toFilterArray(value) {
+  const list = Array.isArray(value) ? value : value === undefined || value === null ? [] : [value];
+  return [...new Set(list.map((item) => String(item).trim()).filter(Boolean))];
+}
+
 async function listOpportunities({ q = '', sort = 'updated', dir = 'desc', stage = '', status = '' } = {}) {
   const sortColumn = sort === 'name' ? 'Name' : sort === 'created' ? 'CreatedAt' : 'UpdatedAt';
   const sortDir = String(dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
+  const stages = toFilterArray(stage);
+  const statuses = toFilterArray(status);
+
   const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('q', sql.NVarChar(220), q ? `%${q}%` : null)
-    .input('stage', sql.NVarChar(60), stage || null)
-    .input('status', sql.NVarChar(30), status || null)
-    .query(
-      `SELECT TOP 500 *
-       FROM dbo.Opportunities
-       WHERE (@q IS NULL OR Name LIKE @q OR TechOwner LIKE @q OR BusinessOwner LIKE @q OR Tags LIKE @q)
-         AND (@stage IS NULL OR Stage = @stage)
-         AND (@status IS NULL OR Status = @status)
-       ORDER BY ${sortColumn} ${sortDir};`
-    );
+  const request = pool.request().input('q', sql.NVarChar(220), q ? `%${q}%` : null);
+
+  const stageClause = buildInClause(request, 'Stage', stages, 'stage', sql.NVarChar(60));
+  const statusClause = buildInClause(request, 'Status', statuses, 'status', sql.NVarChar(30));
+
+  const result = await request.query(
+    `SELECT TOP 500 *
+     FROM dbo.Opportunities
+     WHERE (@q IS NULL OR Name LIKE @q OR TechOwner LIKE @q OR BusinessOwner LIKE @q OR Tags LIKE @q)${stageClause}${statusClause}
+     ORDER BY ${sortColumn} ${sortDir};`
+  );
 
   return result.recordset;
 }

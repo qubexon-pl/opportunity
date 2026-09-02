@@ -15,9 +15,15 @@ const {
   capacityClass,
 } = require('../services/capacityService');
 const { listFirmStages } = require('../services/bookingService');
+const { getViewDefaults, updateViewDefaults } = require('../config/settings');
+const { queryList, filterAgainst } = require('../services/filterService');
+const { STAGES } = require('../services/opportunityService');
 const { isDatabaseUnavailable } = require('../db/pool');
 
 const router = express.Router();
+
+/** Stage options for the timeline filter, plus the "free capacity" pseudo-stage. */
+const TIMELINE_FILTER_OPTIONS = [...STAGES, 'free'];
 
 function num(value) {
   if (value === undefined || value === null || String(value).trim() === '') return null;
@@ -25,11 +31,28 @@ function num(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function normalizePerspective(value, fallback) {
+  const key = String(value || '');
+  if (TIMELINE_UNIT_OPTIONS.some((option) => option.key === key)) return key;
+  return TIMELINE_UNIT_OPTIONS.some((option) => option.key === fallback) ? fallback : 'months';
+}
+
+function normalizeUnits(value, fallback) {
+  return Math.min(24, Math.max(1, num(value) || fallback || 6));
+}
+
 router.get('/', async (req, res, next) => {
-  const perspectiveKey = String(req.query.perspective || 'months');
-  const perspective = TIMELINE_UNIT_OPTIONS.some((option) => option.key === perspectiveKey) ? perspectiveKey : 'months';
-  const unitsToShow = Math.min(24, Math.max(1, num(req.query.units) || 6));
-  const stageFilter = String(req.query.stage || '');
+  const defaults = getViewDefaults().management;
+
+  const applied = req.query.applied === '1';
+  const perspective = normalizePerspective(
+    req.query.perspective === undefined ? defaults.perspective : req.query.perspective,
+    defaults.perspective
+  );
+  const unitsToShow = normalizeUnits(req.query.units === undefined ? defaults.units : req.query.units, defaults.units);
+  const stageFilters = applied
+    ? filterAgainst(queryList(req.query.stage), TIMELINE_FILTER_OPTIONS)
+    : filterAgainst(defaults.stages, TIMELINE_FILTER_OPTIONS);
 
   try {
     let loadError = null;
@@ -46,20 +69,25 @@ router.get('/', async (req, res, next) => {
       loadError = err.message || String(err);
     }
 
-    const view = buildManagementView({ opportunities, assignments, perspective, unitsToShow, stageFilter });
+    const view = buildManagementView({ opportunities, assignments, perspective, unitsToShow, stageFilter: stageFilters });
+
+    const sameStages = JSON.stringify([...stageFilters].sort()) === JSON.stringify([...defaults.stages].sort());
 
     res.render('management', {
       title: 'Team capacity',
       monthlyCapacity: MONTHLY_CAPACITY,
       perspective,
       unitsToShow,
-      stageFilter,
+      stageFilters,
+      timelineFilterOptions: TIMELINE_FILTER_OPTIONS,
       timelineUnitOptions: TIMELINE_UNIT_OPTIONS,
       stageLegend: STAGE_LEGEND,
       people: listPeople(),
       projects: opportunities,
       view,
       firmStages: listFirmStages(),
+      savedDefaults: defaults,
+      filtersMatchDefault: sameStages && perspective === defaults.perspective && unitsToShow === defaults.units,
       loadError,
       stageStatusLabel,
       stageAccentClass,
@@ -70,6 +98,21 @@ router.get('/', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+/** Remembers the current timeline filter as the management default. */
+router.post('/defaults', (req, res) => {
+  try {
+    updateViewDefaults('management', {
+      stages: filterAgainst(queryList(req.body.stage), TIMELINE_FILTER_OPTIONS),
+      perspective: normalizePerspective(req.body.perspective, 'months'),
+      units: normalizeUnits(req.body.units, 6),
+    });
+    req.flash('success', 'Saved as your default timeline view.');
+  } catch (err) {
+    req.flash('error', err.message || String(err));
+  }
+  res.redirect(req.get('referer') || '/management');
 });
 
 router.post('/assignments', async (req, res, next) => {

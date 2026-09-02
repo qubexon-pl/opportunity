@@ -255,6 +255,25 @@
 
 body.timeline-resizing { cursor: ew-resize; user-select: none; }
 
+/* Hold window drawn over the part of a bar where capacity is free again. */
+.timeline-chip-hold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(108, 117, 125, .38),
+    rgba(108, 117, 125, .38) 4px,
+    rgba(255, 255, 255, .55) 4px,
+    rgba(255, 255, 255, .55) 8px
+  );
+  border-left: 1px dashed rgba(108, 117, 125, .8);
+  border-right: 1px dashed rgba(108, 117, 125, .8);
+}
+
+.timeline-chip.is-on-hold .timeline-chip-title { color: var(--color-text-muted, #6c757d); }
+
 .timeline-chip:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); color: inherit; }
 
 .timeline-chip-title {
@@ -310,25 +329,29 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
   display: flex;
   flex-wrap: wrap;
   gap: .75rem;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: .65rem 0;
+  padding: .9rem 0;
   border-top: 1px solid var(--color-divider);
 }
 
-.assignment-edit-grid {
-  display: grid;
-  grid-template-columns: minmax(140px, 1.4fr) 145px 145px 100px 70px 110px auto;
-  gap: .5rem;
-  align-items: center;
+/* The edit form mirrors the create form so an allocation is changed the same way it was made. */
+.assignment-edit-form {
   flex: 1 1 640px;
+  margin: 0;
 }
 
-@media (max-width: 991.98px) {
-  .assignment-edit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+.assignment-edit-form .form-label { margin-bottom: .15rem; }
+
+.assignment-actions { padding-top: 1.6rem; }
 
 .allocation-preview { min-height: 1.2rem; }
+
+/* Multi-value filter lists. */
+.filter-multi { min-height: 6.5rem; padding: .25rem; }
+.filter-multi option { padding: .15rem .35rem; border-radius: var(--radius-sm); }
+
+.hold-hint { color: #0a58ca; }
 
 .note-item {
   padding: .65rem 0;

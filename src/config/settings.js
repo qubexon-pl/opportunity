@@ -13,6 +13,11 @@ const DEFAULT_PEOPLE = [
 
 const DEFAULT_FIRM_STAGES = ['Won'];
 
+const DEFAULT_VIEW_DEFAULTS = {
+  pipeline: { stages: [], statuses: [] },
+  management: { stages: [], perspective: 'months', units: 6 },
+};
+
 function loadFileConfig() {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -88,6 +93,41 @@ function updateFirmStages(stages) {
   saveFileConfig(fileConfig);
 }
 
+function toStringArray(value) {
+  return Array.isArray(value) ? value.map((item) => String(item)) : [];
+}
+
+/** Saved filter defaults for the pipeline and management screens. */
+function getViewDefaults() {
+  const saved = loadFileConfig().viewDefaults || {};
+  const pipeline = saved.pipeline || {};
+  const management = saved.management || {};
+
+  const units = Number(management.units);
+
+  return {
+    pipeline: {
+      stages: toStringArray(pipeline.stages),
+      statuses: toStringArray(pipeline.statuses),
+    },
+    management: {
+      stages: toStringArray(management.stages),
+      perspective: management.perspective ? String(management.perspective) : DEFAULT_VIEW_DEFAULTS.management.perspective,
+      units: Number.isFinite(units) && units > 0 ? units : DEFAULT_VIEW_DEFAULTS.management.units,
+    },
+  };
+}
+
+function updateViewDefaults(scope, values) {
+  if (scope !== 'pipeline' && scope !== 'management') throw new Error(`Unknown view scope: ${scope}`);
+
+  const fileConfig = loadFileConfig();
+  const current = getViewDefaults();
+  fileConfig.viewDefaults = { ...current, [scope]: { ...current[scope], ...values } };
+  saveFileConfig(fileConfig);
+  return fileConfig.viewDefaults[scope];
+}
+
 function isSqlConfigured() {
   const cfg = getConfig();
   return !!(cfg.sql.server && cfg.sql.database);
@@ -96,9 +136,12 @@ function isSqlConfigured() {
 module.exports = {
   DEFAULT_PEOPLE,
   DEFAULT_FIRM_STAGES,
+  DEFAULT_VIEW_DEFAULTS,
   getConfig,
   validateConfig,
   updatePeopleConfig,
   updateFirmStages,
+  getViewDefaults,
+  updateViewDefaults,
   isSqlConfigured,
 };

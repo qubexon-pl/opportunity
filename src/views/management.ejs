@@ -10,6 +10,7 @@
     <span class="badge text-bg-secondary">Assignments: <%= view.stats.total %></span>
     <span class="badge text-bg-success">Committed: <%= view.stats.committed %></span>
     <span class="badge text-bg-warning">Soft booked: <%= view.stats.soft %></span>
+    <span class="badge text-bg-info">On hold: <%= view.stats.onHold %></span>
     <span class="badge text-bg-light">Hidden: <%= view.stats.hidden %></span>
   </div>
 </div>
@@ -24,6 +25,7 @@
   <div class="card-header"><i class="bi bi-sliders me-2"></i>Perspective</div>
   <div class="card-body">
     <form method="get" action="/management" class="row g-3 align-items-end">
+      <input type="hidden" name="applied" value="1">
       <div class="col-lg-3 col-md-4 col-6">
         <label class="form-label" for="perspective">Timeline unit</label>
         <select class="form-select" id="perspective" name="perspective">
@@ -38,18 +40,30 @@
       </div>
       <div class="col-lg-3 col-md-4 col-6">
         <label class="form-label" for="stage">Stage filter</label>
-        <select class="form-select" id="stage" name="stage">
-          <option value="">All stages</option>
-          <option value="free" <%= stageFilter === 'free' ? 'selected' : '' %>>Free capacity only</option>
+        <select class="form-select filter-multi" id="stage" name="stage" multiple size="6">
+          <option value="free" <%= stageFilters.indexOf('free') !== -1 ? 'selected' : '' %>>Free capacity</option>
           <% stageLegend.forEach(function(item) { %>
-            <option value="<%= item.label %>" <%= String(stageFilter).toLowerCase() === item.key ? 'selected' : '' %>><%= item.label %></option>
+            <option value="<%= item.label %>" <%= stageFilters.indexOf(item.label) !== -1 ? 'selected' : '' %>><%= item.label %></option>
           <% }) %>
         </select>
+        <div class="form-text">None selected = all stages</div>
       </div>
       <div class="col-lg-3 col-md-4 col-6 d-flex gap-2">
         <button class="btn btn-primary flex-grow-1" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
-        <a class="btn btn-outline-secondary" href="/management" title="Reset"><i class="bi bi-x-lg"></i></a>
+        <a class="btn btn-outline-secondary" href="/management?applied=1" title="Reset"><i class="bi bi-x-lg"></i></a>
       </div>
+    </form>
+    <form method="post" action="/management/defaults" class="mt-3 d-flex align-items-center gap-2 flex-wrap">
+      <input type="hidden" name="perspective" value="<%= perspective %>">
+      <input type="hidden" name="units" value="<%= unitsToShow %>">
+      <% stageFilters.forEach(function(stage) { %><input type="hidden" name="stage" value="<%= stage %>"><% }) %>
+      <button class="btn btn-sm btn-outline-primary" type="submit" <%= filtersMatchDefault ? 'disabled' : '' %>>
+        <i class="bi bi-pin-angle me-1"></i>Save as my default
+      </button>
+      <span class="text-muted small">
+        Current default: <%= savedDefaults.perspective %> &middot; <%= savedDefaults.units %> units &middot;
+        <%= savedDefaults.stages.length ? savedDefaults.stages.join(', ') : 'all stages' %>
+      </span>
     </form>
   </div>
 </div>
@@ -89,14 +103,26 @@
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <span><i class="bi bi-bar-chart-steps me-2"></i>Timeline</span>
     <div class="timeline-legend d-flex flex-wrap gap-2">
-      <a class="legend-chip <%= stageFilter === '' ? 'is-active' : '' %>" href="/management?perspective=<%= perspective %>&units=<%= unitsToShow %>">All</a>
+      <%
+        // Legend chips toggle a stage in or out of the current multi-selection.
+        var baseQuery = 'applied=1&perspective=' + encodeURIComponent(perspective) + '&units=' + encodeURIComponent(unitsToShow);
+        function toggleHref(value) {
+          var next = stageFilters.indexOf(value) !== -1
+            ? stageFilters.filter(function(s) { return s !== value; })
+            : stageFilters.concat([value]);
+          var qs = baseQuery;
+          next.forEach(function(s) { qs += '&stage=' + encodeURIComponent(s); });
+          return '/management?' + qs;
+        }
+      %>
+      <a class="legend-chip <%= stageFilters.length === 0 ? 'is-active' : '' %>" href="/management?<%= baseQuery %>">All</a>
       <% stageLegend.forEach(function(item) { %>
-        <a class="legend-chip accent-<%= item.key %> <%= String(stageFilter).toLowerCase() === item.key ? 'is-active' : '' %>"
-           href="/management?perspective=<%= perspective %>&units=<%= unitsToShow %>&stage=<%= item.label %>"
+        <a class="legend-chip accent-<%= item.key %> <%= stageFilters.indexOf(item.label) !== -1 ? 'is-active' : '' %>"
+           href="<%= toggleHref(item.label) %>"
            title="<%= item.meaning %>"><%= item.label %></a>
       <% }) %>
-      <a class="legend-chip legend-free <%= stageFilter === 'free' ? 'is-active' : '' %>"
-         href="/management?perspective=<%= perspective %>&units=<%= unitsToShow %>&stage=free">Free capacity</a>
+      <a class="legend-chip legend-free <%= stageFilters.indexOf('free') !== -1 ? 'is-active' : '' %>"
+         href="<%= toggleHref('free') %>">Free capacity</a>
     </div>
   </div>
   <div class="card-body">
@@ -121,7 +147,7 @@
                 <% view.timeline.units.forEach(function(unit) { %><div class="timeline-gridline"></div><% }) %>
               </div>
               <% row.chips.forEach(function(chip) { %>
-                <div class="timeline-chip <%= chip.accentClass %> <%= chip.IsCommitted ? 'is-committed' : 'is-soft' %>"
+                <div class="timeline-chip <%= chip.accentClass %> <%= chip.IsCommitted ? 'is-committed' : 'is-soft' %> <%= chip.IsOnHold ? 'is-on-hold' : '' %>"
                      data-assignment-id="<%= chip.Id %>"
                      data-opportunity-id="<%= chip.OpportunityId %>"
                      data-start="<%= chip.StartDate %>"
@@ -131,9 +157,14 @@
                      style="left: <%= chip.geometry.left.toFixed(3) %>%; width: <%= chip.geometry.width.toFixed(3) %>%; top: <%= chip.geometry.top %>px;"
                      title="<%= chip.OpportunityName %> &middot; <%= chip.StartDate %> &rarr; <%= chip.EndDate %> &middot; <%= chip.AllocatedHours %>h<%= chip.IsCommitted ? '' : ' (soft booking)' %>">
                   <span class="timeline-chip-resizer start" data-edge="start" title="Drag to change the start date"></span>
+                  <% if (chip.hold) { %>
+                    <span class="timeline-chip-hold"
+                          style="left: <%= chip.hold.left.toFixed(3) %>%; width: <%= chip.hold.width.toFixed(3) %>%;"
+                          title="On hold <%= chip.HoldStartDate %> &rarr; <%= chip.HoldEndDate %> (capacity free)"></span>
+                  <% } %>
                   <a class="timeline-chip-body" href="/opportunities/<%= chip.OpportunityId %>#assignments">
                     <span class="timeline-chip-title">
-                      <% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %>
+                      <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %>
                     </span>
                     <span class="timeline-chip-meta"><%= chip.AllocationPercent || 0 %>% &middot; <%= chip.AllocatedHours %>h &middot; <%= stageStatusLabel(chip.Stage) %></span>
                   </a>
@@ -231,7 +262,12 @@
               <td class="fw-semibold"><%= assignment.PersonName %></td>
               <td><a href="/opportunities/<%= assignment.OpportunityId %>#assignments"><%= assignment.OpportunityName %></a></td>
               <td><span class="stage-dot <%= stageAccentClass(assignment.Stage) %>"></span><%= assignment.Stage || '-' %> <span class="text-muted small">(<%= stageStatusLabel(assignment.Stage) %>)</span></td>
-              <td class="text-nowrap"><%= assignment.StartDate || '-' %> &rarr; <%= assignment.EndDate || '-' %></td>
+              <td class="text-nowrap">
+                <%= assignment.StartDate || '-' %> &rarr; <%= assignment.EndDate || '-' %>
+                <% if (assignment.IsOnHold) { %>
+                  <div class="hold-hint small"><i class="bi bi-pause-circle me-1"></i>On hold <%= assignment.HoldStartDate %> &rarr; <%= assignment.HoldEndDate %></div>
+                <% } %>
+              </td>
               <td class="text-end"><%= assignment.AllocationPercent || 0 %>%</td>
               <td class="text-end"><%= assignment.AllocatedHours %>h</td>
               <td class="text-end">
