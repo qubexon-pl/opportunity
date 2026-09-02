@@ -278,9 +278,12 @@
   <div class="card-body">
     <div class="timeline-scroll">
       <div class="timeline-grid" id="timelineGrid"
+           data-perspective="<%= view.timeline.perspective %>"
            data-range-start="<%= view.timeline.startText %>"
            data-range-end-exclusive="<%= view.timeline.endExclusiveText %>"
-           data-hours-per-day="<%= hoursPerDay %>">
+           data-window-start="<%= view.timeline.windowStartText %>"
+           data-window-end-exclusive="<%= view.timeline.windowEndExclusiveText %>"
+           style="--timeline-units: <%= view.timeline.units.length %>;">
         <div class="timeline-head">
           <div class="timeline-person-head">Person</div>
           <div class="timeline-head-stack">
@@ -299,7 +302,14 @@
 
         <% view.timeline.rows.forEach(function(row) { %>
           <div class="timeline-row" style="height: <%= row.height %>px;">
-            <div class="timeline-person"><%= row.person %></div>
+            <div class="timeline-person"
+                 title="<%= row.person %> &middot; <%= row.capacityHours %>h capacity in this window
+Committed: <%= row.committedHours %>h
+Free: <%= row.freeHours %>h
+Committed + free = <%= (row.committedHours + row.freeHours).toFixed(2) %>h
+Soft booked on top: <%= row.softHours %>h"><%= row.person %>
+              <span class="timeline-person-load"><%= row.committedHours %>h / <%= row.capacityHours %>h</span>
+            </div>
             <div class="timeline-lane" style="--timeline-units: <%= view.timeline.units.length %>;">
               <div class="timeline-gridlines">
                 <% view.timeline.units.forEach(function(unit) { %><div class="timeline-gridline"></div><% }) %>
@@ -312,10 +322,21 @@
                      data-end="<%= chip.EndDate %>"
                      data-percent="<%= chip.AllocationPercent || 0 %>"
                      data-hours="<%= chip.AllocatedHours %>"
+                     data-initial-hours="<%= chip.InitialAllocatedHours %>"
+                     data-initial-percent="<%= chip.InitialPercent %>"
+                     data-opportunity-hours="<%= chip.OpportunityHours %>"
+                     data-capacity-hours="<%= row.capacityHours %>"
+                     data-capacity-percent="<%= chip.capacityPercent %>"
+                     data-hold-start="<%= chip.HoldStartDate || '' %>"
+                     data-hold-end="<%= chip.HoldEndDate || '' %>"
                      data-stage-label="<%= stageStatusLabel(chip.Stage) %>"
                      data-person="<%= chip.PersonName %>"
                      style="left: <%= chip.geometry.left.toFixed(3) %>%; width: <%= chip.geometry.width.toFixed(3) %>%; top: <%= chip.geometry.top %>px;"
-                     title="<%= chip.OpportunityName %> &middot; <%= chip.StartDate %> &rarr; <%= chip.EndDate %> &middot; <%= chip.AllocatedHours %>h<%= chip.IsCommitted ? '' : ' (soft booking)' %>">
+                     title="<%= chip.OpportunityName %> &middot; <%= chip.PersonName %>
+<%= chip.StartDate %> &rarr; <%= chip.EndDate %> (<%= chip.businessDays %> working days)
+Assigned: <%= chip.InitialAllocatedHours %>h = <%= chip.InitialPercent %>% of the <%= chip.OpportunityHours %>h project
+Now on the bar: <%= chip.AllocatedHours %>h<%= chip.IsResized ? ' (resized)' : '' %>
+In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= row.person %>'s <%= row.capacityHours %>h capacity<%= chip.IsCommitted ? '' : '\nSoft booking: does not consume capacity yet' %>">
                   <span class="timeline-chip-resizer start" data-edge="start" title="Drag to change the start date"></span>
                   <% if (chip.hold) { %>
                     <span class="timeline-chip-hold"
@@ -326,7 +347,11 @@
                     <span class="timeline-chip-title">
                       <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %>
                     </span>
-                    <span class="timeline-chip-meta" data-role="meta"><%= chip.AllocationPercent || 0 %>% &middot; <%= chip.AllocatedHours %>h &middot; <%= stageStatusLabel(chip.Stage) %></span>
+                    <span class="timeline-chip-meta" data-role="meta"><%
+                      %><%= chip.InitialAllocatedHours %>h<%
+                      %><% if (chip.IsResized) { %> &rarr; <%= chip.AllocatedHours %>h<% } %><%
+                      %> &middot; <%= chip.capacityPercent %>% cap<%
+                      %> &middot; <%= stageStatusLabel(chip.Stage) %></span>
                   </a>
                   <span class="timeline-chip-resizer end" data-edge="end" title="Drag to change the end date"></span>
                 </div>

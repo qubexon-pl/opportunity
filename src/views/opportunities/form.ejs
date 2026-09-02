@@ -230,6 +230,17 @@
           var onHold = !!(assignment.HoldStartDate && assignment.HoldEndDate);
           var allocationModes = ['percent', 'total-hours', 'monthly-hours'];
           var allocationMode = allocationModes.indexOf(assignment.AllocationMode) === -1 ? 'percent' : assignment.AllocationMode;
+          var oppHours = Number(o.OpportunityHours || 0);
+          var currentHours = round2(assignment.AllocatedHours || 0);
+          // Legacy rows have no stored initial figure; fall back to their share of the project.
+          var initialHours = Number(assignment.InitialAllocatedHours) > 0
+            ? round2(assignment.InitialAllocatedHours)
+            : round2(oppHours * (Number(assignment.AllocationPercent || 0) / 100)) || currentHours;
+          var initialPercent = oppHours > 0 ? round2((initialHours / oppHours) * 100) : 0;
+          var wasResized = Math.abs(currentHours - initialHours) >= 0.01;
+          // The form edits the live allocation, so re-saving without changes is a no-op
+          // rather than a silent reset of a resize. Saving re-baselines the initial figure.
+          var formPercent = oppHours > 0 ? round2((currentHours / oppHours) * 100) : initialPercent;
         %>
         <div class="assignment-card <%= onHold ? 'is-on-hold' : '' %>">
           <div class="assignment-card-head">
@@ -243,8 +254,14 @@
               <% } %>
             </div>
             <div class="assignment-facts">
-              <span><strong><%= assignment.AllocationPercent || 0 %>%</strong> allocation</span>
-              <span><strong><%= round2(assignment.AllocatedHours || 0) %>h</strong> assigned</span>
+              <span title="The allocation as it was defined, and what that is worth against the <%= oppHours %>h project total">
+                <strong><%= initialHours %>h</strong> assigned &middot; <%= initialPercent %>% of project
+              </span>
+              <% if (wasResized) { %>
+                <span class="assignment-fact-resized" title="The bar was broadened or squeezed on the timeline, which rescaled the real hours">
+                  <i class="bi bi-arrows-expand me-1"></i><strong><%= currentHours %>h</strong> after resize
+                </span>
+              <% } %>
               <span class="text-nowrap"><%= startText || '-' %> &rarr; <%= endText || '-' %></span>
             </div>
           </div>
@@ -253,8 +270,8 @@
                 action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>"
                 class="allocation-form assignment-edit-form"
                 data-opportunity-hours="<%= o.OpportunityHours || 0 %>"
-                data-allocated-hours="<%= assignment.AllocatedHours || 0 %>"
-                data-allocation-percent="<%= assignment.AllocationPercent || 0 %>">
+                data-allocated-hours="<%= currentHours %>"
+                data-allocation-percent="<%= formPercent %>">
             <div class="assignment-group">
               <div class="assignment-group-title"><i class="bi bi-calendar-range me-1"></i>Schedule</div>
               <div class="row g-2">
@@ -293,7 +310,7 @@
                 </div>
                 <div class="col-lg-4 col-md-6">
                   <label class="form-label small" data-role="value-label">Allocation %</label>
-                  <input type="number" class="form-control form-control-sm" data-role="value" min="0.5" step="0.5" value="<%= assignment.AllocationPercent || 0 %>">
+                  <input type="number" class="form-control form-control-sm" data-role="value" min="0.5" step="0.5" value="<%= formPercent %>" title="<%= wasResized ? 'This reflects the ' + currentHours + 'h currently on the timeline. Saving makes it the new agreed allocation.' : 'Share of the ' + oppHours + 'h project total' %>">
                 </div>
                 <div class="col-lg-4 d-flex align-items-end">
                   <div class="form-check">

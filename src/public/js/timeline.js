@@ -11,8 +11,8 @@
   var rangeEndMs = Date.parse(grid.dataset.rangeEndExclusive + 'T00:00:00Z');
   if (!isFinite(rangeStartMs) || !isFinite(rangeEndMs) || rangeEndMs <= rangeStartMs) return;
 
-  var hoursPerDay = Number(grid.dataset.hoursPerDay);
-  if (!isFinite(hoursPerDay) || hoursPerDay <= 0) hoursPerDay = 8;
+  var windowStartMs = parseDate(grid.dataset.windowStart);
+  var windowEndMs = parseDate(grid.dataset.windowEndExclusive);
 
   var totalDays = Math.round((rangeEndMs - rangeStartMs) / DAY_MS);
   var suppressClickUntil = 0;
@@ -43,12 +43,41 @@
   }
 
   /*
-   * Mirrors calculateAllocatedHoursByDuration: the allocation percentage stays put
-   * and the hours follow the length of the window.
+   * Mirrors rescaleHoursToWindow on the server: the daily intensity the
+   * assignment already had is preserved and the real hours follow the window.
    */
   function hoursFor(chip, startMs, endMs) {
-    var percent = Number(chip.dataset.percent) || 0;
-    return round2(businessDays(startMs, endMs) * hoursPerDay * (percent / 100));
+    var storedHours = Number(chip.dataset.hours) || 0;
+    var storedDays = businessDays(parseDate(chip.dataset.start), parseDate(chip.dataset.end));
+    var nextDays = businessDays(startMs, endMs);
+    if (nextDays <= 0) return 0;
+    if (storedDays <= 0) return round2(storedHours);
+    return round2((storedHours / storedDays) * nextDays);
+  }
+
+  /* Mirrors assignmentHoursInWindow: the slice of the bar inside the visible
+     capacity window, skipping any days the assignment is on hold. */
+  function hoursInWindow(chip, startMs, endMs, totalHours) {
+    if (windowStartMs === null || windowEndMs === null) return totalHours;
+
+    var overlapStart = Math.max(startMs, windowStartMs);
+    var overlapEnd = Math.min(endMs + DAY_MS, windowEndMs) - DAY_MS;
+    if (overlapEnd < overlapStart) return 0;
+
+    var totalDays = businessDays(startMs, endMs);
+    if (totalDays <= 0) return 0;
+
+    var overlapDays = businessDays(overlapStart, overlapEnd);
+    var holdStart = parseDate(chip.dataset.holdStart);
+    var holdEnd = parseDate(chip.dataset.holdEnd);
+    if (holdStart !== null && holdEnd !== null) {
+      var heldStart = Math.max(holdStart, overlapStart);
+      var heldEnd = Math.min(holdEnd, overlapEnd);
+      if (heldEnd >= heldStart) overlapDays -= businessDays(heldStart, heldEnd);
+    }
+    if (overlapDays <= 0) return 0;
+
+    return round2(totalHours * (overlapDays / totalDays));
   }
 
   /* Live readout inside the bar so the effect of a resize is visible while dragging. */
@@ -56,22 +85,35 @@
     var meta = chip.querySelector('[data-role="meta"]');
     if (!meta) return;
 
-    var percent = Number(chip.dataset.percent) || 0;
-    var days = businessDays(startMs, endMs);
+    var initialHours = Number(chip.dataset.initialHours) || 0;
     var hours = hoursFor(chip, startMs, endMs);
+    var capacityHours = Number(chip.dataset.capacityHours) || 0;
+    var windowHours = hoursInWindow(chip, startMs, endMs, hours);
+    var capacityPercent = capacityHours > 0 ? round2((windowHours / capacityHours) * 100) : 0;
+    var days = businessDays(startMs, endMs);
     var stage = chip.dataset.stageLabel || '';
+    var resized = Math.abs(hours - initialHours) >= 0.01;
 
-    meta.textContent = percent + '% \u00b7 ' + hours + 'h \u00b7 ' + days + 'd' + (stage ? ' \u00b7 ' + stage : '');
+    meta.textContent = initialHours + 'h' + (resized ? ' \u2192 ' + hours + 'h' : '') +
+      ' \u00b7 ' + capacityPercent + '% cap' + (stage ? ' \u00b7 ' + stage : '');
+
     chip.title = (chip.dataset.person || '') + ' \u00b7 ' + toDateText(startMs) + ' \u2192 ' + toDateText(endMs) +
-      ' \u00b7 ' + hours + 'h over ' + days + ' working days';
+      ' (' + days + ' working days)\n' +
+      'Assigned: ' + initialHours + 'h = ' + (Number(chip.dataset.initialPercent) || 0) + '% of the ' +
+      (Number(chip.dataset.opportunityHours) || 0) + 'h project\n' +
+      'Now on the bar: ' + hours + 'h\n' +
+      'In this window: ' + windowHours + 'h = ' + capacityPercent + '% of ' + capacityHours + 'h capacity';
   }
 
   function restoreLabel(chip) {
     var meta = chip.querySelector('[data-role="meta"]');
     if (!meta) return;
-    var percent = Number(chip.dataset.percent) || 0;
+    var initialHours = Number(chip.dataset.initialHours) || 0;
+    var hours = Number(chip.dataset.hours) || 0;
     var stage = chip.dataset.stageLabel || '';
-    meta.textContent = percent + '% \u00b7 ' + (chip.dataset.hours || 0) + 'h' + (stage ? ' \u00b7 ' + stage : '');
+    var resized = Math.abs(hours - initialHours) >= 0.01;
+    meta.textContent = initialHours + 'h' + (resized ? ' \u2192 ' + hours + 'h' : '') +
+      ' \u00b7 ' + (Number(chip.dataset.capacityPercent) || 0) + '% cap' + (stage ? ' \u00b7 ' + stage : '');
   }
 
   /* Position the chip live while dragging, mirroring the server geometry maths. */
