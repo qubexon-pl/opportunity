@@ -4,6 +4,7 @@ const {
   toDate,
   toDateText,
   countBusinessDays,
+  countBusinessDaysInclusive,
   startOfUnit,
   addUnit,
   formatUnitLabel,
@@ -92,14 +93,28 @@ function buildAssignmentRows(opportunities, assignments) {
       const opportunity = byId.get(assignment.OpportunityId);
       if (!opportunity) return null;
       const allocated = Number(assignment.AllocatedHours);
-      const fallback = round2(Number(opportunity.OpportunityHours || 0) * (Number(assignment.AllocationPercent || 0) / 100));
+      const opportunityHours = Number(opportunity.OpportunityHours || 0);
+      const fallback = round2(opportunityHours * (Number(assignment.AllocationPercent || 0) / 100));
+      const currentHours = Number.isFinite(allocated) ? allocated : fallback;
+      // Legacy rows have no stored initial figure; their percentage still
+      // describes what was agreed, so derive it from the opportunity total.
+      const storedInitial = Number(assignment.InitialAllocatedHours);
+      const initialHours = Number.isFinite(storedInitial) && storedInitial > 0
+        ? round2(storedInitial)
+        : fallback > 0
+          ? fallback
+          : round2(currentHours);
+
       return {
         ...assignment,
         OpportunityName: opportunity.Name,
         Stage: opportunity.Stage,
         Status: opportunity.Status,
-        OpportunityHours: Number(opportunity.OpportunityHours || 0),
-        AllocatedHours: Number.isFinite(allocated) ? allocated : fallback,
+        OpportunityHours: opportunityHours,
+        AllocatedHours: currentHours,
+        InitialAllocatedHours: initialHours,
+        InitialPercent: opportunityHours > 0 ? round2((initialHours / opportunityHours) * 100) : 0,
+        IsResized: Math.abs(round2(currentHours) - initialHours) >= 0.01,
         StartDate: toDateText(assignment.PlannedStartDate),
         EndDate: toDateText(assignment.PlannedEndDate),
         HoldStartDate: toDateText(assignment.HoldStartDate),
@@ -435,11 +450,18 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
 
     const chips = forPerson.map((assignment, index) => {
       const geometry = chipGeometry(range, assignment.StartDate, assignment.EndDate, index);
+      // Hours landing inside the visible window, which is what actually eats
+      // capacity: committed hours here plus the free bars equal the person's
+      // capacity for the window.
+      const windowHours = round2(assignmentHoursInWindow(assignment, window.start, window.endExclusive));
       return {
         ...assignment,
         accentClass: stageAccentClass(assignment.Stage),
         geometry,
         hold: holdOverlay(range, assignment, geometry),
+        businessDays: countBusinessDaysInclusive(assignment.StartDate, assignment.EndDate),
+        windowHours,
+        capacityPercent: member.capacityHours > 0 ? round2((windowHours / member.capacityHours) * 100) : 0,
       };
     });
 
@@ -453,6 +475,12 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
     return {
       person: member.person,
       role: member.role,
+      capacityHours: member.capacityHours,
+      dailyHours: member.dailyHours,
+      // committed + free = capacity, so the row always adds up to the window.
+      committedHours: member.activeHours,
+      softHours: member.softHours,
+      freeHours: member.availableHours,
       chips,
       freeChips,
       height: rowHeight(forPerson.length, showFreeBars),
@@ -479,6 +507,8 @@ function buildManagementView({ opportunities, assignments, perspective, unitsToS
       showFreeBars,
       startText: toDateText(range.start),
       endExclusiveText: toDateText(range.endExclusive),
+      windowStartText: toDateText(window.start),
+      windowEndExclusiveText: toDateText(window.endExclusive),
     },
     window,
     capacityBusinessDays: countBusinessDays(window.start, window.endExclusive),

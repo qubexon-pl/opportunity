@@ -2,11 +2,12 @@ const crypto = require('crypto');
 const { z } = require('zod');
 const { sql, getPool, isMissingAssignmentsTable, isMissingColumn } = require('../db/pool');
 const { toGuid } = require('./opportunityService');
-const { round2, toDateText, calculateAllocatedHours, calculateAllocatedHoursByDuration } = require('./dateService');
+const { round2, toDateText, calculateAllocatedHours, countBusinessDaysInclusive } = require('./dateService');
 
 const MIGRATION_HINT = 'Missing database migration: run src/sql/004_create_opportunity_assignments.sql';
 const HOLD_MIGRATION_HINT = 'Missing database migration: run src/sql/006_add_assignment_hold_window.sql';
 const MODE_MIGRATION_HINT = 'Missing database migration: run src/sql/007_add_assignment_allocation_mode.sql';
+const INITIAL_HOURS_MIGRATION_HINT = 'Missing database migration: run src/sql/008_add_initial_allocated_hours.sql';
 
 /** How the user expressed the allocation. Legacy rows have no mode and read back as a percentage. */
 const ALLOCATION_MODES = ['percent', 'total-hours', 'monthly-hours'];
@@ -69,6 +70,19 @@ function deriveAssignmentLoad(opportunityHours, candidateAllocatedHours, candida
 }
 
 /**
+ * Scales hours to a new window while keeping the daily intensity the assignment
+ * already had. Deriving the rate from the stored hours and the window they were
+ * stored against makes repeated drags stable rather than compounding.
+ */
+function rescaleHoursToWindow(currentHours, fromStart, fromEnd, toStart, toEnd) {
+  const previousDays = countBusinessDaysInclusive(fromStart, fromEnd);
+  const nextDays = countBusinessDaysInclusive(toStart, toEnd);
+  if (nextDays <= 0) return 0;
+  if (previousDays <= 0) return round2(currentHours);
+  return round2((Number(currentHours || 0) / previousDays) * nextDays);
+}
+
+/**
  * Normalises an optional hold window. Both ends are required together; passing
  * empty strings clears an existing hold.
  */
@@ -88,6 +102,7 @@ function rethrowAssignmentError(err) {
   if (isMissingAssignmentsTable(err)) throw new Error(MIGRATION_HINT);
   if (isMissingColumn(err, 'HoldStartDate') || isMissingColumn(err, 'HoldEndDate')) throw new Error(HOLD_MIGRATION_HINT);
   if (isMissingColumn(err, 'AllocationMode')) throw new Error(MODE_MIGRATION_HINT);
+  if (isMissingColumn(err, 'InitialAllocatedHours')) throw new Error(INITIAL_HOURS_MIGRATION_HINT);
   throw err;
 }
 
@@ -143,21 +158,22 @@ async function addAssignment(rawOpportunityId, payload) {
       .input('PlannedEndDate', sql.Date, body.plannedEndDate)
       .input('AllocationPercent', sql.Float, load.allocationPercent)
       .input('AllocatedHours', sql.Float, load.allocatedHours)
+      .input('InitialAllocatedHours', sql.Float, load.allocatedHours)
       .input('AllocationMode', sql.NVarChar(20), allocationMode)
       .input('IsTimelineVisible', sql.Bit, body.isTimelineVisible ?? true)
       .input('HoldStartDate', sql.Date, hold.holdStartDate)
       .input('HoldEndDate', sql.Date, hold.holdEndDate)
       .query(
         `INSERT INTO dbo.OpportunityAssignments
-           (Id, OpportunityId, PersonName, PlannedStartDate, PlannedEndDate, AllocationPercent, AllocatedHours, AllocationMode, IsTimelineVisible, HoldStartDate, HoldEndDate)
+           (Id, OpportunityId, PersonName, PlannedStartDate, PlannedEndDate, AllocationPercent, AllocatedHours, InitialAllocatedHours, AllocationMode, IsTimelineVisible, HoldStartDate, HoldEndDate)
          VALUES
-           (@Id, @OpportunityId, @PersonName, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @AllocatedHours, @AllocationMode, @IsTimelineVisible, @HoldStartDate, @HoldEndDate);`
+           (@Id, @OpportunityId, @PersonName, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @AllocatedHours, @InitialAllocatedHours, @AllocationMode, @IsTimelineVisible, @HoldStartDate, @HoldEndDate);`
       );
   } catch (err) {
     rethrowAssignmentError(err);
   }
 
-  return { id: newId, allocationMode, ...load, ...hold };
+  return { id: newId, allocationMode, initialAllocatedHours: load.allocatedHours, ...load, ...hold };
 }
 
 async function updateAssignment(rawAssignmentId, payload) {
@@ -213,20 +229,44 @@ async function updateAssignment(rawAssignmentId, payload) {
 
   const datesChanged = next.plannedStartDate !== currentStartDate || next.plannedEndDate !== currentEndDate;
 
+  // The hours the assignment was defined with. Legacy rows fall back to their
+  // share of the opportunity total, then to whatever was last stored.
+  const storedInitial = Number(row.InitialAllocatedHours);
+  const initialFromPercent = round2(
+    Number(row.OpportunityHours || 0) * (Number(row.AllocationPercent || 0) / 100)
+  );
+  const previousInitial = Number.isFinite(storedInitial) && storedInitial > 0
+    ? round2(storedInitial)
+    : initialFromPercent > 0
+      ? initialFromPercent
+      : round2(Number(row.AllocatedHours || 0));
+
   let load;
+  let initialAllocatedHours;
   if (next.allocatedHours !== undefined && next.allocationPercent !== undefined) {
     load = deriveAssignmentLoad(row.OpportunityHours, next.allocatedHours, next.allocationPercent);
+    initialAllocatedHours = load.allocatedHours;
   } else if (next.allocatedHours !== undefined) {
     load = deriveAssignmentLoad(row.OpportunityHours, next.allocatedHours, undefined);
+    initialAllocatedHours = load.allocatedHours;
   } else if (datesChanged) {
-    // Stretching or squeezing the timeline recalculates hours from % and business-day duration.
-    const effectivePercent = round2(next.allocationPercent ?? Number(row.AllocationPercent));
+    // Broadening or squeezing the bar keeps the daily intensity the assignment
+    // already had and scales the real hours with the new window. The percentage
+    // and the initial figure describe how the work was agreed, so they stay put.
     load = {
-      allocationPercent: effectivePercent,
-      allocatedHours: calculateAllocatedHoursByDuration(next.plannedStartDate, next.plannedEndDate, effectivePercent),
+      allocationPercent: round2(Number(row.AllocationPercent || 0)),
+      allocatedHours: rescaleHoursToWindow(
+        Number(row.AllocatedHours || 0),
+        currentStartDate,
+        currentEndDate,
+        next.plannedStartDate,
+        next.plannedEndDate
+      ),
     };
+    initialAllocatedHours = previousInitial;
   } else {
     load = deriveAssignmentLoad(row.OpportunityHours, undefined, next.allocationPercent ?? row.AllocationPercent);
+    initialAllocatedHours = next.allocationPercent !== undefined ? load.allocatedHours : previousInitial;
   }
 
   const result = await pool
@@ -237,6 +277,7 @@ async function updateAssignment(rawAssignmentId, payload) {
     .input('PlannedEndDate', sql.Date, next.plannedEndDate)
     .input('AllocationPercent', sql.Float, load.allocationPercent)
     .input('AllocatedHours', sql.Float, load.allocatedHours)
+    .input('InitialAllocatedHours', sql.Float, initialAllocatedHours)
     .input('AllocationMode', sql.NVarChar(20), allocationMode)
     .input('IsTimelineVisible', sql.Bit, next.isTimelineVisible)
     .input('HoldStartDate', sql.Date, hold.holdStartDate)
@@ -248,6 +289,7 @@ async function updateAssignment(rawAssignmentId, payload) {
            PlannedEndDate=@PlannedEndDate,
            AllocationPercent=@AllocationPercent,
            AllocatedHours=@AllocatedHours,
+           InitialAllocatedHours=@InitialAllocatedHours,
            AllocationMode=@AllocationMode,
            IsTimelineVisible=@IsTimelineVisible,
            HoldStartDate=@HoldStartDate,
@@ -259,7 +301,7 @@ async function updateAssignment(rawAssignmentId, payload) {
     .catch(rethrowAssignmentError);
 
   if (result.recordset[0].affected === 0) throw new Error('Assignment not found.');
-  return { allocationMode, ...load, ...hold };
+  return { allocationMode, initialAllocatedHours, ...load, ...hold };
 }
 
 async function deleteAssignment(rawAssignmentId) {
@@ -284,6 +326,7 @@ module.exports = {
   AssignmentCreateSchema,
   AssignmentUpdateSchema,
   deriveAssignmentLoad,
+  rescaleHoursToWindow,
   normalizeAllocationMode,
   normalizeHold,
   listAssignments,

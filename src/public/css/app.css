@@ -157,7 +157,20 @@
 .legend-chip.is-active { border-color: var(--color-primary); color: var(--color-primary); font-weight: 600; }
 .legend-free::before { background: repeating-linear-gradient(45deg, var(--color-primary) 0 3px, transparent 3px 6px); }
 
-.timeline-scroll { overflow-x: auto; }.timeline-grid { min-width: 900px; }
+.timeline-scroll { overflow-x: auto; }
+
+/*
+ * The board widens with the number of columns so a label always has room; the
+ * horizontal scrollbar (and its floating proxy) takes over beyond the viewport.
+ * Week ranges like "22nd - 28th" need noticeably more width than "Sep 26".
+ */
+.timeline-grid {
+  --timeline-person-width: 170px;
+  --timeline-unit-min: 72px;
+  min-width: max(900px, calc(var(--timeline-person-width) + var(--timeline-units, 1) * var(--timeline-unit-min)));
+}
+
+.timeline-grid[data-perspective="weeks"] { --timeline-unit-min: 116px; }
 
 /*
  * Floating horizontal scrollbar: mirrors the timeline's scroll position and is
@@ -218,6 +231,15 @@
 }
 
 .timeline-person-head { display: flex; align-items: flex-end; }
+
+/* Committed hours against capacity, so a row visibly adds up to its window. */
+.timeline-person-load {
+  display: block;
+  font-weight: 400;
+  font-size: .72rem;
+  color: var(--color-text-muted);
+  margin-top: .1rem;
+}
 
 .timeline-units { flex: 1; display: grid; grid-template-columns: repeat(var(--timeline-units, 1), 1fr); }
 
@@ -403,6 +425,8 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
   font-size: .82rem;
   color: var(--color-text-muted, #6c757d);
 }
+
+.assignment-fact-resized { color: var(--color-primary); }
 
 .assignment-group + .assignment-group { margin-top: .9rem; }
 
