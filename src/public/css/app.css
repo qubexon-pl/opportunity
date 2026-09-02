@@ -243,7 +243,12 @@ body.has-timeline-fullpage .main-content { overflow: hidden; }
 .perspective-dock.is-stuck {
   border-color: var(--color-primary);
   border-width: 2px;
+  /* A light offset tone while it floats, so the docked strip reads as chrome
+     sitting over the page rather than another card in the flow. */
+  background: var(--color-surface-offset);
 }
+
+.perspective-dock.is-stuck > .card-header { background: transparent; }
 
 .timeline-scroll.is-scrolled-y .timeline-head {
   border-bottom: 2px solid var(--color-primary);
@@ -914,6 +919,14 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
 .stage-total-table th {
   vertical-align: middle;
 }
+
+/* The chevron points at what the button does: right when folded, down when open. */
+.stage-breakdown-toggle i {
+  display: inline-block;
+  transition: transform .15s ease;
+}
+
+.stage-breakdown-toggle:not(.collapsed) i { transform: rotate(90deg); }
 
 /* --- Opportunity absence impact ----------------------------------------- */
 .absence-impact-card {

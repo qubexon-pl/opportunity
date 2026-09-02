@@ -137,35 +137,47 @@
         </div>
       </div>
     </div>
-    <div class="table-responsive">
-      <table class="table table-sm align-middle mb-0 stage-total-table">
-        <thead>
-          <tr>
-            <th>Stage</th>
-            <th class="text-end">Opportunities</th>
-            <th class="text-end">Hours</th>
-            <th class="text-end">Share of hours</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% stageTotals.forEach(function(row) { %>
-            <tr class="<%= row.count === 0 ? 'text-muted' : '' %>">
-              <td><span class="stage-badge <%= stageBadgeClass(row.stage) %>"><%= row.stage %></span></td>
-              <td class="text-end"><%= row.count %></td>
-              <td class="text-end"><%= row.hours %>h</td>
-              <td class="text-end"><%= totalHours > 0 ? Math.round((row.hours / totalHours) * 1000) / 10 : 0 %>%</td>
+    <%
+      // The per-stage split is detail: the three tiles above already answer the
+      // usual question, so the breakdown starts folded away and is opened when
+      // someone actually wants the share behind a number.
+    %>
+    <button class="btn btn-sm btn-outline-secondary stage-breakdown-toggle collapsed" type="button"
+            data-bs-toggle="collapse" data-bs-target="#stageBreakdown"
+            aria-expanded="false" aria-controls="stageBreakdown">
+      <i class="bi bi-chevron-right me-1"></i>Share of hours by stage
+    </button>
+    <div class="collapse mt-3" id="stageBreakdown">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0 stage-total-table">
+          <thead>
+            <tr>
+              <th>Stage</th>
+              <th class="text-end">Opportunities</th>
+              <th class="text-end">Hours</th>
+              <th class="text-end">Share of hours</th>
             </tr>
-          <% }) %>
-        </tbody>
-        <tfoot>
-          <tr class="fw-semibold">
-            <td>All stages</td>
-            <td class="text-end"><%= opportunities.length %></td>
-            <td class="text-end"><%= Math.round(totalHours) %>h</td>
-            <td class="text-end">100%</td>
-          </tr>
-        </tfoot>
-      </table>
+          </thead>
+          <tbody>
+            <% stageTotals.forEach(function(row) { %>
+              <tr class="<%= row.count === 0 ? 'text-muted' : '' %>">
+                <td><span class="stage-badge <%= stageBadgeClass(row.stage) %>"><%= row.stage %></span></td>
+                <td class="text-end"><%= row.count %></td>
+                <td class="text-end"><%= row.hours %>h</td>
+                <td class="text-end"><%= totalHours > 0 ? Math.round((row.hours / totalHours) * 1000) / 10 : 0 %>%</td>
+              </tr>
+            <% }) %>
+          </tbody>
+          <tfoot>
+            <tr class="fw-semibold">
+              <td>All stages</td>
+              <td class="text-end"><%= opportunities.length %></td>
+              <td class="text-end"><%= Math.round(totalHours) %>h</td>
+              <td class="text-end">100%</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   </div>
 </div>
