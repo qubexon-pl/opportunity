@@ -202,7 +202,7 @@
         </div>
         <div class="col-lg-2 col-md-4 col-6">
           <label class="form-label">Allocation mode</label>
-          <select class="form-select" data-role="mode">
+          <select class="form-select" name="allocationMode" data-role="mode">
             <option value="percent">Percent of total hours</option>
             <option value="total-hours">Total hours for period</option>
             <option value="monthly-hours">Hours per month</option>
@@ -228,6 +228,8 @@
           var startText = toDateText(assignment.PlannedStartDate);
           var endText = toDateText(assignment.PlannedEndDate);
           var onHold = !!(assignment.HoldStartDate && assignment.HoldEndDate);
+          var allocationModes = ['percent', 'total-hours', 'monthly-hours'];
+          var allocationMode = allocationModes.indexOf(assignment.AllocationMode) === -1 ? 'percent' : assignment.AllocationMode;
         %>
         <div class="assignment-card <%= onHold ? 'is-on-hold' : '' %>">
           <div class="assignment-card-head">
@@ -250,7 +252,9 @@
           <form method="post" id="<%= formId %>"
                 action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>"
                 class="allocation-form assignment-edit-form"
-                data-opportunity-hours="<%= o.OpportunityHours || 0 %>">
+                data-opportunity-hours="<%= o.OpportunityHours || 0 %>"
+                data-allocated-hours="<%= assignment.AllocatedHours || 0 %>"
+                data-allocation-percent="<%= assignment.AllocationPercent || 0 %>">
             <div class="assignment-group">
               <div class="assignment-group-title"><i class="bi bi-calendar-range me-1"></i>Schedule</div>
               <div class="row g-2">
@@ -281,10 +285,10 @@
               <div class="row g-2">
                 <div class="col-lg-4 col-md-6">
                   <label class="form-label small">Allocation mode</label>
-                  <select class="form-select form-select-sm" data-role="mode">
-                    <option value="percent">Percent of total hours</option>
-                    <option value="total-hours">Total hours for period</option>
-                    <option value="monthly-hours">Hours per month</option>
+                  <select class="form-select form-select-sm" name="allocationMode" data-role="mode">
+                    <option value="percent" <%= allocationMode === 'percent' ? 'selected' : '' %>>Percent of total hours</option>
+                    <option value="total-hours" <%= allocationMode === 'total-hours' ? 'selected' : '' %>>Total hours for period</option>
+                    <option value="monthly-hours" <%= allocationMode === 'monthly-hours' ? 'selected' : '' %>>Hours per month</option>
                   </select>
                 </div>
                 <div class="col-lg-4 col-md-6">

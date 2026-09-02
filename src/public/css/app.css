@@ -393,6 +393,11 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
   padding: .35rem .6rem;
 }
 
+.allocation-preview.is-warning {
+  color: #8a4b00;
+  background: rgba(255, 193, 7, .16);
+}
+
 /* --- Dropdown multi-select ----------------------------------------------- */
 
 .multiselect .multiselect-toggle { cursor: pointer; }
