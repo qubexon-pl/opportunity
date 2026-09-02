@@ -26,5 +26,13 @@ export const api = {
 
   addStep: (oppId, payload) => http(`/opportunities/${oppId}/steps`, { method: "POST", body: JSON.stringify(payload) }),
   toggleStep: (stepId, payload) => http(`/steps/${stepId}`, { method: "PATCH", body: JSON.stringify(payload) }),
-  deleteStep: (stepId) => http(`/steps/${stepId}`, { method: "DELETE" })
+  deleteStep: (stepId) => http(`/steps/${stepId}`, { method: "DELETE" }),
+
+  listAssignments: (params = {}) => {
+    const usp = new URLSearchParams(params);
+    return http(`/assignments?${usp.toString()}`);
+  },
+  addAssignment: (oppId, payload) => http(`/opportunities/${oppId}/assignments`, { method: "POST", body: JSON.stringify(payload) }),
+  updateAssignment: (assignmentId, payload) => http(`/assignments/${assignmentId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteAssignment: (assignmentId) => http(`/assignments/${assignmentId}`, { method: "DELETE" })
 };

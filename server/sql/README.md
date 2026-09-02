@@ -19,3 +19,13 @@ Adds nullable planning columns to `dbo.Opportunities`:
 - `AllocationPercent` (`FLOAT`)
 
 Run once against your target database (script is idempotent).
+
+## 004_create_opportunity_assignments.sql
+Creates `dbo.OpportunityAssignments` for multi-person scheduling per opportunity.
+Includes:
+- date range (`PlannedStartDate`, `PlannedEndDate`)
+- allocation percentage (`AllocationPercent`)
+- computed allocated effort snapshot (`AllocatedHours`)
+- timeline visibility (`IsTimelineVisible`) so assignments can be hidden from timeline without deleting the opportunity.
+
+Run once against your target database (script is idempotent).
