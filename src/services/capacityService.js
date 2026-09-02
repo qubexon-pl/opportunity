@@ -388,8 +388,11 @@ function freeGeometry(range, start, endExclusive, laneIndex) {
   };
 }
 
-function rowHeight(assignmentCount, includeFreeLane) {
-  const lanes = Math.max(1, assignmentCount + (includeFreeLane ? 1 : 0));
+function rowHeight(assignmentCount, includeFreeLane, includeAbsenceLane) {
+  const lanes = Math.max(
+    1,
+    assignmentCount + (includeFreeLane ? 1 : 0) + (includeAbsenceLane ? 1 : 0)
+  );
   return Math.max(TIMELINE_LANE_HEIGHT + TIMELINE_ROW_TOP_PADDING, lanes * TIMELINE_LANE_HEIGHT + TIMELINE_ROW_TOP_PADDING);
 }
 
@@ -444,6 +447,11 @@ function freeSegments(assignmentsForPerson, personName, window, perspective) {
         freeHours: round2(freeHours),
         softHours: round2(softHours),
         parts,
+        // Committed work can be pushed past capacity by resizing a bar, so the
+        // overshoot is reported rather than clamped: hiding it would let a
+        // person read as fully booked while actually being oversubscribed.
+        isOver: freeHours < -0.01,
+        overHours: round2(Math.max(0, -freeHours)),
         // Reported against the same capacity base, so used + free is always 100%.
         usedPercent: share(assignedHours),
         freePercent: share(freeHours),
@@ -464,21 +472,25 @@ function freeSegments(assignmentsForPerson, personName, window, perspective) {
 }
 
 /**
- * A person's absences as bands across the timeline, so time away is visible
- * against the assignment chips rather than only inside the free-bar tooltip.
+ * A person's absences as bars on their own timeline lane, read the same way as
+ * the free-capacity lane: one bar per period away, sized to the days it covers.
  *
- * Bands are drawn over the whole row height because an absence applies to the
- * person, not to one assignment: every chip it crosses is affected.
+ * An absence belongs to the person rather than to one assignment, so it gets a
+ * lane of its own instead of being painted over the chips. That keeps it
+ * readable, lets it carry its own tooltip, and leaves the chip resize handles
+ * completely untouched.
  */
-function absenceBands(personName, range) {
+function absenceBands(personName, range, laneIndex, dailyHours) {
   const rangeEndInclusive = new Date(range.endExclusive.getTime() - DAY_MS);
   return absencesInWindow(personName, range.start, range.endExclusive).map((absence) => {
     // Clip the label dates to the visible range so a long absence that starts
     // before the window still reads correctly.
-    const geometry = chipGeometry(range, absence.startDate, absence.endDate, 0);
+    const geometry = chipGeometry(range, absence.startDate, absence.endDate, laneIndex);
     return {
       ...absence,
       geometry,
+      // The capacity these days remove, at the person's own working day.
+      hours: round2(absence.daysInWindow * (dailyHours || 0)),
       startsBefore: absence.startDate < toDateText(range.start),
       endsAfter: absence.endDate > toDateText(rangeEndInclusive),
     };
@@ -713,6 +725,11 @@ function buildManagementView({
         }))
       : [];
 
+    // Absence sits on the lane below the free bar, so the row reads as
+    // "work, then what is left, then what is not there at all".
+    const absenceLane = forPerson.length + (showFreeBars ? 1 : 0);
+    const bands = absenceBands(member.person, range, absenceLane, member.dailyHours);
+
     return {
       person: member.person,
       role: member.role,
@@ -727,8 +744,8 @@ function buildManagementView({
       absentDays: member.absentDays,
       chips,
       freeChips,
-      absenceBands: absenceBands(member.person, range),
-      height: rowHeight(forPerson.length, showFreeBars),
+      absenceBands: bands,
+      height: rowHeight(forPerson.length, showFreeBars, bands.length > 0),
     };
   });
 
