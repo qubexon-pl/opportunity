@@ -135,7 +135,8 @@ router.get('/', async (req, res, next) => {
       return params.toString();
     };
 
-    res.render('management', {
+    const isPartial = req.query.partial === '1';
+    res.render(isPartial ? 'management-content' : 'management', {
       title: 'Team capacity',
       monthlyCapacity: MONTHLY_CAPACITY,
       hoursPerDay: HOURS_PER_DAY,

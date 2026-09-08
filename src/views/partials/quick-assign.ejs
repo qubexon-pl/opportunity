@@ -1,0 +1,58 @@
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <a class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseQuickAssign<%= qaSuffix %>" aria-expanded="true">
+      <i class="bi bi-chevron-down"></i><span><i class="bi bi-plus-circle me-2"></i>Quick assign</span>
+    </a>
+    <span class="text-muted small">Same allocation rules as the opportunity page</span>
+  </div>
+  <div class="card-body collapse show" id="collapseQuickAssign<%= qaSuffix %>">
+    <form method="post" action="/management/assignments" class="allocation-form row g-2 align-items-end">
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label">Opportunity</label>
+        <select class="form-select" name="opportunityId" data-role="opportunity" required>
+          <option value="" data-hours="0">Select opportunity</option>
+          <% projects.forEach(function(project) { %>
+            <option value="<%= project.Id %>" data-hours="<%= project.OpportunityHours || 0 %>"><%= project.Name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <label class="form-label">Person</label>
+        <select class="form-select" name="personName" data-role="person" required>
+          <option value="">Select person</option>
+          <% people.forEach(function(person) { %>
+            <option value="<%= person %>"><%= person %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-4 col-6">
+        <label class="form-label">Start</label>
+        <input type="date" class="form-control" name="plannedStartDate" data-role="start" value="<%= today %>" required>
+      </div>
+      <div class="col-lg-2 col-md-4 col-6">
+        <label class="form-label">End</label>
+        <input type="date" class="form-control" name="plannedEndDate" data-role="end" value="<%= today %>" required>
+      </div>
+      <div class="col-lg-2 col-md-4 col-6">
+        <label class="form-label">Allocation mode</label>
+        <select class="form-select" name="allocationMode" data-role="mode">
+          <option value="percent">Percent of total hours</option>
+          <option value="total-hours">Total hours for period</option>
+          <option value="monthly-hours">Hours per month</option>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-4 col-6">
+        <label class="form-label" data-role="value-label">Allocation %</label>
+        <input type="number" class="form-control" data-role="value" min="0.5" step="0.5" value="50">
+      </div>
+      <div class="col-lg-1 col-md-4 col-12">
+        <button class="btn btn-primary w-100" type="submit">Assign</button>
+      </div>
+      <div class="col-12">
+        <div class="allocation-preview" data-role="preview">&nbsp;</div>
+      </div>
+      <input type="hidden" name="allocationPercent" data-role="percent-field">
+      <input type="hidden" name="allocatedHours" data-role="hours-field">
+    </form>
+  </div>
+</div>

@@ -105,6 +105,44 @@
 
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <i class="bi bi-calendar-event me-2"></i>Upcoming actions and decisions
+      <div class="text-muted small">Items due in selected period (open opportunities only)</div>
+    </div>
+    <form method="get" action="/" class="d-flex align-items-center gap-2">
+      <input type="hidden" name="applied" value="1">
+      <input type="hidden" name="q" value="<%= filters.q %>">
+      <% filters.stage.forEach(function(stage) { %><input type="hidden" name="stage" value="<%= stage %>"><% }) %>
+      <% filters.status.forEach(function(status) { %><input type="hidden" name="status" value="<%= status %>"><% }) %>
+      <input type="hidden" name="sort" value="<%= filters.sort %>">
+      <label class="form-label mb-0 text-nowrap" for="period">Period</label>
+      <select class="form-select form-select-sm" id="period" name="period" style="max-width: 170px;" onchange="this.form.submit()">
+        <% upcomingPeriods.forEach(function(option) { %>
+          <option value="<%= option.key %>" <%= upcomingPeriod === option.key ? 'selected' : '' %>><%= option.label %></option>
+        <% }) %>
+      </select>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="upcoming-window small mb-2"><%= upcoming.label %></div>
+    <% if (upcoming.items.length) { %>
+      <div class="upcoming-list">
+        <% upcoming.items.forEach(function(item) { %>
+          <a class="upcoming-item" href="/opportunities/<%= item.id %>">
+            <div class="upcoming-title"><%= item.name %></div>
+            <div class="upcoming-meta"><%= item.stage %> &middot; Due <%= item.dueText %></div>
+            <div class="upcoming-summary"><%= item.summary %></div>
+          </a>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <p class="text-muted small mb-0">No upcoming steps for this period.</p>
+    <% } %>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <span><i class="bi bi-pie-chart me-2"></i>Stage totals</span>
     <% if (winRate !== null) { %>
       <span class="text-muted small">
@@ -245,44 +283,6 @@
 
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <div>
-      <i class="bi bi-calendar-event me-2"></i>Upcoming actions and decisions
-      <div class="text-muted small">Items due in selected period (open opportunities only)</div>
-    </div>
-    <form method="get" action="/" class="d-flex align-items-center gap-2">
-      <input type="hidden" name="applied" value="1">
-      <input type="hidden" name="q" value="<%= filters.q %>">
-      <% filters.stage.forEach(function(stage) { %><input type="hidden" name="stage" value="<%= stage %>"><% }) %>
-      <% filters.status.forEach(function(status) { %><input type="hidden" name="status" value="<%= status %>"><% }) %>
-      <input type="hidden" name="sort" value="<%= filters.sort %>">
-      <label class="form-label mb-0 text-nowrap" for="period">Period</label>
-      <select class="form-select form-select-sm" id="period" name="period" style="max-width: 170px;" onchange="this.form.submit()">
-        <% upcomingPeriods.forEach(function(option) { %>
-          <option value="<%= option.key %>" <%= upcomingPeriod === option.key ? 'selected' : '' %>><%= option.label %></option>
-        <% }) %>
-      </select>
-    </form>
-  </div>
-  <div class="card-body">
-    <div class="upcoming-window small mb-2"><%= upcoming.label %></div>
-    <% if (upcoming.items.length) { %>
-      <div class="upcoming-list">
-        <% upcoming.items.forEach(function(item) { %>
-          <a class="upcoming-item" href="/opportunities/<%= item.id %>">
-            <div class="upcoming-title"><%= item.name %></div>
-            <div class="upcoming-meta"><%= item.stage %> &middot; Due <%= item.dueText %></div>
-            <div class="upcoming-summary"><%= item.summary %></div>
-          </a>
-        <% }) %>
-      </div>
-    <% } else { %>
-      <p class="text-muted small mb-0">No upcoming steps for this period.</p>
-    <% } %>
-  </div>
-</div>
-
-<div class="card mb-4">
-  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <span><i class="bi bi-table me-2"></i>Pipeline (<%= opportunities.length %>)</span>
     <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Filter rows..." oninput="filterTable(this, 'pipelineTable')">
   </div>
@@ -297,7 +297,6 @@
             <th>Status</th>
             <th>Capacity booking</th>
             <th class="text-end">Hours</th>
-            <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -305,13 +304,14 @@
             <tr>
               <td>
                 <div class="pipeline-title">
-                  <%= o.Name %>
+                  <a href="/opportunities/<%= o.Id %>" class="pipeline-link"><%= o.Name %></a>
                   <%
                     var tagList = String(o.Tags || '').split(',').map(function(t) { return t.trim(); }).filter(Boolean);
                   %>
                   <% tagList.forEach(function(tag) { %><span class="opportunity-tag"><%= tag %></span><% }) %>
                 </div>
                 <div class="pipeline-subtitle"><%= o.TechnologyStack || 'No technology stack' %></div>
+                <div class="pipeline-created small text-muted">Created <%= o.CreatedAt ? new Date(o.CreatedAt).toLocaleDateString() : '-' %></div>
               </td>
               <td><%= o.TechOwner || 'Unassigned' %></td>
               <td><span class="stage-badge <%= stageBadgeClass(o.Stage) %>"><%= o.Stage || 'Unspecified' %></span></td>
@@ -330,13 +330,10 @@
                 </form>
               </td>
               <td class="text-end fw-semibold"><%= o.OpportunityHours == null ? 0 : o.OpportunityHours %>h</td>
-              <td class="text-end">
-                <a href="/opportunities/<%= o.Id %>" class="btn btn-sm btn-outline-primary">Open</a>
-              </td>
             </tr>
           <% }) %>
           <% if (!opportunities.length) { %>
-            <tr><td colspan="7" class="text-center text-muted py-4">No opportunities match the current filters.</td></tr>
+            <tr><td colspan="6" class="text-center text-muted py-4">No opportunities match the current filters.</td></tr>
           <% } %>
         </tbody>
       </table>

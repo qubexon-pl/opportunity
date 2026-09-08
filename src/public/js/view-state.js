@@ -18,7 +18,6 @@
     if (!pane) return;
 
     document.addEventListener('submit', function (event) {
-      // Only for navigations that reload this same page.
       var form = event.target;
       if (!form || form.hasAttribute('data-no-scroll-restore')) return;
       try {
@@ -40,8 +39,6 @@
     var target = Number(saved);
     if (!isFinite(target) || target <= 0) return;
 
-    // Cards and the timeline settle after layout, so the position is reapplied
-    // until it takes rather than set once against a shorter page.
     var attempts = 0;
     (function settle() {
       pane.scrollTop = target;
@@ -51,66 +48,8 @@
       }
     })();
 
-    // Late layout (fonts, the timeline sizing itself) can shorten the page
-    // after the first attempts, so the position is claimed once more.
     window.addEventListener('load', function () {
       if (Math.abs(pane.scrollTop - target) > 1) pane.scrollTop = target;
-    });
-  }
-
-  /*
-   * Docked filters: the card condenses to its header once it has been scrolled
-   * past, so it stays reachable without covering the board. Expanding it while
-   * docked opens the full form over the page, like a panel.
-   */
-  function dockedFilters() {
-    var dock = document.getElementById('perspectiveDock');
-    var pane = scroller();
-    if (!dock || !pane) return;
-
-    var toggle = dock.querySelector('[data-perspective-toggle]');
-    // The top bar's height changes with display density, so the dock's offset is
-    // measured rather than assumed; a stale offset would leave a gap that page
-    // content slides through, or hide the dock behind the bar.
-    var offset = function () {
-      var topbar = document.querySelector('.topbar');
-      return topbar ? Math.round(topbar.getBoundingClientRect().height) : 0;
-    };
-
-    var applyOffset = function () {
-      dock.style.top = offset() + 'px';
-    };
-
-    var queued = false;
-    var refresh = function () {
-      queued = false;
-      var stuck = dock.getBoundingClientRect().top <= offset() + 1;
-      if (stuck === dock.classList.contains('is-stuck')) return;
-      dock.classList.toggle('is-stuck', stuck);
-      // Coming back to the top shows the whole form again, so the open state
-      // does not linger and hide the filters behind a click.
-      if (!stuck) dock.classList.remove('is-open');
-    };
-
-    applyOffset();
-
-    pane.addEventListener('scroll', function () {
-      if (queued) return;
-      queued = true;
-      window.requestAnimationFrame(refresh);
-    }, { passive: true });
-    window.addEventListener('resize', function () {
-      applyOffset();
-      refresh();
-    });
-    refresh();
-
-    if (!toggle) return;
-    toggle.addEventListener('click', function () {
-      var open = !dock.classList.contains('is-open');
-      dock.classList.toggle('is-open', open);
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      toggle.title = open ? 'Hide the filters' : 'Show the filters';
     });
   }
 
@@ -119,70 +58,175 @@
    * over the viewport. The state survives the reload that a filter change
    * causes, otherwise every adjustment would drop the reader back out of it.
    */
+  var _tfp_card, _tfp_toggle, _tfp_label, _tfp_key;
+  var _tfp_keyAdded = false;
+
+  function _tfp_apply(on) {
+    if (!_tfp_card) return;
+    _tfp_card.classList.toggle('timeline-card-fullpage', on);
+    document.body.classList.toggle('has-timeline-fullpage', on);
+    if (_tfp_toggle) {
+      _tfp_toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+      _tfp_toggle.title = on ? 'Back to the page (Esc)' : 'Show the timeline full page (F)';
+      var icon = _tfp_toggle.querySelector('i');
+      if (icon) icon.className = on ? 'bi bi-fullscreen-exit me-1' : 'bi bi-arrows-fullscreen me-1';
+    }
+    if (_tfp_label) _tfp_label.textContent = on ? 'Exit full page' : 'Full page';
+    try {
+      if (on) sessionStorage.setItem(_tfp_key, '1');
+      else sessionStorage.removeItem(_tfp_key);
+    } catch (error) {
+      /* storage disabled: the toggle still works, it just does not persist */
+    }
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  function _tfp_set(on) {
+    _tfp_apply(on);
+    if (on && _tfp_card) _tfp_card.scrollIntoView({ block: 'nearest' });
+  }
+
   function timelineFullPage() {
-    var card = document.getElementById('timelineCard');
-    if (!card) return;
+    _tfp_card = document.getElementById('timelineCard');
+    if (!_tfp_card) return;
 
-    var toggle = card.querySelector('[data-timeline-fullpage]');
-    var label = card.querySelector('[data-timeline-fullpage-label]');
-    var key = 'opp-timeline-fullpage:' + window.location.pathname;
-
-    function apply(on) {
-      card.classList.toggle('timeline-card-fullpage', on);
-      document.body.classList.toggle('has-timeline-fullpage', on);
-      if (toggle) {
-        toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
-        toggle.title = on ? 'Back to the page (Esc)' : 'Show the timeline full page (F)';
-        var icon = toggle.querySelector('i');
-        if (icon) icon.className = on ? 'bi bi-fullscreen-exit me-1' : 'bi bi-arrows-fullscreen me-1';
-      }
-      if (label) label.textContent = on ? 'Exit full page' : 'Full page';
+    _tfp_toggle = _tfp_card.querySelector('[data-timeline-fullpage]:not([data-tfp-init])');
+    if (!_tfp_toggle) {
+      // Already initialized; just re-check sessionStorage state.
       try {
-        if (on) sessionStorage.setItem(key, '1');
-        else sessionStorage.removeItem(key);
-      } catch (error) {
-        /* storage disabled: the toggle still works, it just does not persist */
-      }
-      // The floating scrollbar measures the board, which has just resized.
-      window.dispatchEvent(new Event('resize'));
+        if (sessionStorage.getItem(_tfp_key) === '1') _tfp_apply(true);
+      } catch (error) { }
+      return;
     }
+    _tfp_toggle.setAttribute('data-tfp-init', '');
+    _tfp_label = _tfp_card.querySelector('[data-timeline-fullpage-label]');
+    _tfp_key = 'opp-timeline-fullpage:' + window.location.pathname;
 
-    function set(on) {
-      apply(on);
-      if (on) card.scrollIntoView({ block: 'nearest' });
-    }
-
-    if (toggle) {
-      toggle.addEventListener('click', function () {
-        set(!card.classList.contains('timeline-card-fullpage'));
-      });
-    }
-
-    document.addEventListener('keydown', function (event) {
-      // Never steal a key from someone filling in a filter or an hours field.
-      var el = event.target;
-      var typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
-      if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
-
-      var on = card.classList.contains('timeline-card-fullpage');
-      if (event.key === 'Escape' && on) {
-        set(false);
-      } else if (event.key === 'f' || event.key === 'F') {
-        event.preventDefault();
-        set(!on);
-      }
+    _tfp_toggle.addEventListener('click', function () {
+      _tfp_set(!_tfp_card.classList.contains('timeline-card-fullpage'));
     });
 
+    if (!_tfp_keyAdded) {
+      document.addEventListener('keydown', function (event) {
+        var el = event.target;
+        var typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+        if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
+
+        var on = _tfp_card && _tfp_card.classList.contains('timeline-card-fullpage');
+        if (event.key === 'Escape' && on) {
+          _tfp_set(false);
+        } else if (event.key === 'f' || event.key === 'F') {
+          event.preventDefault();
+          _tfp_set(!on);
+        }
+      });
+      _tfp_keyAdded = true;
+    }
+
     try {
-      if (sessionStorage.getItem(key) === '1') apply(true);
+      if (sessionStorage.getItem(_tfp_key) === '1') _tfp_apply(true);
     } catch (error) {
       /* storage disabled */
     }
   }
 
+  /*
+   * Collapsible card sections: the collapsed state is remembered across page
+   * reloads so that filter changes (which reload the page) don't undo it.
+   */
+  function collapsibleCards() {
+    var toggles = document.querySelectorAll('.card-collapse-toggle[data-bs-target]:not([data-cc-init])');
+    if (!toggles.length) return;
+
+    var key = 'opp-collapsed:' + window.location.pathname;
+
+    try {
+      var saved = JSON.parse(sessionStorage.getItem(key) || '{}');
+      toggles.forEach(function (toggle) {
+        toggle.setAttribute('data-cc-init', '');
+        var targetId = toggle.getAttribute('data-bs-target');
+        var target = targetId && document.querySelector(targetId);
+        if (!target) return;
+        if (saved[targetId]) {
+          target.classList.remove('show');
+          toggle.classList.add('collapsed');
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    } catch (error) {
+      /* storage disabled */
+    }
+
+    toggles.forEach(function (toggle) {
+      toggle.addEventListener('click', function () {
+        var targetId = toggle.getAttribute('data-bs-target');
+        var target = targetId && document.querySelector(targetId);
+        if (!target) return;
+        var isCollapsed = !target.classList.contains('show');
+        try {
+          var data = JSON.parse(sessionStorage.getItem(key) || '{}');
+          if (isCollapsed) data[targetId] = true;
+          else delete data[targetId];
+          sessionStorage.setItem(key, JSON.stringify(data));
+        } catch (error) {
+          /* storage disabled */
+        }
+      });
+    });
+  }
+
+  /*
+   * Live-sort the people summary cards without reloading the page.
+   * Each card carries data-* attributes that mirror the server-side sort
+   * fields, so the client can re-sort the DOM in place.
+   */
+  function peopleSort() {
+    var grid = document.getElementById('peopleGrid');
+    if (!grid) return;
+    var sortSelect = document.getElementById('peopleSort');
+    var dirSelect = document.getElementById('peopleDir');
+    if (!sortSelect || !dirSelect) return;
+
+    var key = sortSelect.value;
+    var dir = dirSelect.value;
+    var attr = 'data-' + key;
+    var cards = Array.prototype.slice.call(grid.children);
+
+    cards.sort(function(a, b) {
+      var av = a.getAttribute(attr) || '';
+      var bv = b.getAttribute(attr) || '';
+      var an = parseFloat(av);
+      var bn = parseFloat(bv);
+      var cmp;
+      if (!isNaN(an) && !isNaN(bn)) cmp = an - bn;
+      else cmp = av.localeCompare(bv);
+      return dir === 'desc' ? -cmp : cmp;
+    });
+
+    cards.forEach(function(card) { grid.appendChild(card); });
+  }
+
+  function initViewState(container) {
+    container = container || document;
+    collapsibleCards();
+    timelineFullPage();
+
+    var sortSelect = container.querySelector('#peopleSort:not([data-ps-init])');
+    var dirSelect = container.querySelector('#peopleDir:not([data-ps-init])');
+    if (sortSelect) {
+      sortSelect.setAttribute('data-ps-init', '');
+      sortSelect.addEventListener('change', peopleSort);
+    }
+    if (dirSelect) {
+      dirSelect.setAttribute('data-ps-init', '');
+      dirSelect.addEventListener('change', peopleSort);
+    }
+  }
+
+  window.OPP_initViewState = initViewState;
+
   document.addEventListener('DOMContentLoaded', function () {
     keepScrollPosition();
-    dockedFilters();
-    timelineFullPage();
+    initViewState();
   });
 })();

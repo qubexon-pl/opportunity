@@ -2,6 +2,25 @@
    Opportunity-specific components layered on top of the shared design system.
    ========================================================================== */
 
+/* Collapsible card sections: the title is a toggle that collapses the
+   card-body. The chevron rotates to indicate state. */
+.card-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+}
+.card-collapse-toggle:hover { color: var(--color-primary); }
+.card-collapse-toggle > i.bi-chevron-down {
+  font-size: .8rem;
+  transition: transform .2s ease;
+}
+.card-collapse-toggle.collapsed > i.bi-chevron-down {
+  transform: rotate(-90deg);
+}
+
 .stat-card .card-body { display: flex; flex-direction: column; justify-content: center; }
 
 .summary-label {
@@ -14,6 +33,9 @@
 /* --- Pipeline ------------------------------------------------------------ */
 
 .pipeline-title { font-weight: 600; color: var(--color-text); }
+.pipeline-link { color: inherit; text-decoration: none; }
+.pipeline-link:hover { color: var(--color-primary); }
+.pipeline-created { font-size: .72rem; }
 .pipeline-subtitle { font-size: .8rem; color: var(--color-text-muted); }
 
 .stage-badge {
@@ -165,7 +187,7 @@
  */
 .timeline-scroll {
   overflow: auto;
-  max-height: max(340px, calc(100vh - 300px));
+  max-height: max(440px, calc(100vh - 260px));
 }
 
 /*
@@ -240,16 +262,6 @@ body.has-timeline-fullpage .main-content { overflow: hidden; }
  */
 .timeline-floating-scroll.is-visible { border-top: 2px solid var(--color-primary); }
 
-.perspective-dock.is-stuck {
-  border-color: var(--color-primary);
-  border-width: 2px;
-  /* A light offset tone while it floats, so the docked strip reads as chrome
-     sitting over the page rather than another card in the flow. */
-  background: var(--color-surface-offset);
-}
-
-.perspective-dock.is-stuck > .card-header { background: transparent; }
-
 .timeline-scroll.is-scrolled-y .timeline-head {
   border-bottom: 2px solid var(--color-primary);
 }
@@ -258,28 +270,6 @@ body.has-timeline-fullpage .main-content { overflow: hidden; }
 .timeline-scroll.is-scrolled-x .timeline-person-head {
   border-right: 2px solid var(--color-primary);
 }
-
-/*
- * The filters stay within reach: the card sticks below the top bar, and
- * condenses to a single docked line once it has been scrolled past, so it costs
- * a strip of the board rather than a whole card. The full form is one click
- * away, and is shown in full whenever the page is at the top.
- */
-.perspective-dock {
-  position: sticky;
-  /* Below the top bar, which is sticky at 0: without this offset the dock
-     would slide underneath it and be unreachable. */
-  top: var(--topbar-height, 56px);
-  z-index: 1010;
-}
-
-.perspective-dock.is-stuck { box-shadow: var(--shadow-md); }
-.perspective-dock.is-stuck:not(.is-open) > .card-body { display: none; }
-.perspective-dock .perspective-summary { display: none; }
-.perspective-dock.is-stuck .perspective-summary { display: inline; }
-.perspective-dock:not(.is-stuck) .perspective-toggle { display: none; }
-.perspective-dock.is-stuck.is-open .perspective-toggle i { transform: rotate(180deg); }
-.perspective-toggle i { display: inline-block; transition: transform .15s ease; }
 
 .person-role {
   font-size: .74rem;
@@ -416,7 +406,11 @@ body.has-timeline-fullpage .main-content { overflow: hidden; }
   text-decoration: none;
   color: inherit;
   overflow: hidden;
+  cursor: grab;
 }
+
+.timeline-chip-body:active { cursor: grabbing; }
+.timeline-chip.is-resizing .timeline-chip-body { cursor: grabbing; }
 
 .timeline-chip-body:hover { color: inherit; }
 
@@ -555,6 +549,14 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
 }
 
 /* --- Assignments and detail ---------------------------------------------- */
+
+/* Group header rows that separate assignments by opportunity. */
+.assignment-group-header td {
+  background: var(--color-surface-offset, #f8f9fa);
+  font-weight: 600;
+  font-size: .85rem;
+  border-top: 2px solid var(--color-divider) !important;
+}
 
 /* An allocation is a card so schedule, allocation and hold read as separate blocks. */
 .assignment-card {

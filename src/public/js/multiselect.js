@@ -22,8 +22,10 @@
     root.classList.toggle('has-selection', chosen.length > 0);
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('[data-multiselect]').forEach(function (root) {
+  function initMultiselects(container) {
+    container = container || document;
+    container.querySelectorAll('[data-multiselect]:not([data-ms-init])').forEach(function (root) {
+      root.setAttribute('data-ms-init', '');
       root.addEventListener('change', function () {
         summarise(root);
       });
@@ -40,5 +42,11 @@
 
       summarise(root);
     });
+  }
+
+  window.OPP_initMultiselects = initMultiselects;
+
+  document.addEventListener('DOMContentLoaded', function () {
+    initMultiselects();
   });
 })();

@@ -4,19 +4,11 @@
   'use strict';
 
   var DAY_MS = 24 * 60 * 60 * 1000;
-  var grid = document.getElementById('timelineGrid');
-  if (!grid) return;
-
-  var rangeStartMs = Date.parse(grid.dataset.rangeStart + 'T00:00:00Z');
-  var rangeEndMs = Date.parse(grid.dataset.rangeEndExclusive + 'T00:00:00Z');
-  if (!isFinite(rangeStartMs) || !isFinite(rangeEndMs) || rangeEndMs <= rangeStartMs) return;
-
-  var windowStartMs = parseDate(grid.dataset.windowStart);
-  var windowEndMs = parseDate(grid.dataset.windowEndExclusive);
-
-  var totalDays = Math.round((rangeEndMs - rangeStartMs) / DAY_MS);
+  var grid = null;
+  var rangeStartMs, rangeEndMs, totalDays, windowStartMs, windowEndMs;
   var suppressClickUntil = 0;
   var drag = null;
+  var windowListenersAdded = false;
 
   function toDateText(ms) {
     return new Date(ms).toISOString().slice(0, 10);
@@ -93,7 +85,6 @@
     var days = businessDays(startMs, endMs);
     var resized = Math.abs(hours - initialHours) >= 0.01;
 
-    // The stage lives beside the opportunity name, so it is not repeated here.
     meta.textContent = initialHours + 'h' + (resized ? ' \u2192 ' + hours + 'h' : '') +
       ' \u00b7 ' + capacityPercent + '% cap';
 
@@ -126,10 +117,22 @@
   }
 
   function beginDrag(event) {
-    var handle = event.target.closest('.timeline-chip-resizer');
-    if (!handle || event.button !== 0) return;
+    if (event.button !== 0) return;
 
-    var chip = handle.closest('.timeline-chip');
+    var handle = event.target.closest('.timeline-chip-resizer');
+    var body = null;
+    var edge = null;
+
+    if (handle) {
+      edge = handle.dataset.edge; /* 'start' or 'end' */
+    } else {
+      /* Allow grabbing the chip body to move the whole bar left/right. */
+      body = event.target.closest('.timeline-chip-body');
+      if (body) edge = 'move';
+    }
+    if (!edge) return;
+
+    var chip = (handle || body).closest('.timeline-chip');
     var lane = chip && chip.closest('.timeline-lane');
     var startMs = chip && parseDate(chip.dataset.start);
     var endMs = chip && parseDate(chip.dataset.end);
@@ -138,7 +141,7 @@
     event.preventDefault();
     drag = {
       chip: chip,
-      edge: handle.dataset.edge,
+      edge: edge,
       pointerStartX: event.clientX,
       laneWidth: lane.clientWidth || 1,
       originalStartMs: startMs,
@@ -154,7 +157,12 @@
     if (!drag) return;
     var deltaDays = Math.round(((event.clientX - drag.pointerStartX) / drag.laneWidth) * totalDays);
 
-    if (drag.edge === 'start') {
+    if (drag.edge === 'move') {
+      /* Slide the whole bar: shift both start and end by the same delta. */
+      var span = drag.originalEndMs - drag.originalStartMs;
+      drag.startMs = drag.originalStartMs + deltaDays * DAY_MS;
+      drag.endMs = drag.startMs + span;
+    } else if (drag.edge === 'start') {
       var nextStart = drag.originalStartMs + deltaDays * DAY_MS;
       drag.startMs = Math.min(nextStart, drag.endMs);
     } else {
@@ -190,7 +198,6 @@
       body: JSON.stringify(payload),
     })
       .then(function (response) {
-        // The API explains refusals in an { error } body; show that rather than a bare status.
         if (!response.ok) {
           return response
             .json()
@@ -208,8 +215,8 @@
             'success'
           );
         }
-        if (typeof reloadPageWithMessage === 'function') {
-          reloadPageWithMessage('Recalculating allocation...', 400);
+        if (typeof window.OPP_mgmtSwap === 'function') {
+          window.OPP_mgmtSwap();
         } else {
           window.location.reload();
         }
@@ -221,19 +228,36 @@
       });
   }
 
-  grid.addEventListener('mousedown', beginDrag);
-  window.addEventListener('mousemove', moveDrag);
-  window.addEventListener('mouseup', endDrag);
+  function clickSuppressor(event) {
+    if (Date.now() < suppressClickUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
 
-  // A drag that ends over the chip body must not navigate to the opportunity.
-  grid.addEventListener(
-    'click',
-    function (event) {
-      if (Date.now() < suppressClickUntil) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    },
-    true
-  );
+  function init() {
+    grid = document.getElementById('timelineGrid');
+    if (!grid) return;
+
+    rangeStartMs = Date.parse(grid.dataset.rangeStart + 'T00:00:00Z');
+    rangeEndMs = Date.parse(grid.dataset.rangeEndExclusive + 'T00:00:00Z');
+    if (!isFinite(rangeStartMs) || !isFinite(rangeEndMs) || rangeEndMs <= rangeStartMs) return;
+
+    windowStartMs = parseDate(grid.dataset.windowStart);
+    windowEndMs = parseDate(grid.dataset.windowEndExclusive);
+    totalDays = Math.round((rangeEndMs - rangeStartMs) / DAY_MS);
+
+    grid.addEventListener('mousedown', beginDrag);
+    grid.addEventListener('click', clickSuppressor, true);
+
+    if (!windowListenersAdded) {
+      window.addEventListener('mousemove', moveDrag);
+      window.addEventListener('mouseup', endDrag);
+      windowListenersAdded = true;
+    }
+  }
+
+  window.OPP_initTimelineDrag = init;
+
+  document.addEventListener('DOMContentLoaded', init);
 })();

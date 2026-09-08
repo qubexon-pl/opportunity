@@ -91,6 +91,62 @@ function filterTable(input, tableId) {
   });
 }
 
+// ──── Grouped table filter: hides rows that don't match, and hides group
+//     headers when none of their child rows are visible ────
+function filterGroupedTable(input, tableId) {
+  var filter = (input.value || '').toLowerCase();
+  var rows = document.querySelectorAll('#' + tableId + ' tbody tr');
+  var groupVisible = {};
+  rows.forEach(function(row) {
+    if (row.classList.contains('assignment-group-header')) return;
+    var text = (row.textContent || '').toLowerCase();
+    var match = text.includes(filter);
+    row.style.display = match ? '' : 'none';
+    // Track whether any row in the current group is visible
+    if (match) {
+      // Walk backwards to find the preceding group header
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i] === row) break;
+        if (rows[i].classList.contains('assignment-group-header')) {
+          groupVisible[i] = true;
+        }
+      }
+    }
+  });
+  // Show/hide group headers
+  rows.forEach(function(row, i) {
+    if (!row.classList.contains('assignment-group-header')) return;
+    row.style.display = groupVisible[i] ? '' : 'none';
+  });
+}
+
+// ──── Timeline filter: hides timeline rows where neither the person name
+//     nor any chip's project name matches ────
+function filterTimeline(input) {
+  var filter = (input.value || '').toLowerCase();
+  var grid = document.getElementById('timelineGrid');
+  if (!grid) return;
+  var rows = grid.querySelectorAll('.timeline-row');
+  rows.forEach(function(row) {
+    if (!filter) { row.style.display = ''; return; }
+    var personEl = row.querySelector('.person-link');
+    var personName = personEl ? (personEl.textContent || '').toLowerCase() : '';
+    var chips = row.querySelectorAll('.timeline-chip');
+    var chipMatch = false;
+    chips.forEach(function(chip) {
+      var title = (chip.getAttribute('data-person') || '') + ' ' + (chip.getAttribute('title') || '');
+      if (title.toLowerCase().includes(filter)) chipMatch = true;
+    });
+    // Also check free/absence segments
+    var freeChips = row.querySelectorAll('.timeline-free, .timeline-absence');
+    freeChips.forEach(function(el) {
+      var text = (el.getAttribute('title') || el.textContent || '').toLowerCase();
+      if (text.includes(filter)) chipMatch = true;
+    });
+    row.style.display = (personName.includes(filter) || chipMatch) ? '' : 'none';
+  });
+}
+
 function showPageReloading(message) {
   var overlay = document.getElementById('reloadOverlay');
   var text = document.getElementById('reloadOverlayText');
@@ -211,5 +267,6 @@ if (confirmActionBtn) {
 <script src="/js/multiselect.js"></script>
 <script src="/js/timeline-scroll.js"></script>
 <script src="/js/view-state.js"></script>
+<script src="/js/management-dynamic.js"></script>
 </body>
 </html>
