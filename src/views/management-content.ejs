@@ -450,7 +450,7 @@
         </button>
       </div>
       <div class="card-body collapse" id="collapseTimeline">
-        <div class="timeline-scroll">
+        <div class="timeline-scroll" data-scroll-key="management-timeline">
           <div class="timeline-grid" id="timelineGrid"
                data-perspective="<%= view.timeline.perspective %>"
                data-range-start="<%= view.timeline.startText %>"
@@ -603,7 +603,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
     <div class="card mb-4">
       <div class="card-header">
         <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePeopleList" aria-expanded="false">
-          <i class="bi bi-chevron-down"></i><span><i class="bi bi-people me-2"></i>People (<%= personFilters.length > 0 ? personFilters.length : people.length %>)</span>
+          <i class="bi bi-chevron-down"></i><span><i class="bi bi-people me-2"></i>People (<%= (peopleSelectionActive ? people.filter(function(name) { return selectedPeople.indexOf(name) !== -1; }) : people).length %>)</span>
         </a>
       </div>
       <div class="card-body collapse p-0" id="collapsePeopleList">
@@ -622,8 +622,10 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
             </thead>
             <tbody>
               <%
-                var filteredPeople = personFilters.length > 0
-                  ? people.filter(function(name) { return personFilters.indexOf(name) !== -1; })
+                // Manager counts as a people filter too, so this has to follow
+                // the resolved selection rather than the Person dropdown alone.
+                var filteredPeople = peopleSelectionActive
+                  ? people.filter(function(name) { return selectedPeople.indexOf(name) !== -1; })
                   : people;
               %>
               <% filteredPeople.forEach(function(personName) {
@@ -656,6 +658,9 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                   </td>
                 </tr>
               <% }) %>
+              <% if (!filteredPeople.length) { %>
+                <tr><td colspan="7" class="text-center text-muted py-4">No people match the current filters.</td></tr>
+              <% } %>
             </tbody>
           </table>
         </div>

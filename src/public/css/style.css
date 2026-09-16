@@ -711,27 +711,49 @@ body.sidebar-collapsed .main-content {
 .toast-item.toast-error { border-left: 3px solid var(--color-danger); }
 .toast-item.toast-info { border-left: 3px solid var(--color-primary); }
 
+/* Busy indicator: a small circle that floats clear of the content while data
+   loads or saves. It deliberately does not dim or block the page - the work
+   happens in the background and the reader keeps their place. */
 .reload-overlay {
   position: fixed;
-  inset: 0;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(7, 11, 22, 0.48);
-  backdrop-filter: blur(1px);
+  pointer-events: none;
+  animation: busyFadeIn 0.18s ease-out;
 }
 .reload-overlay-card {
   background: var(--color-surface);
   color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
   box-shadow: var(--shadow-lg);
-  padding: 14px 18px;
+  padding: 8px 16px 8px 12px;
   display: inline-flex;
   align-items: center;
-  font-size: 0.9rem;
+  gap: 10px;
+  font-size: 0.82rem;
   font-weight: 600;
+}
+.reload-overlay-card .spinner-border {
+  width: 1.05rem;
+  height: 1.05rem;
+  border-width: 0.16em;
+}
+
+/* The pressed control spins too, so it is obvious which action is running. */
+.btn.is-busy {
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+@keyframes busyFadeIn {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 @keyframes slideInRight {

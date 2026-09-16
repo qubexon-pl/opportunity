@@ -10,11 +10,11 @@
 <!-- Toast container -->
 <div class="toast-container" id="toastContainer"></div>
 
-<!-- Global reload overlay -->
-<div id="reloadOverlay" class="reload-overlay d-none">
+<!-- Global busy indicator: shown while data is loading or saving -->
+<div id="reloadOverlay" class="reload-overlay d-none" role="status" aria-live="polite">
   <div class="reload-overlay-card">
-    <div class="spinner-border text-primary me-2" role="status" aria-hidden="true"></div>
-    <span id="reloadOverlayText">Reloading...</span>
+    <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+    <span id="reloadOverlayText">Working...</span>
   </div>
 </div>
 
@@ -148,17 +148,18 @@ function filterTimeline(input) {
 }
 
 function showPageReloading(message) {
-  var overlay = document.getElementById('reloadOverlay');
-  var text = document.getElementById('reloadOverlayText');
-  if (!overlay) return;
-  if (text && message) text.textContent = message;
-  overlay.classList.remove('d-none');
+  if (window.OPP_busy) window.OPP_busy.begin(message || 'Working...');
 }
 
+/* Kept for callers that used to force a full reload. Nothing reloads any
+   more: the current view is re-fetched and swapped in place, so scroll
+   position, open sections and the active tab all survive. */
 function reloadPageWithMessage(message, delayMs) {
-  showPageReloading(message || 'Reloading...');
   var wait = typeof delayMs === 'number' ? delayMs : 0;
-  setTimeout(function() { window.location.reload(); }, wait);
+  setTimeout(function() {
+    if (window.OPP_refreshView) window.OPP_refreshView(message);
+    else window.location.reload();
+  }, wait);
 }
 
 var confirmActionModal;
@@ -189,7 +190,10 @@ document.addEventListener('submit', function(event) {
     confirmText: form.getAttribute('data-confirm-text') || 'Delete',
     onConfirm: function() {
       form.dataset.confirmed = 'true';
-      form.submit();
+      /* requestSubmit keeps the submit event alive so the background
+         handlers still run - form.submit() would force a full navigation. */
+      if (form.requestSubmit) form.requestSubmit();
+      else form.submit();
     }
   });
 });
@@ -263,10 +267,12 @@ if (confirmActionBtn) {
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/busy.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/multiselect.js"></script>
 <script src="/js/timeline-scroll.js"></script>
 <script src="/js/view-state.js"></script>
+<script src="/js/live-update.js"></script>
 <script src="/js/management-dynamic.js"></script>
 </body>
 </html>

@@ -191,6 +191,11 @@ router.get('/', async (req, res, next) => {
       personOptions,
       managerFilters,
       managerOptions,
+      // The people the filters actually select, managers resolved to their
+      // reports. Views must use this rather than personFilters, or picking a
+      // manager alone looks like no filter at all.
+      selectedPeople: selection.people,
+      peopleSelectionActive: selection.active,
       peopleManagers: managersMap,
       timelineFilterOptions: TIMELINE_FILTER_OPTIONS,
       timelineUnitOptions: TIMELINE_UNIT_OPTIONS,

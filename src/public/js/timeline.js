@@ -270,6 +270,10 @@
         }
         if (typeof window.OPP_mgmtSwap === 'function') {
           window.OPP_mgmtSwap();
+        } else if (typeof window.OPP_refreshView === 'function') {
+          /* The person page has no management swap, but it can still refresh
+             its own content instead of throwing the reader back to the top. */
+          window.OPP_refreshView();
         } else {
           window.location.reload();
         }
