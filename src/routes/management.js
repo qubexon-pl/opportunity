@@ -60,6 +60,29 @@ function normalizeUnits(value, fallback) {
   return Math.min(24, Math.max(1, num(value) || fallback || 6));
 }
 
+/**
+ * Resolves the person selection, honouring the manager filter as a hierarchy:
+ * picking a manager means "the people who report to them", and combining it
+ * with named people keeps only the ones who do both.
+ *
+ * Returns `active` separately because an empty person list is ambiguous on its
+ * own: it means "everyone" when nothing is filtered, but "nobody" when a
+ * manager was chosen and nobody reports to them.
+ */
+function resolvePeopleSelection({ requestedPeople, requestedManagers, personOptions, managerOptions, managersMap }) {
+  const managerFilters = filterAgainst(requestedManagers, managerOptions);
+  const personFilters = filterAgainst(requestedPeople, personOptions);
+
+  if (!managerFilters.length) {
+    return { managerFilters, personFilters, people: personFilters, active: personFilters.length > 0 };
+  }
+
+  const reports = personOptions.filter((name) => managerFilters.includes(String(managersMap[name] || '').trim()));
+  const people = personFilters.length ? personFilters.filter((name) => reports.includes(name)) : reports;
+
+  return { managerFilters, personFilters, people, active: true };
+}
+
 router.get('/', async (req, res, next) => {
   const defaults = getViewDefaults().management;
 
@@ -76,7 +99,7 @@ router.get('/', async (req, res, next) => {
     ? filterAgainst(queryList(req.query.status), STATUSES)
     : filterAgainst(defaults.statuses, STATUSES);
   const requestedPeople = applied ? queryList(req.query.person) : defaults.people;
-  const requestedManagers = applied ? queryList(req.query.manager) : [];
+  const requestedManagers = applied ? queryList(req.query.manager) : defaults.managers;
 
   try {
     let loadError = null;
@@ -101,17 +124,15 @@ router.get('/', async (req, res, next) => {
     // Manager options: anyone who is a manager of at least one person.
     const managersMap = getManagerMap();
     const managerOptions = [...new Set(Object.values(managersMap).map((m) => String(m).trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-    const managerFilters = filterAgainst(requestedManagers, managerOptions);
 
-    // When manager filter is active, narrow the person list to people reporting to those managers.
-    let personFilters = filterAgainst(requestedPeople, personOptions);
-    if (managerFilters.length > 0) {
-      const filteredByManager = personOptions.filter((name) => managerFilters.includes(managersMap[name]));
-      // If person filters were also applied, intersect; otherwise use the manager-filtered list.
-      personFilters = personFilters.length > 0
-        ? personFilters.filter((name) => filteredByManager.includes(name))
-        : filteredByManager;
-    }
+    const selection = resolvePeopleSelection({
+      requestedPeople,
+      requestedManagers,
+      personOptions,
+      managerOptions,
+      managersMap,
+    });
+    const { managerFilters, personFilters } = selection;
 
     const view = buildManagementView({
       opportunities,
@@ -120,7 +141,8 @@ router.get('/', async (req, res, next) => {
       unitsToShow,
       stageFilter: stageFilters,
       statusFilter: statusFilters,
-      personFilter: personFilters,
+      personFilter: selection.people,
+      personFilterActive: selection.active,
       sort: req.query.sort,
       dir: req.query.dir,
       peopleSort: req.query.peopleSort,
@@ -130,6 +152,7 @@ router.get('/', async (req, res, next) => {
     const sameStages = JSON.stringify([...stageFilters].sort()) === JSON.stringify([...defaults.stages].sort());
     const sameStatuses = JSON.stringify([...statusFilters].sort()) === JSON.stringify([...defaults.statuses].sort());
     const samePeople = JSON.stringify([...personFilters].sort()) === JSON.stringify([...defaults.people].sort());
+    const sameManagers = JSON.stringify([...managerFilters].sort()) === JSON.stringify([...defaults.managers].sort());
 
     // Sort links have to carry the whole filter state, otherwise clicking a
     // column header would silently reset the perspective and filters.
@@ -187,7 +210,7 @@ router.get('/', async (req, res, next) => {
       queryWith,
       firmStages: listFirmStages(),
       savedDefaults: defaults,
-      filtersMatchDefault: sameStages && sameStatuses && samePeople && perspective === defaults.perspective && unitsToShow === defaults.units,
+      filtersMatchDefault: sameStages && sameStatuses && samePeople && sameManagers && perspective === defaults.perspective && unitsToShow === defaults.units,
       loadError,
       stageStatusLabel,
       stageAccentClass,
@@ -279,6 +302,7 @@ router.post('/defaults', (req, res) => {
       stages: filterAgainst(queryList(req.body.stage), TIMELINE_FILTER_OPTIONS),
       statuses: filterAgainst(queryList(req.body.status), STATUSES),
       people: queryList(req.body.person).map((name) => String(name)),
+      managers: queryList(req.body.manager).map((name) => String(name)),
       perspective: normalizePerspective(req.body.perspective, 'months'),
       units: normalizeUnits(req.body.units, 6),
     });
@@ -339,6 +363,7 @@ router.get('/assignments/export', async (req, res, next) => {
     ? filterAgainst(queryList(req.query.status), STATUSES)
     : filterAgainst(defaults.statuses, STATUSES);
   const requestedPeople = applied ? queryList(req.query.person) : defaults.people;
+  const requestedManagers = applied ? queryList(req.query.manager) : defaults.managers;
 
   try {
     const [opportunities, assignments] = await Promise.all([
@@ -349,7 +374,18 @@ router.get('/assignments/export', async (req, res, next) => {
     const personOptions = [
       ...new Set([...listPeople(), ...assignments.map((a) => a.PersonName).filter(Boolean)]),
     ].sort((a, b) => a.localeCompare(b));
-    const personFilters = filterAgainst(requestedPeople, personOptions);
+
+    const managersMap = getManagerMap();
+    const managerOptions = [...new Set(Object.values(managersMap).map((m) => String(m).trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+
+    const selection = resolvePeopleSelection({
+      requestedPeople,
+      requestedManagers,
+      personOptions,
+      managerOptions,
+      managersMap,
+    });
 
     const view = buildManagementView({
       opportunities,
@@ -358,7 +394,8 @@ router.get('/assignments/export', async (req, res, next) => {
       unitsToShow,
       stageFilter: stageFilters,
       statusFilter: statusFilters,
-      personFilter: personFilters,
+      personFilter: selection.people,
+      personFilterActive: selection.active,
       sort: req.query.sort,
       dir: req.query.dir,
     });

@@ -95,22 +95,22 @@
           </div>
           <div class="col-lg-3 col-md-4 col-6">
             <%- include('partials/multiselect', {
-              id: 'filter-timeline-person',
-              name: 'person',
-              label: 'Person',
-              allLabel: 'All people',
-              selected: personFilters,
-              options: personOptions.map(function(name) { return { value: name, label: name }; })
-            }) %>
-          </div>
-          <div class="col-lg-3 col-md-4 col-6">
-            <%- include('partials/multiselect', {
               id: 'filter-timeline-manager',
               name: 'manager',
               label: 'Manager',
               allLabel: 'All managers',
               selected: managerFilters,
               options: managerOptions.map(function(name) { return { value: name, label: name }; })
+            }) %>
+          </div>
+          <div class="col-lg-3 col-md-4 col-6">
+            <%- include('partials/multiselect', {
+              id: 'filter-timeline-person',
+              name: 'person',
+              label: 'Person',
+              allLabel: 'All people',
+              selected: personFilters,
+              options: personOptions.map(function(name) { return { value: name, label: name }; })
             }) %>
           </div>
           <div class="col-lg-12 col-md-8 d-flex gap-2">
@@ -132,6 +132,7 @@
             Current default: <%= savedDefaults.perspective %> &middot; <%= savedDefaults.units %> units &middot;
             <%= savedDefaults.stages.length ? savedDefaults.stages.join(', ') : 'all stages' %> &middot;
             <%= savedDefaults.statuses.length ? savedDefaults.statuses.join(', ') : 'all statuses' %> &middot;
+            <%= savedDefaults.managers.length ? savedDefaults.managers.join(', ') : 'all managers' %> &middot;
             <%= savedDefaults.people.length ? savedDefaults.people.join(', ') : 'all people' %>
           </span>
         </form>
