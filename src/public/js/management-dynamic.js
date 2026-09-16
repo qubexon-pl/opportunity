@@ -57,6 +57,23 @@
     return states;
   }
 
+  /* Capture everything that makes the page feel "where I left it": scroll
+     position, open sections, active tab, the timeline's own horizontal
+     scroll and the focused field. Falls back to collapse states alone if
+     live-update.js is not on the page. */
+  function captureState(container) {
+    if (window.OPP_viewState) return window.OPP_viewState.capture(container);
+    return { legacyCollapses: saveCollapseState(container) };
+  }
+
+  function restoreState(container, state) {
+    if (window.OPP_viewState && !state.legacyCollapses) {
+      window.OPP_viewState.restore(container, state);
+      return;
+    }
+    restoreCollapseState(container, state.legacyCollapses || {});
+  }
+
   function restoreCollapseState(container, states) {
     Object.keys(states).forEach(function (id) {
       var el = container.querySelector('#' + id);
@@ -91,12 +108,9 @@
         return res.text();
       })
       .then(function (html) {
-        /* Remember which tab was active so it survives the swap. */
-        var activeTab = contentEl.querySelector('.nav-link.active');
-        var activeTarget = activeTab ? activeTab.getAttribute('data-bs-target') : null;
-
-        /* Remember collapse states of all cards. */
-        var collapseStates = saveCollapseState(contentEl);
+        /* Remember everything about how the page is currently arranged, so
+           the swap is invisible apart from the numbers changing. */
+        var state = captureState(contentEl);
 
         /* Remember filter input values that live outside the server-rendered
            form (the assignment filter and timeline filter text boxes). */
@@ -121,19 +135,8 @@
         /* Re-initialise every JS module on the new DOM. */
         reinitAll(contentEl);
 
-        /* Restore collapse states. */
-        restoreCollapseState(contentEl, collapseStates);
-
-        /* Restore the active tab. */
-        if (activeTarget) {
-          var trigger = contentEl.querySelector('[data-bs-target="' + activeTarget + '"]');
-          if (trigger) {
-            var tab = bootstrap.Tab.getInstance(trigger) || new bootstrap.Tab(trigger);
-            tab.show();
-          }
-        }
-
-        /* Restore filter text boxes. */
+        /* Restore filter text boxes before the scroll is put back, because
+           filtering rows changes the page height. */
         if (assignmentFilterVal) {
           var newAf = contentEl.querySelector('#collapseAssignments input[oninput*="filterGroupedTable"]');
           if (newAf) { newAf.value = assignmentFilterVal; newAf.dispatchEvent(new Event('input')); }
@@ -142,6 +145,8 @@
           var newTf = contentEl.querySelector('[data-timeline-filter]');
           if (newTf) { newTf.value = timelineFilterVal; newTf.dispatchEvent(new Event('input')); }
         }
+
+        restoreState(contentEl, state);
 
         /* Re-attach all interceptors. */
         interceptForms();
@@ -183,64 +188,13 @@
         var params = new URLSearchParams(new FormData(form));
         var url = action + '?' + params.toString();
 
-        /* When the People tab filter is submitted, refresh only the people
-           table instead of swapping the entire page. */
-        var peopleTab = form.closest('#tabPeople');
-        if (peopleTab) {
-          swapPeopleTable(url);
-          return;
-        }
-
+        /* Every tab reads the same filter state, so all of them are
+           refreshed together. Updating only the tab that was submitted used
+           to leave the others - and the URL, and the export link - showing
+           the previous selection. */
         swapContent(url);
       });
     });
-  }
-
-  /* Fetch the partial and swap only #tabPeople, preserving the other tabs
-     and the timeline / assignments state untouched. */
-  function swapPeopleTable(cleanUrl) {
-    if (swapping) return;
-    swapping = true;
-
-    var separator = cleanUrl.indexOf('?') === -1 ? '?' : '&';
-    var fetchUrl = cleanUrl + separator + 'partial=1';
-
-    fetch(fetchUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then(function (res) {
-        if (!res.ok) throw new Error('Server returned ' + res.status);
-        return res.text();
-      })
-      .then(function (html) {
-        var temp = document.createElement('div');
-        temp.innerHTML = html;
-        var newTab = temp.querySelector('#tabPeople');
-        var oldTab = contentEl.querySelector('#tabPeople');
-        if (!newTab || !oldTab) {
-          /* Fallback: full content swap. */
-          swapping = false;
-          swapContent(cleanUrl);
-          return;
-        }
-
-        var collapseStates = saveCollapseState(oldTab);
-        oldTab.innerHTML = newTab.innerHTML;
-
-        /* Re-init JS modules inside the replaced tab. */
-        if (window.OPP_initMultiselects) window.OPP_initMultiselects(oldTab);
-        if (window.OPP_initViewState) window.OPP_initViewState(oldTab);
-
-        restoreCollapseState(oldTab, collapseStates);
-        interceptForms();
-        interceptLinks();
-
-        if (typeof showToast === 'function') showToast('Filter applied.', 'success');
-      })
-      .catch(function (err) {
-        if (typeof showToast === 'function') {
-          showToast('Failed to update: ' + err.message, 'danger');
-        }
-      })
-      .finally(function () { swapping = false; });
   }
 
   /* ── Sort links & legend chips ───────────────────────────────── */
