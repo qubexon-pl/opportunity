@@ -9,15 +9,16 @@
   var msId = typeof id !== 'undefined' && id ? id : 'ms-' + name;
   var msSelected = selected || [];
   var msAllLabel = typeof allLabel !== 'undefined' && allLabel ? allLabel : 'All';
+  var msSizeClass = typeof size !== 'undefined' && size === 'sm' ? 'form-select-sm' : '';
   var msSummary = msSelected.length === 0
     ? msAllLabel
     : msSelected.length === 1
       ? msSelected[0]
       : msSelected.length + ' selected';
 %>
-<label class="form-label" for="<%= msId %>-toggle"><%= label %></label>
+<label class="<%= typeof labelClass !== 'undefined' ? labelClass : 'form-label' %>" for="<%= msId %>-toggle"><%= label %></label>
 <div class="dropdown multiselect" data-multiselect data-all-label="<%= msAllLabel %>">
-  <button class="form-select text-start multiselect-toggle" type="button" id="<%= msId %>-toggle"
+  <button class="form-select text-start multiselect-toggle <%= msSizeClass %>" type="button" id="<%= msId %>-toggle"
           data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
     <span data-role="summary"><%= msSummary %></span>
   </button>

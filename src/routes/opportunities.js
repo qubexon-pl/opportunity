@@ -15,7 +15,7 @@ const {
 } = require('../services/opportunityService');
 const { addAssignment, updateAssignment, deleteAssignment, ALLOCATION_MODES } = require('../services/assignmentService');
 const { listPeople, getDailyHoursMap } = require('../services/peopleService');
-const { calculateEndDate, calculateDurationWorkDays, toDateText, round2 } = require('../services/dateService');
+const { calculateEndDate, calculateDurationWorkDays, toDateText, round2, parseHolds, isCurrentlyOnHold, isHoldExpired } = require('../services/dateService');
 const { stageStatusLabel, stageAccentClass, stageBadgeClass, buildOpportunityAbsenceImpact } = require('../services/capacityService');
 const {
   BOOKING_MODES,
@@ -55,6 +55,19 @@ function allocationMode(value) {
   return ALLOCATION_MODES.includes(mode) ? mode : undefined;
 }
 
+/** Parses paired holdStartDate[]/holdEndDate[] arrays from the form body. */
+function parseHoldPairs(body) {
+  const starts = Array.isArray(body.holdStartDate) ? body.holdStartDate : body.holdStartDate ? [body.holdStartDate] : [];
+  const ends = Array.isArray(body.holdEndDate) ? body.holdEndDate : body.holdEndDate ? [body.holdEndDate] : [];
+  const pairs = [];
+  for (let i = 0; i < Math.max(starts.length, ends.length); i++) {
+    const start = String(starts[i] || '').slice(0, 10);
+    const end = String(ends[i] || '').slice(0, 10);
+    if (start || end) pairs.push({ startDate: start, endDate: end });
+  }
+  return pairs;
+}
+
 /** Maps the opportunity form body onto the service payload shape. */
 function opportunityPayload(body) {
   const opportunityHours = num(body.opportunityHours);
@@ -67,6 +80,7 @@ function opportunityPayload(body) {
 
   return {
     name: String(body.name ?? '').trim(),
+    oppId: text(body.oppId),
     technologyStack: text(body.technologyStack),
     description: text(body.description),
     techOwner: text(body.techOwner),
@@ -127,6 +141,9 @@ function baseViewModel(extra) {
     firmStages,
     toDateText,
     round2,
+    parseHolds,
+    isCurrentlyOnHold,
+    isHoldExpired,
     ...extra,
   };
 }
@@ -137,6 +154,10 @@ function friendlyError(err) {
 }
 
 // ──── New opportunity ────
+router.get('/', (req, res) => {
+  res.redirect('/');
+});
+
 router.get('/new', (req, res) => {
   res.render(
     'opportunities/form',
@@ -146,6 +167,7 @@ router.get('/new', (req, res) => {
       opportunity: emptyForm(),
       plannedEndPreview: null,
       plannedDurationPreview: null,
+      partial: false,
     })
   );
 });
@@ -153,8 +175,8 @@ router.get('/new', (req, res) => {
 router.post('/', async (req, res, next) => {
   try {
     const payload = opportunityPayload(req.body);
-    if (!payload.opportunityHours || payload.opportunityHours <= 0) {
-      req.flash('error', 'Opportunity hours is required and must be greater than 0.');
+    if (payload.opportunityHours == null || payload.opportunityHours < 0) {
+      req.flash('error', 'Opportunity hours is required.');
       return res.redirect('/opportunities/new');
     }
     const id = await createOpportunity(payload);
@@ -196,6 +218,7 @@ router.get('/:id', async (req, res, next) => {
         plannedEndPreview: calculateEndDate(toDateText(opportunity.PlannedStartDate), opportunity.OpportunityHours, 100),
         plannedDurationPreview: calculateDurationWorkDays(opportunity.OpportunityHours, 100),
         today: toDateText(new Date()),
+        partial: req.query.partial === 'detail',
       })
     );
   } catch (err) {
@@ -204,18 +227,23 @@ router.get('/:id', async (req, res, next) => {
 });
 
 router.post('/:id', async (req, res, next) => {
+  const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
   try {
     const payload = opportunityPayload(req.body);
-    if (!payload.opportunityHours || payload.opportunityHours <= 0) {
-      req.flash('error', 'Opportunity hours is required and must be greater than 0.');
+    if (payload.opportunityHours == null || payload.opportunityHours < 0) {
+      if (isAjax) return res.json({ ok: false, error: 'Opportunity hours is required.' });
+      req.flash('error', 'Opportunity hours is required.');
       return res.redirect(`/opportunities/${req.params.id}`);
     }
     const updated = await updateOpportunity(req.params.id, payload);
+    if (isAjax) return res.json({ ok: !!updated, error: updated ? null : 'Opportunity not found.' });
     req.flash(updated ? 'success' : 'error', updated ? 'Opportunity saved.' : 'Opportunity not found.');
     res.redirect(`/opportunities/${req.params.id}`);
   } catch (err) {
     if (err && (err.issues || err.name === 'ZodError')) {
-      req.flash('error', friendlyError(err));
+      const msg = friendlyError(err);
+      if (isAjax) return res.json({ ok: false, error: msg });
+      req.flash('error', msg);
       return res.redirect(`/opportunities/${req.params.id}`);
     }
     next(err);
@@ -224,18 +252,20 @@ router.post('/:id', async (req, res, next) => {
 
 /** Inline capacity booking control (used by the pipeline and the detail form). */
 router.post('/:id/booking', async (req, res) => {
-  const back = req.get('referer') || '/';
+  const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
   try {
     const mode = String(req.body.bookingMode || 'auto');
     if (!BOOKING_MODES.some((option) => option.key === mode)) {
       throw new Error('Unknown booking mode.');
     }
     await setBookingFlag(req.params.id, bookingModeToFlag(mode));
+    if (isAjax) return res.json({ ok: true });
     req.flash('success', 'Capacity booking updated.');
   } catch (err) {
+    if (isAjax) return res.status(400).json({ error: friendlyError(err) });
     req.flash('error', friendlyError(err));
   }
-  res.redirect(back);
+  res.redirect(req.get('referer') || '/');
 });
 
 router.post('/:id/delete', async (req, res, next) => {
@@ -318,8 +348,7 @@ router.post('/:id/assignments', async (req, res, next) => {
       allocatedHours: positiveNum(req.body.allocatedHours),
       allocationMode: allocationMode(req.body.allocationMode),
       isTimelineVisible: true,
-      holdStartDate: String(req.body.holdStartDate || '').slice(0, 10),
-      holdEndDate: String(req.body.holdEndDate || '').slice(0, 10),
+      holds: parseHoldPairs(req.body),
     });
     req.flash('success', 'Assignment added.');
   } catch (err) {
@@ -338,8 +367,7 @@ router.post('/:id/assignments/:assignmentId', async (req, res, next) => {
       allocatedHours: positiveNum(req.body.allocatedHours),
       allocationMode: allocationMode(req.body.allocationMode),
       isTimelineVisible: bool(req.body.isTimelineVisible),
-      holdStartDate: String(req.body.holdStartDate || '').slice(0, 10),
-      holdEndDate: String(req.body.holdEndDate || '').slice(0, 10),
+      holds: parseHoldPairs(req.body),
     });
     req.flash('success', 'Assignment saved.');
   } catch (err) {

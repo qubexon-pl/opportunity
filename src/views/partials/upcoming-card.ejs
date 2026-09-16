@@ -1,0 +1,36 @@
+<div class="card mb-4" id="upcomingCard">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <a class="card-collapse-toggle<%= typeof collapsed !== 'undefined' && collapsed ? ' collapsed' : (typeof collapsed === 'undefined' ? ' collapsed' : '') %>" data-bs-toggle="collapse" data-bs-target="#collapseUpcoming" aria-expanded="<%= typeof collapsed !== 'undefined' && !collapsed ? 'true' : 'false' %>">
+      <i class="bi bi-chevron-down"></i><span><i class="bi bi-calendar-event me-2"></i>Upcoming actions and decisions</span>
+    </a>
+    <form class="d-flex align-items-center gap-2" data-upcoming-filter>
+      <input type="hidden" name="applied" value="1">
+      <input type="hidden" name="q" value="<%= filters.q %>">
+      <% filters.stage.forEach(function(stage) { %><input type="hidden" name="stage" value="<%= stage %>"><% }) %>
+      <% filters.status.forEach(function(status) { %><input type="hidden" name="status" value="<%= status %>"><% }) %>
+      <input type="hidden" name="sort" value="<%= filters.sort %>">
+      <label class="form-label mb-0 text-nowrap" for="period">Period</label>
+      <select class="form-select form-select-sm" id="period" name="period" style="max-width: 170px;">
+        <% upcomingPeriods.forEach(function(option) { %>
+          <option value="<%= option.key %>" <%= upcomingPeriod === option.key ? 'selected' : '' %>><%= option.label %></option>
+        <% }) %>
+      </select>
+    </form>
+  </div>
+  <div class="card-body collapse<%= typeof collapsed !== 'undefined' && !collapsed ? ' show' : '' %>" id="collapseUpcoming">
+    <div class="upcoming-window small mb-2"><%= upcoming.label %></div>
+    <% if (upcoming.items.length) { %>
+      <div class="upcoming-list">
+        <% upcoming.items.forEach(function(item) { %>
+          <a class="upcoming-item" href="/opportunities/<%= item.id %>">
+            <div class="upcoming-title"><%= item.name %></div>
+            <div class="upcoming-meta"><%= item.stage %> &middot; Due <%= item.dueText %></div>
+            <div class="upcoming-summary"><%= item.summary %></div>
+          </a>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <p class="text-muted small mb-0">No upcoming steps for this period.</p>
+    <% } %>
+  </div>
+</div>

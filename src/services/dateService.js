@@ -271,6 +271,46 @@ function addBusinessDaysText(dateText, days) {
   return toDateText(cursor);
 }
 
+/** Parses a Holds JSON string (or already-parsed array) into [{startDate, endDate}]. */
+function parseHolds(value) {
+  if (!value) return [];
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((h) => h && h.startDate && h.endDate)
+      .map((h) => ({
+        startDate: String(h.startDate).slice(0, 10),
+        endDate: String(h.endDate).slice(0, 10),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** Returns true when today falls inside any of the hold periods. */
+function isCurrentlyOnHold(holds) {
+  if (!holds || !holds.length) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return holds.some((hold) => {
+    const start = toDate(hold.startDate);
+    const end = toDate(hold.endDate);
+    if (!start || !end) return false;
+    return today >= start && today <= end;
+  });
+}
+
+/** Returns true when the hold period has already ended (endDate < today). */
+function isHoldExpired(hold) {
+  if (!hold || !hold.endDate) return false;
+  const end = toDate(hold.endDate);
+  if (!end) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today > end;
+}
+
 module.exports = {
   MONTHLY_CAPACITY,
   WORK_DAYS_PER_MONTH,
@@ -301,4 +341,7 @@ module.exports = {
   formatShortDate,
   unitsToCoverRange,
   periodBounds,
+  parseHolds,
+  isCurrentlyOnHold,
+  isHoldExpired,
 };

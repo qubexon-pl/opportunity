@@ -27,6 +27,10 @@ function getCostMap() {
   return { ...getConfig().people.costs };
 }
 
+function getManagerMap() {
+  return { ...getConfig().people.managers };
+}
+
 /** Raw absence store, used when removing a person so their entries go with them. */
 function getAbsenceMap() {
   return { ...getConfig().people.absences };
@@ -47,6 +51,15 @@ function getPersonRole(personName) {
 function getPersonCost(personName) {
   const cost = Number(getConfig().people.costs[personName]);
   return Number.isFinite(cost) && cost >= 0 ? cost : null;
+}
+
+function getPersonManager(personName) {
+  return String(getConfig().people.managers[personName] || '').trim();
+}
+
+/** Returns a list of unique manager names from the managers map. */
+function listManagers() {
+  return [...new Set(Object.values(getManagerMap()).map((m) => String(m).trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 }
 
 function normalizeDailyHours(dailyHours) {
@@ -73,13 +86,20 @@ function normalizeCost(cost) {
   return round2(value);
 }
 
-function writePerson(name, { dailyHours, role, cost }) {
+/** An empty manager clears it; otherwise it's stored as a trimmed string. */
+function normalizeManager(manager) {
+  const value = String(manager ?? '').trim();
+  return value || '';
+}
+
+function writePerson(name, { dailyHours, role, cost, manager }) {
   const people = listPeople();
   if (!people.includes(name)) people.push(name);
 
   const dailyHoursMap = getDailyHoursMap();
   const roleMap = getRoleMap();
   const costMap = getCostMap();
+  const managerMap = getManagerMap();
 
   if (dailyHours !== undefined) dailyHoursMap[name] = dailyHours;
   if (role !== undefined) {
@@ -90,11 +110,15 @@ function writePerson(name, { dailyHours, role, cost }) {
     if (cost === null) delete costMap[name];
     else costMap[name] = cost;
   }
+  if (manager !== undefined) {
+    if (manager) managerMap[name] = manager;
+    else delete managerMap[name];
+  }
 
-  updatePeopleConfig({ people, personDailyHours: dailyHoursMap, personRoles: roleMap, personCosts: costMap });
+  updatePeopleConfig({ people, personDailyHours: dailyHoursMap, personRoles: roleMap, personCosts: costMap, personManagers: managerMap });
 }
 
-function addPerson(personName, dailyHours, role, cost) {
+function addPerson(personName, dailyHours, role, cost, manager) {
   const name = String(personName || '').trim();
   if (!name) throw new Error('Person name is required.');
 
@@ -102,6 +126,7 @@ function addPerson(personName, dailyHours, role, cost) {
     dailyHours: normalizeDailyHours(dailyHours),
     role: normalizeRole(role),
     cost: normalizeCost(cost),
+    manager: normalizeManager(manager),
   });
 }
 
@@ -113,10 +138,12 @@ function removePerson(personName) {
   const dailyHoursMap = getDailyHoursMap();
   const roleMap = getRoleMap();
   const costMap = getCostMap();
+  const managerMap = getManagerMap();
   const absenceMap = getAbsenceMap();
   delete dailyHoursMap[name];
   delete roleMap[name];
   delete costMap[name];
+  delete managerMap[name];
   delete absenceMap[name];
 
   updatePeopleConfig({
@@ -124,12 +151,13 @@ function removePerson(personName) {
     personDailyHours: dailyHoursMap,
     personRoles: roleMap,
     personCosts: costMap,
+    personManagers: managerMap,
     personAbsences: absenceMap,
   });
 }
 
 /** Saves the editable columns of a configured person in one go. */
-function updatePersonProfile(personName, { dailyHours, role, cost }) {
+function updatePersonProfile(personName, { dailyHours, role, cost, manager }) {
   const name = String(personName || '').trim();
   if (!name) throw new Error('Person name is required.');
 
@@ -137,6 +165,7 @@ function updatePersonProfile(personName, { dailyHours, role, cost }) {
     dailyHours: normalizeDailyHours(dailyHours),
     role: normalizeRole(role),
     cost: normalizeCost(cost),
+    manager: normalizeManager(manager),
   });
 }
 
@@ -150,12 +179,15 @@ module.exports = {
   PERSON_ROLES,
   COST_CURRENCY,
   listPeople,
+  listManagers,
   getDailyHoursMap,
   getRoleMap,
   getCostMap,
+  getManagerMap,
   getPersonDailyHours,
   getPersonRole,
   getPersonCost,
+  getPersonManager,
   addPerson,
   removePerson,
   updatePersonProfile,

@@ -54,6 +54,7 @@ function getConfig() {
       dailyHours: fileConfig.personDailyHours && typeof fileConfig.personDailyHours === 'object' ? fileConfig.personDailyHours : {},
       roles: fileConfig.personRoles && typeof fileConfig.personRoles === 'object' ? fileConfig.personRoles : {},
       costs: fileConfig.personCosts && typeof fileConfig.personCosts === 'object' ? fileConfig.personCosts : {},
+      managers: fileConfig.personManagers && typeof fileConfig.personManagers === 'object' ? fileConfig.personManagers : {},
       absences: fileConfig.personAbsences && typeof fileConfig.personAbsences === 'object' ? fileConfig.personAbsences : {},
     },
     capacity: {
@@ -83,12 +84,13 @@ function validateConfig({ requireProductionSecrets = false } = {}) {
   return cfg;
 }
 
-function updatePeopleConfig({ people, personDailyHours, personRoles, personCosts, personAbsences }) {
+function updatePeopleConfig({ people, personDailyHours, personRoles, personCosts, personManagers, personAbsences }) {
   const fileConfig = loadFileConfig();
   if (Array.isArray(people)) fileConfig.people = people;
   if (personDailyHours && typeof personDailyHours === 'object') fileConfig.personDailyHours = personDailyHours;
   if (personRoles && typeof personRoles === 'object') fileConfig.personRoles = personRoles;
   if (personCosts && typeof personCosts === 'object') fileConfig.personCosts = personCosts;
+  if (personManagers && typeof personManagers === 'object') fileConfig.personManagers = personManagers;
   if (personAbsences && typeof personAbsences === 'object') fileConfig.personAbsences = personAbsences;
   saveFileConfig(fileConfig);
 }

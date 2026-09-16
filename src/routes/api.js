@@ -3,6 +3,7 @@ const { getPool } = require('../db/pool');
 const { listOpportunities } = require('../services/opportunityService');
 const { listAssignments, addAssignment, updateAssignment, deleteAssignment } = require('../services/assignmentService');
 const { listPeople, getPersonDailyHours } = require('../services/peopleService');
+const { addAbsence, updateAbsence, removeAbsence } = require('../services/absenceService');
 
 const router = express.Router();
 
@@ -80,6 +81,46 @@ router.delete('/assignments/:assignmentId', async (req, res) => {
   try {
     const deleted = await deleteAssignment(req.params.assignmentId);
     if (!deleted) return res.status(404).json({ error: 'Assignment not found.' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message || String(err) });
+  }
+});
+
+router.post('/people/:person/absences', (req, res) => {
+  try {
+    const person = decodeURIComponent(req.params.person);
+    const created = addAbsence(person, {
+      startDate: String(req.body.startDate || '').slice(0, 10),
+      endDate: String(req.body.endDate || '').slice(0, 10),
+      kind: req.body.kind,
+      note: req.body.note,
+    });
+    res.status(201).json(created);
+  } catch (err) {
+    res.status(400).json({ error: err.message || String(err) });
+  }
+});
+
+router.patch('/people/:person/absences/:absenceId', (req, res) => {
+  try {
+    const person = decodeURIComponent(req.params.person);
+    const updated = updateAbsence(person, req.params.absenceId, {
+      startDate: String(req.body.startDate || '').slice(0, 10),
+      endDate: String(req.body.endDate || '').slice(0, 10),
+      kind: req.body.kind,
+      note: req.body.note,
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message || String(err) });
+  }
+});
+
+router.delete('/people/:person/absences/:absenceId', (req, res) => {
+  try {
+    const person = decodeURIComponent(req.params.person);
+    removeAbsence(person, req.params.absenceId);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message || String(err) });

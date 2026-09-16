@@ -109,6 +109,28 @@ function removeAbsence(personName, absenceId) {
   updatePeopleConfig({ personAbsences: toStored(map) });
 }
 
+function updateAbsence(personName, absenceId, input) {
+  const person = String(personName || '').trim();
+  const id = String(absenceId || '');
+  if (!person || !id) throw new Error('Person and absence are required.');
+
+  const normalized = normalizeInput(input || {});
+  const map = absenceMap();
+  const existing = map[person] || [];
+  const idx = existing.findIndex((entry) => entry.id === id);
+  if (idx === -1) throw new Error('That absence no longer exists.');
+
+  const duplicate = existing.some(
+    (entry, i) => i !== idx && entry.startDate === normalized.startDate && entry.endDate === normalized.endDate && entry.kind === normalized.kind
+  );
+  if (duplicate) throw new Error('That absence is already recorded.');
+
+  existing[idx] = { id, ...normalized };
+  map[person] = existing;
+  updatePeopleConfig({ personAbsences: toStored(map) });
+  return normalized;
+}
+
 /**
  * Working days lost to absence in [from, toExclusive).
  *
@@ -188,6 +210,7 @@ module.exports = {
   listAbsences,
   listAllAbsences,
   addAbsence,
+  updateAbsence,
   removeAbsence,
   removeAllForPerson,
   absenceBusinessDays,

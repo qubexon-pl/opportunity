@@ -35,8 +35,12 @@
 <% } else { %>
 
 <div class="card mb-4">
-  <div class="card-header"><i class="bi bi-sliders me-2"></i>Period</div>
-  <div class="card-body">
+  <div class="card-header">
+    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePeriod" aria-expanded="false">
+      <i class="bi bi-chevron-down"></i><span><i class="bi bi-sliders me-2"></i>Period</span>
+    </a>
+  </div>
+  <div class="card-body collapse" id="collapsePeriod">
     <form method="get" class="row g-3 align-items-end">
       <div class="col-lg-3 col-md-4 col-6">
         <label class="form-label" for="perspective">Timeline unit</label>
@@ -102,62 +106,16 @@
   </div>
 </div>
 
-<% if (detail.absences.length) { %>
-  <div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <span><i class="bi bi-calendar-x me-2"></i>Absence in this period</span>
-      <a class="btn btn-sm btn-outline-secondary" href="/settings?person=<%= encodeURIComponent(detail.person) %>">
-        Manage in Configuration
-      </a>
-    </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0">
-          <thead>
-            <tr>
-              <th style="width: 180px;">Type</th>
-              <th style="width: 230px;">Dates</th>
-              <th style="width: 150px;">Days in this window</th>
-              <th style="width: 130px;">Capacity removed</th>
-              <th>Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% detail.absences.forEach(function(absence) { %>
-              <tr>
-                <td><span class="badge text-bg-light border"><%= absence.kind %></span></td>
-                <td class="text-muted small"><%= absence.startDate %> &rarr; <%= absence.endDate %></td>
-                <td><%= absence.daysInWindow %>d <span class="text-muted small">of <%= absence.businessDays %>d</span></td>
-                <td class="absence-hint">&minus;<%= Math.round(absence.daysInWindow * detail.member.dailyHours * 100) / 100 %>h</td>
-                <td class="text-muted small"><%= absence.note || '—' %></td>
-              </tr>
-            <% }) %>
-          </tbody>
-          <tfoot>
-            <tr class="fw-semibold">
-              <td colspan="2">Capacity in this window</td>
-              <td><%= detail.member.absentDays %>d</td>
-              <td class="absence-hint">&minus;<%= detail.member.absenceHours %>h</td>
-              <td class="text-muted small">
-                <%= detail.member.grossCapacityHours %>h before absence &rarr; <%= detail.member.capacityHours %>h available<% if (detail.member.absencePercentPoints > 0) { %>,
-                  so utilization reads <%= detail.member.chargeabilityReal %>% instead of
-                  <%= detail.member.chargeabilityWithoutAbsence %>% (+<%= detail.member.absencePercentPoints %> pts)<% } else { %>.
-                  Nothing is committed in this window, so utilization is unchanged<% } %>.
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>
-  </div>
-<% } %>
+<%- include('partials/person-absences') %>
 
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <span><i class="bi bi-calendar3 me-2"></i>Capacity by period</span>
+    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseCapacityPeriod" aria-expanded="false">
+      <i class="bi bi-chevron-down"></i><span><i class="bi bi-calendar3 me-2"></i>Capacity by period</span>
+    </a>
     <span class="text-muted small">Committed + free = capacity, so each row is 100%</span>
   </div>
-  <div class="card-body p-0">
+  <div class="card-body collapse p-0" id="collapseCapacityPeriod">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0 person-period-table">
         <thead>
@@ -226,12 +184,14 @@
 
 <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <span><i class="bi bi-list-check me-2"></i>Allocations in this period (<%= detail.inWindow.length %>)</span>
+    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseAllocations" aria-expanded="false">
+      <i class="bi bi-chevron-down"></i><span><i class="bi bi-list-check me-2"></i>Allocations in this period (<%= detail.inWindow.length %>)</span>
+    </a>
     <% if (detail.hiddenCount) { %>
       <span class="text-muted small"><%= detail.hiddenCount %> hidden from the timeline</span>
     <% } %>
   </div>
-  <div class="card-body p-0">
+  <div class="card-body collapse p-0" id="collapseAllocations">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
         <thead>
@@ -257,11 +217,15 @@
               <td class="text-nowrap">
                 <%= row.StartDate || '-' %> &rarr; <%= row.EndDate || '-' %>
                 <div class="text-muted small"><%= row.businessDays %> working days</div>
-                <% if (row.IsOnHold) { %>
-                  <div class="hold-hint small">
-                    <i class="bi bi-pause-circle me-1"></i>On hold <%= row.HoldStartDate %> &rarr; <%= row.HoldEndDate %>
-                    <% if (row.releasedByHoldHours > 0) { %>(frees <%= row.releasedByHoldHours %>h)<% } %>
-                  </div>
+                <% if (row.hasHolds) { %>
+                  <% (row.holds || []).forEach(function(hold) { %>
+                    <div class="hold-hint small<%= isHoldExpired(hold) ? ' text-decoration-line-through text-muted' : '' %>">
+                      <i class="bi bi-pause-circle me-1"></i>On hold <%= hold.startDate %> &rarr; <%= hold.endDate %>
+                    </div>
+                  <% }) %>
+                  <% if (row.releasedByHoldHours > 0) { %>
+                    <div class="text-muted small">Holds free <%= row.releasedByHoldHours %>h</div>
+                  <% } %>
                 <% } %>
               </td>
               <td class="text-end" title="<%= row.InitialAllocatedHours %>h of the <%= row.OpportunityHours %>h project scope">
@@ -301,6 +265,159 @@
   <% } %>
 </div>
 
+<div class="mt-4"></div>
+
+<div class="card mb-4">
+  <div class="card-header">
+    <a class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapsePersonTimeline" aria-expanded="true">
+      <i class="bi bi-chevron-down"></i><span><i class="bi bi-bar-chart-steps me-2"></i>Timeline</span>
+    </a>
+  </div>
+  <div class="card-body collapse show" id="collapsePersonTimeline">
+    <% if (timeline && timeline.rows.length) { %>
+    <div class="timeline-scroll">
+      <div class="timeline-grid" id="timelineGrid"
+           data-perspective="<%= timeline.perspective %>"
+           data-range-start="<%= timeline.startText %>"
+           data-range-end-exclusive="<%= timeline.endExclusiveText %>"
+           data-window-start="<%= timeline.windowStartText %>"
+           data-window-end-exclusive="<%= timeline.windowEndExclusiveText %>"
+           style="--timeline-units: <%= timeline.units.length %>;">
+        <div class="timeline-head">
+          <div class="timeline-person-head">Person</div>
+          <div class="timeline-head-stack">
+            <div class="timeline-groups" style="--timeline-units: <%= timeline.units.length %>;">
+              <% timeline.unitGroups.forEach(function(group) { %>
+                <div class="timeline-group" style="--group-span: <%= group.span %>;"><span><%= group.label %></span></div>
+              <% }) %>
+            </div>
+            <div class="timeline-units" style="--timeline-units: <%= timeline.units.length %>;">
+              <% timeline.units.forEach(function(unit) { %>
+                <div class="timeline-unit"><%= unit.label %></div>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+        <% timeline.rows.forEach(function(row) { %>
+          <div class="timeline-row" style="height: <%= row.height %>px;">
+            <div class="timeline-person"
+                 title="<%= row.person %> &middot; <%= row.capacityHours %>h capacity in this window
+Committed: <%= row.committedHours %>h
+Free: <%= row.freeHours %>h
+Committed + free = <%= (row.committedHours + row.freeHours).toFixed(2) %>h
+Soft booked on top: <%= row.softHours %>h<%= row.heldHours ? '\nReleased by holds: ' + row.heldHours + 'h' : '' %><%
+%><% if (row.absentDays) { %>
+Away <%= row.absentDays %>d, which removes <%= row.absenceHours %>h of capacity:<% row.absenceBands.forEach(function(band) { %>
+  <%= band.kind %> <%= band.startDate %> &rarr; <%= band.endDate %> (<%= band.daysInWindow %>d in view)<% }) %><% } %>">
+              <span class="person-link"><%= row.person %></span>
+              <span class="timeline-person-load"><%= row.committedHours %>h / <%= row.capacityHours %>h (<%= row.utilizationPercent %>%)</span>
+            </div>
+            <div class="timeline-lane" style="--timeline-units: <%= timeline.units.length %>;">
+              <div class="timeline-gridlines">
+                <% timeline.units.forEach(function(unit) { %><div class="timeline-gridline"></div><% }) %>
+              </div>
+              <% row.chips.forEach(function(chip) { %>
+                <div class="timeline-chip <%= chip.accentClass %> <%= chip.IsCommitted ? 'is-committed' : 'is-soft' %> <%= chip.IsOnHold ? 'is-on-hold' : '' %>"
+                     data-assignment-id="<%= chip.Id %>"
+                     data-opportunity-id="<%= chip.OpportunityId %>"
+                     data-start="<%= chip.StartDate %>"
+                     data-end="<%= chip.EndDate %>"
+                     data-percent="<%= chip.AllocationPercent || 0 %>"
+                     data-hours="<%= chip.AllocatedHours %>"
+                     data-initial-hours="<%= chip.InitialAllocatedHours %>"
+                     data-initial-percent="<%= chip.InitialPercent %>"
+                     data-opportunity-hours="<%= chip.OpportunityHours %>"
+                     data-capacity-hours="<%= row.capacityHours %>"
+                     data-capacity-percent="<%= chip.capacityPercent %>"
+                     data-holds="<%= chip.holds ? JSON.stringify(chip.holds) : '[]' %>"
+                     data-stage-label="<%= stageStatusLabel(chip.Stage) %>"
+                     data-person="<%= chip.PersonName %>"
+                     style="left: <%= chip.geometry.left.toFixed(3) %>%; width: <%= chip.geometry.width.toFixed(3) %>%; top: <%= chip.geometry.top %>px;"
+                     title="<%= chip.OpportunityName %> &middot; <%= chip.PersonName %>
+<%= chip.StartDate %> &rarr; <%= chip.EndDate %> (<%= chip.businessDays %> working days)
+Assigned: <%= chip.InitialAllocatedHours %>h = <%= chip.InitialPercent %>% of the <%= chip.OpportunityHours %>h project
+Now on the bar: <%= chip.AllocatedHours %>h<%= chip.IsResized ? ' (resized)' : '' %>
+In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= row.person %>'s <%= row.capacityHours %>h capacity<%= chip.IsCommitted ? '' : '\nSoft booking: does not consume capacity yet' %>">
+                  <span class="timeline-chip-resizer start" data-edge="start" title="Drag to change the start date"></span>
+                  <% chip.holdOverlays.forEach(function(hold) { %>
+                    <span class="timeline-chip-hold"
+                          style="left: <%= hold.left.toFixed(3) %>%; width: <%= hold.width.toFixed(3) %>%;"
+                          title="On hold <%= hold.startDate %> &rarr; <%= hold.endDate %> (capacity free)"></span>
+                  <% }) %>
+                  <a class="timeline-chip-body" href="/opportunities/<%= chip.OpportunityId %>#assignments">
+                    <span class="timeline-chip-title">
+                      <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %><%
+                      %><span class="timeline-chip-stage <%= chip.accentClass %>"><%= stageStatusLabel(chip.Stage) %></span>
+                    </span>
+                    <span class="timeline-chip-meta" data-role="meta"><%
+                      %><%= chip.InitialAllocatedHours %>h<%
+                      %><% if (chip.IsResized) { %> &rarr; <%= chip.AllocatedHours %>h<% } %><%
+                      %> &middot; <%= chip.capacityPercent %>% cap</span>
+                  </a>
+                  <span class="timeline-chip-resizer end" data-edge="end" title="Drag to change the end date"></span>
+                </div>
+              <% }) %>
+              <% row.freeChips.forEach(function(segment) { %>
+                <%
+                  var breakdown = segment.parts.map(function(part) {
+                    return part.name + ': ' + part.hours + 'h = ' + part.percent + '%';
+                  }).concat(['Free: ' + segment.freeHours + 'h = ' + segment.freePercent + '%']).join('\n');
+                  var fullyAbsent = segment.capacityHours === 0 && segment.absentDays > 0;
+                  var absenceDetail = segment.absentDays
+                    ? '\n' + segment.absences.map(function(a) {
+                        return a.kind + ' ' + a.startDate + ' to ' + a.endDate + ' (' + a.daysInWindow + 'd here)';
+                      }).join('\n')
+                    : '';
+                %>
+                <div class="timeline-free<%= fullyAbsent ? ' is-absent' : '' %><%= segment.isOver ? ' is-over' : '' %>"
+                     style="left: <%= segment.geometry.left.toFixed(3) %>%; width: <%= segment.geometry.width.toFixed(3) %>%; top: <%= segment.geometry.top %>px;"
+                     title="<%= segment.groupLabel %> <%= segment.unitLabel %> &middot; <%= segment.capacityHours %>h capacity<%= segment.absentDays ? ' (' + segment.grossCapacityHours + 'h \u2212 ' + segment.absenceHours + 'h absence)' : '' %><%= fullyAbsent ? '\nAway for the whole period, so there is no capacity to share out.' : '\n' + breakdown + '\nTotal: ' + (segment.usedPercent + segment.freePercent).toFixed(2) + '%' %><%= segment.isOver ? '\nOver capacity by ' + segment.overHours + 'h: more is committed here than there are hours to give.' : '' %><%= segment.softHours ? '\nSoft booked on top: ' + segment.softHours + 'h = ' + segment.softPercent + '%' : '' %><%= absenceDetail %>">
+                  <span class="timeline-free-label">
+                    <% if (fullyAbsent) { %>
+                      <span class="timeline-free-primary">Away <%= segment.absentDays %>d</span>
+                      <span class="timeline-free-secondary">no capacity</span>
+                    <% } else if (segment.isOver) { %>
+                      <span class="timeline-free-primary">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i><%= segment.overHours %>h over
+                      </span>
+                      <span class="timeline-free-secondary"><%= segment.usedPercent %>%<% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %></span>
+                    <% } else { %>
+                      <span class="timeline-free-primary"><%= segment.freeHours %>h free</span>
+                      <span class="timeline-free-secondary"><%= segment.freePercent %>%<% if (segment.softHours) { %> &middot; <%= segment.softHours %>h soft<% } %><% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %></span>
+                    <% } %>
+                  </span>
+                </div>
+              <% }) %>
+              <% row.absenceBands.forEach(function(band) { %>
+                <%
+                  var bandRange = band.startDate + ' \u2192 ' + band.endDate;
+                %>
+                <div class="timeline-absence"
+                     style="left: <%= band.geometry.left.toFixed(3) %>%; width: <%= band.geometry.width.toFixed(3) %>%; top: <%= band.geometry.top %>px;"
+                     title="<%= band.kind %><%= band.note ? ' \u2014 ' + band.note : '' %>
+<%= bandRange %><%= band.startsBefore || band.endsAfter ? ' (continues outside this window)' : '' %>
+<%= band.daysInWindow %> working days here, removing <%= band.hours %>h of capacity">
+                  <span class="timeline-absence-label">
+                    <%= band.daysInWindow %>d off
+                  </span>
+                </div>
+              <% }) %>
+              <% if (!row.chips.length && !row.freeChips.length && !row.absenceBands.length) { %>
+                <div class="timeline-empty">No scheduled work in this window</div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+    <% } else { %>
+      <div class="p-4 text-center text-muted">Nothing to display for this person in the selected window.</div>
+    <% } %>
+  </div>
+</div>
+
 <% } %>
 
+<script src="/js/person-absences.js"></script>
+<script src="/js/timeline.js"></script>
 <%- include('partials/footer') %>

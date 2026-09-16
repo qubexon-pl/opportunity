@@ -38,6 +38,11 @@
       <i class="bi bi-bar-chart-steps me-1"></i>Timeline
     </button>
   </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPeople" type="button" role="tab">
+      <i class="bi bi-person-lines-fill me-1"></i>People
+    </button>
+  </li>
 </ul>
 
 <div class="tab-content">
@@ -47,11 +52,11 @@
 
     <div class="card mb-4">
       <div class="card-header">
-        <a class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapsePerspective" aria-expanded="true">
+        <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePerspective" aria-expanded="false">
           <i class="bi bi-chevron-down"></i><span><i class="bi bi-sliders me-2"></i>Perspective</span>
         </a>
       </div>
-      <div class="card-body collapse show" id="collapsePerspective">
+      <div class="card-body collapse" id="collapsePerspective">
         <form method="get" action="/management" class="row g-3 align-items-end" data-mgmt-form>
           <input type="hidden" name="applied" value="1">
           <div class="col-lg-3 col-md-4 col-6">
@@ -98,6 +103,16 @@
               options: personOptions.map(function(name) { return { value: name, label: name }; })
             }) %>
           </div>
+          <div class="col-lg-3 col-md-4 col-6">
+            <%- include('partials/multiselect', {
+              id: 'filter-timeline-manager',
+              name: 'manager',
+              label: 'Manager',
+              allLabel: 'All managers',
+              selected: managerFilters,
+              options: managerOptions.map(function(name) { return { value: name, label: name }; })
+            }) %>
+          </div>
           <div class="col-lg-12 col-md-8 d-flex gap-2">
             <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
             <a class="btn btn-outline-secondary" href="/management?applied=1" title="Reset" data-mgmt-link><i class="bi bi-x-lg"></i></a>
@@ -109,6 +124,7 @@
           <% stageFilters.forEach(function(stage) { %><input type="hidden" name="stage" value="<%= stage %>"><% }) %>
           <% statusFilters.forEach(function(status) { %><input type="hidden" name="status" value="<%= status %>"><% }) %>
           <% personFilters.forEach(function(name) { %><input type="hidden" name="person" value="<%= name %>"><% }) %>
+          <% managerFilters.forEach(function(name) { %><input type="hidden" name="manager" value="<%= name %>"><% }) %>
           <button class="btn btn-sm btn-outline-primary" type="submit" <%= filtersMatchDefault ? 'disabled' : '' %>>
             <i class="bi bi-pin-angle me-1"></i>Save as my default
           </button>
@@ -257,14 +273,21 @@
   <!-- ═══════════════ Tab 2: Assignments ═══════════════ -->
   <div class="tab-pane fade" id="tabAssignments" role="tabpanel">
 
+    <%- include('partials/period-filter', { pfId: 'Assignments' }) %>
+
     <%- include('partials/quick-assign', { qaSuffix: 'Assignments' }) %>
 
     <div class="card mb-4">
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <a class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseAssignments" aria-expanded="true">
+        <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseAssignments" aria-expanded="false">
           <i class="bi bi-chevron-down"></i><span><i class="bi bi-list-ul me-2"></i>Assignments (<%= view.assignmentRows.length %>)</span>
         </a>
-        <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Filter rows..." oninput="filterGroupedTable(this, 'assignmentTable')">
+        <div class="d-flex align-items-center gap-2">
+          <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Filter rows..." oninput="filterGroupedTable(this, 'assignmentTable')">
+          <a class="btn btn-sm btn-outline-success" id="exportAssignmentsBtn" href="/management/assignments/export" title="Export assignments to Excel">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export
+          </a>
+        </div>
       </div>
       <div class="card-body p-0 collapse show" id="collapseAssignments">
         <div class="table-responsive">
@@ -307,7 +330,7 @@
               %>
               <% assignmentGroups.forEach(function(group) { %>
                 <tr class="assignment-group-header">
-                  <td colspan="8">
+                  <td colspan="9">
                     <i class="bi bi-folder2-open me-2"></i><%= group.name %>
                     <span class="badge text-bg-secondary ms-1"><%= group.rows.length %></span>
                   </td>
@@ -339,11 +362,14 @@
                       </div>
                     <% } %>
                   </td>
+                  <td><span class="pipeline-oppid"><%= assignment.OppId || '-' %></span></td>
                   <td><span class="stage-dot <%= stageAccentClass(assignment.Stage) %>"></span><%= assignment.Stage || '-' %> <span class="text-muted small">(<%= stageStatusLabel(assignment.Stage) %>)</span></td>
                   <td class="text-nowrap">
                     <%= assignment.StartDate || '-' %> &rarr; <%= assignment.EndDate || '-' %>
-                    <% if (assignment.IsOnHold) { %>
-                      <div class="hold-hint small"><i class="bi bi-pause-circle me-1"></i>On hold <%= assignment.HoldStartDate %> &rarr; <%= assignment.HoldEndDate %></div>
+                    <% if (assignment.hasHolds) { %>
+                      <% assignment.holds.forEach(function(hold) { %>
+                        <div class="hold-hint small<%= isHoldExpired(hold) ? ' text-decoration-line-through text-muted' : '' %>"><i class="bi bi-pause-circle me-1"></i>On hold <%= hold.startDate %> &rarr; <%= hold.endDate %></div>
+                      <% }) %>
                     <% } %>
                   </td>
                   <td class="text-end" title="<%= assignment.InitialAllocatedHours %>h of the <%= assignment.OpportunityHours %>h project scope"><%= assignment.InitialPercent || 0 %>%</td>
@@ -376,6 +402,8 @@
 
   <!-- ═══════════════ Tab 3: Timeline ═══════════════ -->
   <div class="tab-pane fade" id="tabTimeline" role="tabpanel">
+
+    <%- include('partials/period-filter', { pfId: 'Timeline' }) %>
 
     <%- include('partials/quick-assign', { qaSuffix: 'Timeline' }) %>
 
@@ -420,7 +448,7 @@
           <i class="bi bi-arrows-fullscreen me-1"></i><span data-timeline-fullpage-label>Full page</span>
         </button>
       </div>
-      <div class="card-body collapse show" id="collapseTimeline">
+      <div class="card-body collapse" id="collapseTimeline">
         <div class="timeline-scroll">
           <div class="timeline-grid" id="timelineGrid"
                data-perspective="<%= view.timeline.perspective %>"
@@ -457,7 +485,7 @@ Soft booked on top: <%= row.softHours %>h<%= row.heldHours ? '\nReleased by hold
 Away <%= row.absentDays %>d, which removes <%= row.absenceHours %>h of capacity:<% row.absenceBands.forEach(function(band) { %>
   <%= band.kind %> <%= band.startDate %> &rarr; <%= band.endDate %> (<%= band.daysInWindow %>d in view)<% }) %><% } %>">
                   <a class="person-link" href="/management/people/<%= encodeURIComponent(row.person) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>"><%= row.person %></a>
-                  <span class="timeline-person-load"><%= row.committedHours %>h / <%= row.capacityHours %>h</span>
+                  <span class="timeline-person-load"><%= row.committedHours %>h / <%= row.capacityHours %>h (<%= row.utilizationPercent %>%)</span>
                 </div>
                 <div class="timeline-lane" style="--timeline-units: <%= view.timeline.units.length %>;">
                   <div class="timeline-gridlines">
@@ -476,8 +504,7 @@ Away <%= row.absentDays %>d, which removes <%= row.absenceHours %>h of capacity:
                          data-opportunity-hours="<%= chip.OpportunityHours %>"
                          data-capacity-hours="<%= row.capacityHours %>"
                          data-capacity-percent="<%= chip.capacityPercent %>"
-                         data-hold-start="<%= chip.HoldStartDate || '' %>"
-                         data-hold-end="<%= chip.HoldEndDate || '' %>"
+                         data-holds="<%= chip.holds ? JSON.stringify(chip.holds) : '[]' %>"
                          data-stage-label="<%= stageStatusLabel(chip.Stage) %>"
                          data-person="<%= chip.PersonName %>"
                          style="left: <%= chip.geometry.left.toFixed(3) %>%; width: <%= chip.geometry.width.toFixed(3) %>%; top: <%= chip.geometry.top %>px;"
@@ -487,11 +514,11 @@ Assigned: <%= chip.InitialAllocatedHours %>h = <%= chip.InitialPercent %>% of th
 Now on the bar: <%= chip.AllocatedHours %>h<%= chip.IsResized ? ' (resized)' : '' %>
 In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= row.person %>'s <%= row.capacityHours %>h capacity<%= chip.IsCommitted ? '' : '\nSoft booking: does not consume capacity yet' %>">
                       <span class="timeline-chip-resizer start" data-edge="start" title="Drag to change the start date"></span>
-                      <% if (chip.hold) { %>
+                      <% chip.holdOverlays.forEach(function(hold) { %>
                         <span class="timeline-chip-hold"
-                              style="left: <%= chip.hold.left.toFixed(3) %>%; width: <%= chip.hold.width.toFixed(3) %>%;"
-                              title="On hold <%= chip.HoldStartDate %> &rarr; <%= chip.HoldEndDate %> (capacity free)"></span>
-                      <% } %>
+                              style="left: <%= hold.left.toFixed(3) %>%; width: <%= hold.width.toFixed(3) %>%;"
+                              title="On hold <%= hold.startDate %> &rarr; <%= hold.endDate %> (capacity free)"></span>
+                      <% }) %>
                       <a class="timeline-chip-body" href="/opportunities/<%= chip.OpportunityId %>#assignments">
                         <span class="timeline-chip-title">
                           <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %><%
@@ -546,7 +573,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
 <%= bandRange %><%= band.startsBefore || band.endsAfter ? ' (continues outside this window)' : '' %>
 <%= band.daysInWindow %> working days here, removing <%= band.hours %>h of capacity">
                       <span class="timeline-absence-label">
-                        <i class="bi bi-person-dash me-1"></i><%= band.kind %> &middot; <%= band.daysInWindow %>d &middot; <%= band.hours %>h off
+                        <%= band.daysInWindow %>d off
                       </span>
                     </div>
                   <% }) %>
@@ -566,5 +593,74 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
     </div>
 
   </div><!-- /#tabTimeline -->
+
+  <!-- ═══════════════ Tab 4: People ═══════════════ -->
+  <div class="tab-pane fade" id="tabPeople" role="tabpanel">
+
+    <%- include('partials/period-filter', { pfId: 'People' }) %>
+
+    <div class="card mb-4">
+      <div class="card-header">
+        <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePeopleList" aria-expanded="false">
+          <i class="bi bi-chevron-down"></i><span><i class="bi bi-people me-2"></i>People (<%= personFilters.length > 0 ? personFilters.length : people.length %>)</span>
+        </a>
+      </div>
+      <div class="card-body collapse p-0" id="collapsePeopleList">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0" id="peopleListTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th style="width: 200px;">Role</th>
+                <th style="width: 180px;">Manager</th>
+                <th class="text-end" style="width: 100px;">Daily hours</th>
+                <th class="text-end" style="width: 120px;">Cost (<%= costCurrency %>/day)</th>
+                <th class="text-end" style="width: 120px;">Absences</th>
+                <th style="width: 80px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <%
+                var filteredPeople = personFilters.length > 0
+                  ? people.filter(function(name) { return personFilters.indexOf(name) !== -1; })
+                  : people;
+              %>
+              <% filteredPeople.forEach(function(personName) {
+                var dailyHours = peopleDailyHours[personName] || hoursPerDay;
+                var role = peopleRoles[personName] || '—';
+                var cost = peopleCosts[personName];
+                var absences = allAbsences[personName] || [];
+              %>
+                <tr>
+                  <td>
+                    <a href="/management/people/<%= encodeURIComponent(personName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>" class="text-decoration-none fw-semibold">
+                      <i class="bi bi-person me-1"></i><%= personName %>
+                    </a>
+                  </td>
+                  <td class="text-muted small"><%= role %></td>
+                  <td class="text-muted small"><%= peopleManagers[personName] || '—' %></td>
+                  <td class="text-end"><%= dailyHours %>h</td>
+                  <td class="text-end"><%= cost !== undefined && cost !== null ? cost : '—' %></td>
+                  <td class="text-end">
+                    <% if (absences.length) { %>
+                      <span class="badge text-bg-warning"><%= absences.length %></span>
+                    <% } else { %>
+                      <span class="text-muted">—</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <a href="/management/people/<%= encodeURIComponent(personName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>" class="btn btn-sm btn-outline-primary">
+                      Details
+                    </a>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#tabPeople -->
 
 </div><!-- /.tab-content -->

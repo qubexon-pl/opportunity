@@ -1,0 +1,59 @@
+<%/* Compact period filter: a single-row form with timeline unit, horizon,
+    stage/status/person multiselects. Included at the top of every management
+    tab so the user can change the period without switching to Team capacity. */ %>
+<form method="get" action="/management" class="row g-2 align-items-end mgmt-period-filter" data-mgmt-form>
+  <input type="hidden" name="applied" value="1">
+  <div class="col-auto">
+    <label class="form-label small mb-0" for="pf-perspective-<%= pfId %>">Period</label>
+    <select class="form-select form-select-sm" id="pf-perspective-<%= pfId %>" name="perspective">
+      <% timelineUnitOptions.forEach(function(option) { %>
+        <option value="<%= option.key %>" <%= perspective === option.key ? 'selected' : '' %>><%= option.label %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-auto">
+    <label class="form-label small mb-0" for="pf-units-<%= pfId %>">Horizon</label>
+    <input type="number" class="form-control form-control-sm" id="pf-units-<%= pfId %>" name="units" min="1" max="24" value="<%= unitsToShow %>" style="width: 70px;">
+  </div>
+  <div class="col-auto">
+    <%- include('multiselect', {
+      id: 'pf-stage-' + pfId,
+      name: 'stage',
+      label: 'Stage',
+      labelClass: 'form-label small mb-0',
+      size: 'sm',
+      allLabel: 'All stages',
+      selected: stageFilters,
+      options: [{ value: 'free', label: 'Free capacity' }].concat(stageLegend.map(function(item) {
+        return { value: item.label, label: item.label };
+      }))
+    }) %>
+  </div>
+  <div class="col-auto">
+    <%- include('multiselect', {
+      id: 'pf-status-' + pfId,
+      name: 'status',
+      label: 'Status',
+      labelClass: 'form-label small mb-0',
+      size: 'sm',
+      allLabel: 'All statuses',
+      selected: statusFilters,
+      options: statusOptions.map(function(status) { return { value: status, label: status }; })
+    }) %>
+  </div>
+  <div class="col-auto">
+    <%- include('multiselect', {
+      id: 'pf-person-' + pfId,
+      name: 'person',
+      label: 'Person',
+      labelClass: 'form-label small mb-0',
+      size: 'sm',
+      allLabel: 'All people',
+      selected: personFilters,
+      options: personOptions.map(function(name) { return { value: name, label: name }; })
+    }) %>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
+  </div>
+</form>

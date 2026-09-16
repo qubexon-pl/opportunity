@@ -1,11 +1,11 @@
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <a class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseQuickAssign<%= qaSuffix %>" aria-expanded="true">
+    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseQuickAssign<%= qaSuffix %>" aria-expanded="false">
       <i class="bi bi-chevron-down"></i><span><i class="bi bi-plus-circle me-2"></i>Quick assign</span>
     </a>
     <span class="text-muted small">Same allocation rules as the opportunity page</span>
   </div>
-  <div class="card-body collapse show" id="collapseQuickAssign<%= qaSuffix %>">
+  <div class="card-body collapse" id="collapseQuickAssign<%= qaSuffix %>">
     <form method="post" action="/management/assignments" class="allocation-form row g-2 align-items-end">
       <div class="col-lg-3 col-md-6">
         <label class="form-label">Opportunity</label>

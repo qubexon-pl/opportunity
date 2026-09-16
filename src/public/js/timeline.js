@@ -60,12 +60,18 @@
     if (totalDays <= 0) return 0;
 
     var overlapDays = businessDays(overlapStart, overlapEnd);
-    var holdStart = parseDate(chip.dataset.holdStart);
-    var holdEnd = parseDate(chip.dataset.holdEnd);
-    if (holdStart !== null && holdEnd !== null) {
-      var heldStart = Math.max(holdStart, overlapStart);
-      var heldEnd = Math.min(holdEnd, overlapEnd);
-      if (heldEnd >= heldStart) overlapDays -= businessDays(heldStart, heldEnd);
+
+    /* Parse holds from the data-holds JSON attribute (supports multiple holds). */
+    var holds = [];
+    try { holds = JSON.parse(chip.dataset.holds || '[]'); } catch (e) { holds = []; }
+    for (var i = 0; i < holds.length; i++) {
+      var holdStart = parseDate(holds[i].startDate);
+      var holdEnd = parseDate(holds[i].endDate);
+      if (holdStart !== null && holdEnd !== null) {
+        var heldStart = Math.max(holdStart, overlapStart);
+        var heldEnd = Math.min(holdEnd, overlapEnd);
+        if (heldEnd >= heldStart) overlapDays -= businessDays(heldStart, heldEnd);
+      }
     }
     if (overlapDays <= 0) return 0;
 
@@ -116,6 +122,47 @@
     paintLabel(chip, startMs, endMs);
   }
 
+  /* ── Floating drag tooltip ───────────────────────────────────── */
+
+  var tooltip = null;
+
+  function ensureTooltip() {
+    if (tooltip) return tooltip;
+    tooltip = document.createElement('div');
+    tooltip.className = 'timeline-drag-tooltip';
+    tooltip.style.cssText =
+      'position:fixed;z-index:1080;pointer-events:none;display:none;' +
+      'background:var(--bs-body-bg,#fff);color:var(--bs-body-color,#212529);' +
+      'border:1px solid var(--bs-border-color,#dee2e6);border-radius:.375rem;' +
+      'padding:.5rem .75rem;font-size:.8125rem;box-shadow:0 .25rem .5rem rgba(0,0,0,.15);' +
+      'white-space:nowrap;line-height:1.4;';
+    document.body.appendChild(tooltip);
+    return tooltip;
+  }
+
+  function showTooltip(chip, startMs, endMs, clientX, clientY) {
+    var tip = ensureTooltip();
+    var hours = hoursFor(chip, startMs, endMs);
+    var days = businessDays(startMs, endMs);
+    tip.innerHTML =
+      '<strong>' + toDateText(startMs) + ' &rarr; ' + toDateText(endMs) + '</strong><br>' +
+      '<span class="text-muted">' + days + ' working days &middot; ' + hours + 'h</span>';
+    tip.style.display = 'block';
+    /* Position above the cursor, clamped to viewport. */
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    var x = clientX - w / 2;
+    var y = clientY - h - 12;
+    if (x < 8) x = 8;
+    if (x + w > window.innerWidth - 8) x = window.innerWidth - w - 8;
+    if (y < 8) y = clientY + 16;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  }
+
+  function hideTooltip() {
+    if (tooltip) tooltip.style.display = 'none';
+  }
+
   function beginDrag(event) {
     if (event.button !== 0) return;
 
@@ -151,6 +198,7 @@
     };
     chip.classList.add('is-resizing');
     document.body.classList.add('timeline-resizing');
+    showTooltip(chip, startMs, endMs, event.clientX, event.clientY);
   }
 
   function moveDrag(event) {
@@ -170,6 +218,7 @@
       drag.endMs = Math.max(nextEnd, drag.startMs);
     }
     paint(drag.chip, drag.startMs, drag.endMs);
+    showTooltip(drag.chip, drag.startMs, drag.endMs, event.clientX, event.clientY);
   }
 
   function endDrag() {
@@ -178,13 +227,17 @@
     drag = null;
     current.chip.classList.remove('is-resizing');
     document.body.classList.remove('timeline-resizing');
-    suppressClickUntil = Date.now() + 350;
+    hideTooltip();
 
     var changed = current.startMs !== current.originalStartMs || current.endMs !== current.originalEndMs;
     if (!changed) {
       restoreLabel(current.chip);
       return;
     }
+
+    /* Only suppress the click after an actual drag so a simple click on the
+       chip body still follows the opportunity link. */
+    suppressClickUntil = Date.now() + 350;
 
     var payload = {
       plannedStartDate: toDateText(current.startMs),

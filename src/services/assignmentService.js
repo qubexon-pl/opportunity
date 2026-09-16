@@ -2,10 +2,10 @@ const crypto = require('crypto');
 const { z } = require('zod');
 const { sql, getPool, isMissingAssignmentsTable, isMissingColumn } = require('../db/pool');
 const { toGuid } = require('./opportunityService');
-const { round2, toDateText, calculateAllocatedHours, countBusinessDaysInclusive } = require('./dateService');
+const { round2, toDateText, calculateAllocatedHours, countBusinessDaysInclusive, parseHolds } = require('./dateService');
 
 const MIGRATION_HINT = 'Missing database migration: run src/sql/004_create_opportunity_assignments.sql';
-const HOLD_MIGRATION_HINT = 'Missing database migration: run src/sql/006_add_assignment_hold_window.sql';
+const HOLD_MIGRATION_HINT = 'Missing database migration: run src/sql/010_add_holds_column.sql';
 const MODE_MIGRATION_HINT = 'Missing database migration: run src/sql/007_add_assignment_allocation_mode.sql';
 const INITIAL_HOURS_MIGRATION_HINT = 'Missing database migration: run src/sql/008_add_initial_allocated_hours.sql';
 
@@ -18,8 +18,10 @@ function normalizeAllocationMode(value) {
   return ALLOCATION_MODES.includes(mode) ? mode : null;
 }
 
-/** Optional date: an empty string clears the value, undefined leaves it untouched. */
-const OptionalDate = z.union([z.string().length(10), z.literal(''), z.null()]).optional();
+const HoldSchema = z.object({
+  startDate: z.string().min(10).max(10),
+  endDate: z.string().min(10).max(10),
+});
 
 const AssignmentBaseSchema = z.object({
   personName: z.string().min(1).max(200),
@@ -29,8 +31,7 @@ const AssignmentBaseSchema = z.object({
   allocatedHours: z.number().gt(0).max(100000).optional(),
   allocationMode: z.enum(['percent', 'total-hours', 'monthly-hours']).optional(),
   isTimelineVisible: z.boolean().optional(),
-  holdStartDate: OptionalDate,
-  holdEndDate: OptionalDate,
+  holds: z.array(HoldSchema).optional(),
 });
 
 const AssignmentCreateSchema = AssignmentBaseSchema;
@@ -83,24 +84,33 @@ function rescaleHoursToWindow(currentHours, fromStart, fromEnd, toStart, toEnd) 
 }
 
 /**
- * Normalises an optional hold window. Both ends are required together; passing
- * empty strings clears an existing hold.
+ * Normalises an array of hold periods. Each pair needs both a start and an end
+ * date, with end >= start. An empty or missing array means no holds.
  */
-function normalizeHold(startValue, endValue) {
-  const start = startValue ? String(startValue).slice(0, 10) : null;
-  const end = endValue ? String(endValue).slice(0, 10) : null;
+function normalizeHolds(holdsValue) {
+  if (!holdsValue) return [];
+  const arr = Array.isArray(holdsValue) ? holdsValue : [holdsValue];
+  return arr
+    .filter((h) => h && (h.startDate || h.endDate))
+    .map((h) => {
+      const start = h.startDate ? String(h.startDate).slice(0, 10) : null;
+      const end = h.endDate ? String(h.endDate).slice(0, 10) : null;
+      if (!start || !end) throw new Error('Each hold needs both a start and an end date.');
+      if (new Date(end) < new Date(start)) throw new Error('Hold end date must be on or after the hold start date.');
+      return { startDate: start, endDate: end };
+    });
+}
 
-  if (!start && !end) return { holdStartDate: null, holdEndDate: null };
-  if (!start || !end) throw new Error('A hold needs both a start and an end date.');
-  if (new Date(end) < new Date(start)) throw new Error('Hold end date must be on or after the hold start date.');
-
-  return { holdStartDate: start, holdEndDate: end };
+/** Serializes holds to JSON for storage in the Holds column. */
+function holdsToJson(holds) {
+  if (!holds || !holds.length) return null;
+  return JSON.stringify(holds);
 }
 
 /** Surfaces a clear migration hint when the hold columns are not deployed yet. */
 function rethrowAssignmentError(err) {
   if (isMissingAssignmentsTable(err)) throw new Error(MIGRATION_HINT);
-  if (isMissingColumn(err, 'HoldStartDate') || isMissingColumn(err, 'HoldEndDate')) throw new Error(HOLD_MIGRATION_HINT);
+  if (isMissingColumn(err, 'Holds')) throw new Error(HOLD_MIGRATION_HINT);
   if (isMissingColumn(err, 'AllocationMode')) throw new Error(MODE_MIGRATION_HINT);
   if (isMissingColumn(err, 'InitialAllocatedHours')) throw new Error(INITIAL_HOURS_MIGRATION_HINT);
   throw err;
@@ -144,7 +154,8 @@ async function addAssignment(rawOpportunityId, payload) {
 
   const opportunityHours = Number(opp.recordset[0].OpportunityHours || 0);
   const load = deriveAssignmentLoad(opportunityHours, body.allocatedHours, body.allocationPercent);
-  const hold = normalizeHold(body.holdStartDate, body.holdEndDate);
+  const holds = normalizeHolds(body.holds);
+  const holdsJson = holdsToJson(holds);
   const allocationMode = normalizeAllocationMode(body.allocationMode);
   const newId = crypto.randomUUID();
 
@@ -161,19 +172,18 @@ async function addAssignment(rawOpportunityId, payload) {
       .input('InitialAllocatedHours', sql.Float, load.allocatedHours)
       .input('AllocationMode', sql.NVarChar(20), allocationMode)
       .input('IsTimelineVisible', sql.Bit, body.isTimelineVisible ?? true)
-      .input('HoldStartDate', sql.Date, hold.holdStartDate)
-      .input('HoldEndDate', sql.Date, hold.holdEndDate)
+      .input('Holds', sql.NVarChar(sql.MAX), holdsJson)
       .query(
         `INSERT INTO dbo.OpportunityAssignments
-           (Id, OpportunityId, PersonName, PlannedStartDate, PlannedEndDate, AllocationPercent, AllocatedHours, InitialAllocatedHours, AllocationMode, IsTimelineVisible, HoldStartDate, HoldEndDate)
+           (Id, OpportunityId, PersonName, PlannedStartDate, PlannedEndDate, AllocationPercent, AllocatedHours, InitialAllocatedHours, AllocationMode, IsTimelineVisible, Holds)
          VALUES
-           (@Id, @OpportunityId, @PersonName, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @AllocatedHours, @InitialAllocatedHours, @AllocationMode, @IsTimelineVisible, @HoldStartDate, @HoldEndDate);`
+           (@Id, @OpportunityId, @PersonName, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @AllocatedHours, @InitialAllocatedHours, @AllocationMode, @IsTimelineVisible, @Holds);`
       );
   } catch (err) {
     rethrowAssignmentError(err);
   }
 
-  return { id: newId, allocationMode, initialAllocatedHours: load.allocatedHours, ...load, ...hold };
+  return { id: newId, allocationMode, initialAllocatedHours: load.allocatedHours, holds, ...load };
 }
 
 async function updateAssignment(rawAssignmentId, payload) {
@@ -217,11 +227,11 @@ async function updateAssignment(rawAssignmentId, payload) {
     ? normalizeAllocationMode(row.AllocationMode)
     : normalizeAllocationMode(body.allocationMode);
 
-  // An omitted hold field keeps the stored window; an empty string clears it.
-  const hold = normalizeHold(
-    body.holdStartDate === undefined ? toDateText(row.HoldStartDate) : body.holdStartDate,
-    body.holdEndDate === undefined ? toDateText(row.HoldEndDate) : body.holdEndDate
-  );
+  // An omitted holds field keeps the stored holds; an empty array clears them.
+  const holds = body.holds === undefined
+    ? parseHolds(row.Holds)
+    : normalizeHolds(body.holds);
+  const holdsJson = holdsToJson(holds);
 
   if (new Date(next.plannedEndDate) < new Date(next.plannedStartDate)) {
     throw new Error('End date must be equal to or after start date.');
@@ -280,8 +290,7 @@ async function updateAssignment(rawAssignmentId, payload) {
     .input('InitialAllocatedHours', sql.Float, initialAllocatedHours)
     .input('AllocationMode', sql.NVarChar(20), allocationMode)
     .input('IsTimelineVisible', sql.Bit, next.isTimelineVisible)
-    .input('HoldStartDate', sql.Date, hold.holdStartDate)
-    .input('HoldEndDate', sql.Date, hold.holdEndDate)
+    .input('Holds', sql.NVarChar(sql.MAX), holdsJson)
     .query(
       `UPDATE dbo.OpportunityAssignments
        SET PersonName=@PersonName,
@@ -292,8 +301,7 @@ async function updateAssignment(rawAssignmentId, payload) {
            InitialAllocatedHours=@InitialAllocatedHours,
            AllocationMode=@AllocationMode,
            IsTimelineVisible=@IsTimelineVisible,
-           HoldStartDate=@HoldStartDate,
-           HoldEndDate=@HoldEndDate,
+           Holds=@Holds,
            UpdatedAt=SYSUTCDATETIME()
        WHERE Id=@Id;
        SELECT @@ROWCOUNT as affected;`
@@ -301,7 +309,7 @@ async function updateAssignment(rawAssignmentId, payload) {
     .catch(rethrowAssignmentError);
 
   if (result.recordset[0].affected === 0) throw new Error('Assignment not found.');
-  return { allocationMode, initialAllocatedHours, ...load, ...hold };
+  return { allocationMode, initialAllocatedHours, holds, ...load };
 }
 
 async function deleteAssignment(rawAssignmentId) {
@@ -328,7 +336,8 @@ module.exports = {
   deriveAssignmentLoad,
   rescaleHoursToWindow,
   normalizeAllocationMode,
-  normalizeHold,
+  normalizeHolds,
+  holdsToJson,
   listAssignments,
   addAssignment,
   updateAssignment,

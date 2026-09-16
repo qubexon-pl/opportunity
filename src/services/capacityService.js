@@ -14,8 +14,10 @@ const {
   unitsToCoverRange,
   periodBounds,
   addBusinessDaysText,
+  parseHolds,
+  isCurrentlyOnHold,
 } = require('./dateService');
-const { listPeople, getPersonDailyHours, getPersonRole, getPersonCost, COST_CURRENCY } = require('./peopleService');
+const { listPeople, getPersonDailyHours, getPersonRole, getPersonCost, getPersonManager, COST_CURRENCY } = require('./peopleService');
 const { absenceBusinessDays, absencesInWindow } = require('./absenceService');
 const { countsTowardsCapacity, listFirmStages } = require('./bookingService');
 
@@ -82,6 +84,7 @@ function capacityClass(hours) {
 const ASSIGNMENT_SORT_FIELDS = [
   { key: 'person', label: 'Person', type: 'text', value: (row) => row.PersonName },
   { key: 'opportunity', label: 'Opportunity', type: 'text', value: (row) => row.OpportunityName },
+  { key: 'oppid', label: 'Project Label', type: 'text', value: (row) => row.OppId || '' },
   { key: 'stage', label: 'Stage', type: 'text', value: (row) => stageStatusLabel(row.Stage) },
   { key: 'start', label: 'Window', type: 'text', value: (row) => row.StartDate || '' },
   { key: 'allocation', label: 'Project Allocation', type: 'number', value: (row) => Number(row.InitialPercent || 0) },
@@ -167,6 +170,7 @@ function buildAssignmentRows(opportunities, assignments) {
 
       return {
         ...assignment,
+        OppId: opportunity.OppId || '',
         OpportunityName: opportunity.Name,
         Stage: opportunity.Stage,
         Status: opportunity.Status,
@@ -177,9 +181,9 @@ function buildAssignmentRows(opportunities, assignments) {
         IsResized: Math.abs(round2(currentHours) - initialHours) >= 0.01,
         StartDate: toDateText(assignment.PlannedStartDate),
         EndDate: toDateText(assignment.PlannedEndDate),
-        HoldStartDate: toDateText(assignment.HoldStartDate),
-        HoldEndDate: toDateText(assignment.HoldEndDate),
-        IsOnHold: !!(assignment.HoldStartDate && assignment.HoldEndDate),
+        holds: parseHolds(assignment.Holds),
+        hasHolds: parseHolds(assignment.Holds).length > 0,
+        IsOnHold: isCurrentlyOnHold(parseHolds(assignment.Holds)),
         IsTimelineVisible: !!assignment.IsTimelineVisible,
         IsCommitted: countsTowardsCapacity(opportunity, firmStages),
       };
@@ -224,20 +228,27 @@ function opportunityScope(rows, opportunityId, opportunityHours) {
   };
 }
 
-/** Business days of an assignment's hold window that fall inside [from, toExclusive). */
+/** Business days of an assignment's hold windows that fall inside [from, toExclusive). */
 function heldBusinessDays(assignment, from, toExclusive) {
-  const holdStart = toDate(assignment.HoldStartDate);
-  const holdEnd = toDate(assignment.HoldEndDate);
-  if (!holdStart || !holdEnd) return 0;
+  const holds = assignment.holds || parseHolds(assignment.Holds);
+  if (!holds.length) return 0;
 
-  const holdEndExclusive = new Date(holdEnd);
-  holdEndExclusive.setDate(holdEndExclusive.getDate() + 1);
+  let total = 0;
+  for (const hold of holds) {
+    const holdStart = toDate(hold.startDate);
+    const holdEnd = toDate(hold.endDate);
+    if (!holdStart || !holdEnd) continue;
 
-  const overlapStart = new Date(Math.max(holdStart.getTime(), from.getTime()));
-  const overlapEndExclusive = new Date(Math.min(holdEndExclusive.getTime(), toExclusive.getTime()));
-  if (overlapEndExclusive <= overlapStart) return 0;
+    const holdEndExclusive = new Date(holdEnd);
+    holdEndExclusive.setDate(holdEndExclusive.getDate() + 1);
 
-  return countBusinessDays(overlapStart, overlapEndExclusive);
+    const overlapStart = new Date(Math.max(holdStart.getTime(), from.getTime()));
+    const overlapEndExclusive = new Date(Math.min(holdEndExclusive.getTime(), toExclusive.getTime()));
+    if (overlapEndExclusive <= overlapStart) continue;
+
+    total += countBusinessDays(overlapStart, overlapEndExclusive);
+  }
+  return total;
 }
 
 /**
@@ -483,9 +494,21 @@ function freeSegments(assignmentsForPerson, personName, window, perspective) {
 function absenceBands(personName, range, laneIndex, dailyHours) {
   const rangeEndInclusive = new Date(range.endExclusive.getTime() - DAY_MS);
   return absencesInWindow(personName, range.start, range.endExclusive).map((absence) => {
-    // Clip the label dates to the visible range so a long absence that starts
-    // before the window still reads correctly.
-    const geometry = chipGeometry(range, absence.startDate, absence.endDate, laneIndex);
+    // Extend the bar to cover the full month(s) the absence falls in so the
+    // user sees at a glance which month is affected.  The tooltip keeps the
+    // exact dates.
+    const absStart = toDate(absence.startDate);
+    const absEnd = toDate(absence.endDate);
+    let monthStartText = absence.startDate;
+    let monthEndText = absence.endDate;
+    if (absStart) {
+      monthStartText = toDateText(new Date(Date.UTC(absStart.getUTCFullYear(), absStart.getUTCMonth(), 1)));
+    }
+    if (absEnd) {
+      // Last day of the month: first day of next month minus 1 day.
+      monthEndText = toDateText(new Date(Date.UTC(absEnd.getUTCFullYear(), absEnd.getUTCMonth() + 1, 0)));
+    }
+    const geometry = chipGeometry(range, monthStartText, monthEndText, laneIndex);
     return {
       ...absence,
       geometry,
@@ -519,7 +542,7 @@ function buildManagementPeople(assignmentRows, window) {
 
     // What the committed work would consume if none of it were paused. The
     // difference is the capacity that holds hand back for this window.
-    const heldRows = visible.filter((assignment) => assignment.IsCommitted && assignment.IsOnHold);
+    const heldRows = visible.filter((assignment) => assignment.IsCommitted && assignment.hasHolds);
     const activeIgnoringHolds = activeHours + (hoursIn(heldRows, { ignoreHolds: true }) - hoursIn(heldRows));
     const heldHours = round2(Math.max(0, activeIgnoringHolds - activeHours));
 
@@ -540,6 +563,7 @@ function buildManagementPeople(assignmentRows, window) {
     return {
       person,
       role: getPersonRole(person),
+      manager: getPersonManager(person),
       assigned,
       dailyHours,
       capacityHours,
@@ -603,20 +627,28 @@ function summariseChargeability(people) {
   };
 }
 
-/** Hold overlay position expressed relative to the chip it sits on. */
+/** Hold overlay positions expressed relative to the chip they sit on. */
 function holdOverlay(range, assignment, chipBox) {
-  if (!assignment.IsOnHold || chipBox.width <= 0) return null;
-  const box = chipGeometry(range, assignment.HoldStartDate, assignment.HoldEndDate, 0);
-  if (box.width <= 0) return null;
+  const holds = assignment.holds || parseHolds(assignment.Holds);
+  if (!holds.length || chipBox.width <= 0) return [];
 
-  const left = ((box.left - chipBox.left) / chipBox.width) * 100;
-  const width = (box.width / chipBox.width) * 100;
-  const clampedLeft = Math.max(0, Math.min(100, left));
+  return holds
+    .map((hold) => {
+      const box = chipGeometry(range, hold.startDate, hold.endDate, 0);
+      if (box.width <= 0) return null;
 
-  return {
-    left: clampedLeft,
-    width: Math.max(0, Math.min(100 - clampedLeft, width)),
-  };
+      const left = ((box.left - chipBox.left) / chipBox.width) * 100;
+      const width = (box.width / chipBox.width) * 100;
+      const clampedLeft = Math.max(0, Math.min(100, left));
+
+      return {
+        startDate: hold.startDate,
+        endDate: hold.endDate,
+        left: clampedLeft,
+        width: Math.max(0, Math.min(100 - clampedLeft, width)),
+      };
+    })
+    .filter(Boolean);
 }
 
 /**
@@ -711,7 +743,7 @@ function buildManagementView({
         ...assignment,
         accentClass: stageAccentClass(assignment.Stage),
         geometry,
-        hold: holdOverlay(range, assignment, geometry),
+        holdOverlays: holdOverlay(range, assignment, geometry),
         businessDays: countBusinessDaysInclusive(assignment.StartDate, assignment.EndDate),
         windowHours,
         capacityPercent: member.capacityHours > 0 ? round2((windowHours / member.capacityHours) * 100) : 0,
@@ -737,6 +769,7 @@ function buildManagementView({
       dailyHours: member.dailyHours,
       // committed + free = capacity, so the row always adds up to the window.
       committedHours: member.activeHours,
+      utilizationPercent: member.chargeabilityReal,
       softHours: member.softHours,
       freeHours: member.availableHours,
       heldHours: member.heldHours,

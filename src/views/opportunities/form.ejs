@@ -1,4 +1,4 @@
-<%- include('../partials/header') %>
+<% if (!partial) { %><%- include('../partials/header') %><% } %>
 <%
   var isNew = mode === 'new';
   var o = opportunity;
@@ -10,13 +10,17 @@
   var actionUrl = isNew ? '/opportunities' : '/opportunities/' + o.Id;
 %>
 
+<div id="opportunityDetail">
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
   <div>
     <h2>
       <i class="bi <%= isNew ? 'bi-plus-circle' : 'bi-briefcase' %> me-2"></i>
       <%= isNew ? 'Create opportunity' : o.Name %>
     </h2>
-    <p class="text-muted mb-0"><%= isNew ? 'Add a new opportunity to the pipeline.' : (o.TechnologyStack || 'No technology stack') %></p>
+    <p class="text-muted mb-0">
+      <%= isNew ? 'Add a new opportunity to the pipeline.' : (o.TechnologyStack || 'No technology stack') %>
+      <% if (!isNew && o.OppId) { %><span class="ms-2 badge text-bg-secondary"><%= o.OppId %></span><% } %>
+    </p>
   </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="/"><i class="bi bi-arrow-left me-1"></i>Back</a>
@@ -74,7 +78,11 @@
             <label class="form-label" for="name">Opportunity name</label>
             <input class="form-control" id="name" name="name" required maxlength="200" value="<%= o.Name || '' %>">
           </div>
-          <div class="col-12">
+          <div class="col-md-6">
+            <label class="form-label" for="oppId">OPP ID</label>
+            <input class="form-control" id="oppId" name="oppId" maxlength="50" placeholder="External ID" value="<%= o.OppId || '' %>">
+          </div>
+          <div class="col-md-6">
             <label class="form-label" for="technologyStack">Technology stack</label>
             <input class="form-control" id="technologyStack" name="technologyStack" maxlength="400" value="<%= o.TechnologyStack || '' %>">
           </div>
@@ -159,7 +167,7 @@
 
           <div class="col-md-6">
             <label class="form-label" for="opportunityHours">Opportunity hours</label>
-            <input type="number" class="form-control" id="opportunityHours" name="opportunityHours" min="0.5" step="0.5" required placeholder="e.g. 120" value="<%= o.OpportunityHours == null ? '' : o.OpportunityHours %>">
+            <input type="number" class="form-control" id="opportunityHours" name="opportunityHours" min="0" step="0.5" required placeholder="e.g. 120" value="<%= o.OpportunityHours == null ? '' : o.OpportunityHours %>">
           </div>
           <div class="col-md-6">
             <label class="form-label" for="opportunityTimeline">Opportunity timeline (weeks)</label>
@@ -323,7 +331,7 @@
           var formId = 'assignment-form-' + assignment.Id;
           var startText = toDateText(assignment.PlannedStartDate);
           var endText = toDateText(assignment.PlannedEndDate);
-          var onHold = !!(assignment.HoldStartDate && assignment.HoldEndDate);
+          var onHold = isCurrentlyOnHold(parseHolds(assignment.Holds));
           var allocationModes = ['percent', 'total-hours', 'monthly-hours'];
           var allocationMode = allocationModes.indexOf(assignment.AllocationMode) === -1 ? 'percent' : assignment.AllocationMode;
           var oppHours = Number(o.OpportunityHours || 0);
@@ -420,21 +428,48 @@
               </div>
             </div>
 
-            <div class="assignment-group">
-              <div class="assignment-group-title"><i class="bi bi-pause-circle me-1"></i>Hold &mdash; frees capacity for the period</div>
-              <div class="row g-2">
-                <div class="col-lg-4 col-md-6 col-6">
-                  <label class="form-label small">Hold from</label>
-                  <input type="date" class="form-control form-control-sm" name="holdStartDate" value="<%= toDateText(assignment.HoldStartDate) %>">
-                </div>
-                <div class="col-lg-4 col-md-6 col-6">
-                  <label class="form-label small">Hold until</label>
-                  <input type="date" class="form-control form-control-sm" name="holdEndDate" value="<%= toDateText(assignment.HoldEndDate) %>">
-                </div>
-                <div class="col-lg-4 d-flex align-items-end">
-                  <div class="form-text mb-1">Leave both empty for no hold. Assigned hours stay unchanged.</div>
-                </div>
+            <div class="assignment-group" data-role="hold-group">
+              <div class="assignment-group-title"><i class="bi bi-pause-circle me-1"></i>Hold periods &mdash; frees capacity for each period</div>
+              <div class="hold-periods" data-role="hold-periods">
+                <% parseHolds(assignment.Holds).forEach(function(hold, idx) { %>
+                  <div class="hold-period-row row g-2 mb-1" data-role="hold-row">
+                    <div class="col-lg-4 col-md-5 col-5">
+                      <label class="form-label small">Hold from</label>
+                      <input type="date" class="form-control form-control-sm" name="holdStartDate" value="<%= hold.startDate %>">
+                    </div>
+                    <div class="col-lg-4 col-md-5 col-5">
+                      <label class="form-label small">Hold until</label>
+                      <div class="input-group input-group-sm">
+                        <input type="date" class="form-control form-control-sm rounded" name="holdEndDate" value="<%= hold.endDate %>">
+                        <button type="button" class="btn btn-outline-danger rounded-end px-2" data-role="remove-hold" title="Remove this hold period">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                <% }) %>
+                <% if (!parseHolds(assignment.Holds).length) { %>
+                  <div class="hold-period-row row g-2 mb-1" data-role="hold-row">
+                    <div class="col-lg-4 col-md-5 col-5">
+                      <label class="form-label small">Hold from</label>
+                      <input type="date" class="form-control form-control-sm" name="holdStartDate" value="">
+                    </div>
+                    <div class="col-lg-4 col-md-5 col-5">
+                      <label class="form-label small">Hold until</label>
+                      <div class="input-group input-group-sm">
+                        <input type="date" class="form-control form-control-sm rounded" name="holdEndDate" value="">
+                        <button type="button" class="btn btn-outline-danger rounded-end px-2" data-role="remove-hold" title="Remove this hold period">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                <% } %>
               </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary mt-1" data-role="add-hold">
+                <i class="bi bi-plus-circle me-1"></i>Add hold period
+              </button>
+              <div class="form-text">Leave both empty for no hold. Assigned hours stay unchanged.</div>
             </div>
 
             <input type="hidden" name="allocationPercent" data-role="percent-field">
@@ -569,4 +604,59 @@
   window.OPP_PEOPLE_DAILY_HOURS = <%- JSON.stringify((typeof peopleDailyHours !== 'undefined' && peopleDailyHours) || {}) %>;
 </script>
 <script src="/js/allocation.js"></script>
-<%- include('../partials/footer') %>
+<script src="/js/opportunity-form-dynamic.js"></script>
+<script>
+(function () {
+  function initHoldGroups() {
+    document.querySelectorAll('[data-role="hold-group"]').forEach(function (group) {
+      if (group._holdInit) return;
+      group._holdInit = true;
+
+      var container = group.querySelector('[data-role="hold-periods"]');
+      var addBtn = group.querySelector('[data-role="add-hold"]');
+
+      function createRow() {
+        var row = document.createElement('div');
+        row.className = 'hold-period-row row g-2 mb-1';
+        row.setAttribute('data-role', 'hold-row');
+        row.innerHTML =
+          '<div class="col-lg-4 col-md-5 col-5">' +
+            '<label class="form-label small">Hold from</label>' +
+            '<input type="date" class="form-control form-control-sm" name="holdStartDate" value="">' +
+          '</div>' +
+          '<div class="col-lg-4 col-md-5 col-5">' +
+            '<label class="form-label small">Hold until</label>' +
+            '<div class="input-group input-group-sm">' +
+              '<input type="date" class="form-control form-control-sm rounded" name="holdEndDate" value="">' +
+              '<button type="button" class="btn btn-outline-danger rounded-end px-2" data-role="remove-hold" title="Remove this hold period">' +
+                '<i class="bi bi-trash"></i>' +
+              '</button>' +
+            '</div>' +
+          '</div>';
+        return row;
+      }
+
+      group.addEventListener('click', function (e) {
+        var removeBtn = e.target.closest('[data-role="remove-hold"]');
+        if (removeBtn) {
+          removeBtn.closest('[data-role="hold-row"]').remove();
+          return;
+        }
+        if (e.target.closest('[data-role="add-hold"]')) {
+          container.appendChild(createRow());
+        }
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHoldGroups);
+  } else {
+    initHoldGroups();
+  }
+
+  window.OPP_initHoldGroups = initHoldGroups;
+})();
+</script>
+</div><!-- /#opportunityDetail -->
+<% if (!partial) { %><%- include('../partials/footer') %><% } %>

@@ -3,15 +3,17 @@ const {
   PERSON_ROLES,
   COST_CURRENCY,
   listPeople,
+  listManagers,
   getPersonDailyHours,
   getPersonRole,
   getPersonCost,
+  getPersonManager,
   addPerson,
   removePerson,
   updatePersonProfile,
 } = require('../services/peopleService');
 const { HOURS_PER_DAY, MONTHLY_CAPACITY } = require('../services/dateService');
-const { ABSENCE_KINDS, listAbsences, addAbsence, removeAbsence } = require('../services/absenceService');
+const { ABSENCE_KINDS, listAbsences, addAbsence, updateAbsence, removeAbsence } = require('../services/absenceService');
 const { STAGES } = require('../services/opportunityService');
 const { listFirmStages } = require('../services/bookingService');
 const { updateFirmStages } = require('../config/settings');
@@ -26,6 +28,7 @@ router.get('/', (req, res) => {
       dailyHours: getPersonDailyHours(person),
       role: getPersonRole(person),
       cost: getPersonCost(person),
+      manager: getPersonManager(person),
       absences,
       absenceDays: absences.reduce((total, absence) => total + absence.businessDays, 0),
     };
@@ -35,6 +38,7 @@ router.get('/', (req, res) => {
     title: 'Configuration',
     people,
     personRoles: PERSON_ROLES,
+    managerOptions: listManagers(),
     absenceKinds: ABSENCE_KINDS,
     costCurrency: COST_CURRENCY,
     defaultDailyHours: HOURS_PER_DAY,
@@ -61,7 +65,7 @@ router.post('/capacity/stages', (req, res) => {
 
 router.post('/people', (req, res) => {
   try {
-    addPerson(req.body.personName, req.body.dailyHours, req.body.role, req.body.internalCost);
+    addPerson(req.body.personName, req.body.dailyHours, req.body.role, req.body.internalCost, req.body.manager);
     req.flash('success', `${String(req.body.personName).trim()} added.`);
   } catch (err) {
     req.flash('error', err.message || String(err));
@@ -75,6 +79,7 @@ router.post('/people/profile', (req, res) => {
       dailyHours: req.body.dailyHours,
       role: req.body.role,
       cost: req.body.internalCost,
+      manager: req.body.manager,
     });
     req.flash('success', `${String(req.body.personName).trim()} updated.`);
   } catch (err) {
@@ -96,6 +101,7 @@ router.post('/people/remove', (req, res) => {
 /** Absence removes working days from a person's capacity for the dates it covers. */
 router.post('/people/absences', (req, res) => {
   const person = String(req.body.personName || '').trim();
+  const redirectTo = String(req.body.redirect || '');
   try {
     const absence = addAbsence(person, {
       startDate: req.body.startDate,
@@ -110,18 +116,36 @@ router.post('/people/absences', (req, res) => {
   } catch (err) {
     req.flash('error', err.message || String(err));
   }
-  res.redirect(`/settings?person=${encodeURIComponent(person)}`);
+  res.redirect(redirectTo || `/settings?person=${encodeURIComponent(person)}`);
 });
 
 router.post('/people/absences/remove', (req, res) => {
   const person = String(req.body.personName || '').trim();
+  const redirectTo = String(req.body.redirect || '');
   try {
     removeAbsence(person, req.body.absenceId);
     req.flash('success', `Absence removed. ${person} is available again for those dates.`);
   } catch (err) {
     req.flash('error', err.message || String(err));
   }
-  res.redirect(`/settings?person=${encodeURIComponent(person)}`);
+  res.redirect(redirectTo || `/settings?person=${encodeURIComponent(person)}`);
+});
+
+router.post('/people/absences/update', (req, res) => {
+  const person = String(req.body.personName || '').trim();
+  const redirectTo = String(req.body.redirect || '');
+  try {
+    const updated = updateAbsence(person, req.body.absenceId, {
+      startDate: req.body.startDate,
+      endDate: req.body.endDate,
+      kind: req.body.kind,
+      note: req.body.note,
+    });
+    req.flash('success', `Absence updated for ${person}: ${updated.startDate} to ${updated.endDate}.`);
+  } catch (err) {
+    req.flash('error', err.message || String(err));
+  }
+  res.redirect(redirectTo || `/settings?person=${encodeURIComponent(person)}`);
 });
 
 module.exports = router;

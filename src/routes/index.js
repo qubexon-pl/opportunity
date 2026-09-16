@@ -57,20 +57,42 @@ router.get('/', async (req, res, next) => {
     // A missing next-step read should never take the whole pipeline down.
     const nextSteps = await listOpenNextSteps().catch(() => []);
 
+    const upcoming = buildUpcoming(opportunities, upcomingPeriod, nextSteps);
+
+    if (req.query.partial === 'upcoming') {
+      return res.render('partials/upcoming-card', {
+        upcoming,
+        upcomingPeriod,
+        upcomingPeriods: UPCOMING_PERIODS,
+        filters,
+      });
+    }
+
+    if (req.query.partial === 'pipeline') {
+      return res.render('pipeline-content', {
+        ...baseModel,
+        opportunities,
+        upcoming,
+        loadError: null,
+      });
+    }
+
     res.render('pipeline', {
       ...baseModel,
       opportunities,
-      upcoming: buildUpcoming(opportunities, upcomingPeriod, nextSteps),
+      upcoming,
       loadError: null,
     });
   } catch (err) {
     if (isDatabaseUnavailable(err)) {
-      return res.render('pipeline', {
+      const errorModel = {
         ...baseModel,
         opportunities: [],
         upcoming: { items: [], label: '' },
         loadError: err.message || String(err),
-      });
+      };
+      if (req.query.partial === 'pipeline') return res.render('pipeline-content', errorModel);
+      return res.render('pipeline', errorModel);
     }
     next(err);
   }
@@ -78,13 +100,16 @@ router.get('/', async (req, res, next) => {
 
 /** Remembers the current stage/status selection as the pipeline default. */
 router.post('/pipeline/defaults', (req, res) => {
+  const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
   try {
     updateViewDefaults('pipeline', {
       stages: filterAgainst(queryList(req.body.stage), STAGES),
       statuses: filterAgainst(queryList(req.body.status), STATUSES),
     });
+    if (isAjax) return res.json({ ok: true });
     req.flash('success', 'Saved as your default pipeline filters.');
   } catch (err) {
+    if (isAjax) return res.status(400).json({ error: err.message || String(err) });
     req.flash('error', err.message || String(err));
   }
   res.redirect(req.get('referer') || '/');

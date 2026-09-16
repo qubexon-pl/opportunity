@@ -1,0 +1,91 @@
+<div class="card mb-4" id="absenceCard">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseAbsence" aria-expanded="false">
+      <i class="bi bi-chevron-down"></i><span><i class="bi bi-calendar-x me-2"></i>Absence</span>
+    </a>
+    <span class="text-muted small">
+      <% if (detail.member && detail.member.absentDays > 0) { %>
+        <%= detail.member.absentDays %>d in this window &middot; &minus;<%= detail.member.absenceHours %>h capacity
+      <% } else { %>
+        No absence in this window
+      <% } %>
+    </span>
+  </div>
+  <div class="card-body collapse" id="collapseAbsence">
+    <% if (allAbsences.length) { %>
+      <div class="table-responsive mb-3">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width: 170px;">Type</th>
+              <th style="width: 150px;">From</th>
+              <th style="width: 150px;">To</th>
+              <th style="width: 100px;">Work days</th>
+              <th>Note</th>
+              <th class="text-end" style="width: 120px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% allAbsences.forEach(function(absence) { %>
+              <tr>
+                <form method="post" action="/settings/people/absences/update" class="row g-1 align-items-center m-0" data-absence-edit data-absence-id="<%= absence.id %>">
+                  <input type="hidden" name="personName" value="<%= detail.person %>">
+                  <input type="hidden" name="absenceId" value="<%= absence.id %>">
+                  <td>
+                    <select class="form-select form-select-sm" name="kind">
+                      <% absenceKinds.forEach(function(kind) { %>
+                        <option value="<%= kind %>" <%= kind === absence.kind ? 'selected' : '' %>><%= kind %></option>
+                      <% }) %>
+                    </select>
+                  </td>
+                  <td><input type="date" class="form-control form-control-sm" name="startDate" value="<%= absence.startDate %>" required></td>
+                  <td><input type="date" class="form-control form-control-sm" name="endDate" value="<%= absence.endDate %>" required></td>
+                  <td class="text-muted small text-end"><%= absence.businessDays %>d</td>
+                  <td><input class="form-control form-control-sm" name="note" maxlength="200" value="<%= absence.note || '' %>" placeholder="Optional"></td>
+                  <td class="text-end">
+                    <div class="d-flex justify-content-end gap-1">
+                      <button class="btn btn-sm btn-outline-primary" type="submit" title="Save"><i class="bi bi-check-lg"></i></button>
+                      <button class="btn btn-sm btn-outline-danger" type="button" title="Remove"
+                              data-absence-remove data-absence-id="<%= absence.id %>"
+                              data-person="<%= detail.person %>"><i class="bi bi-trash"></i></button>
+                    </div>
+                  </td>
+                </form>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <p class="text-muted small mb-3">No absence recorded, so the full <%= detail.member ? detail.member.dailyHours : 8 %>h/day counts as capacity.</p>
+    <% } %>
+
+    <h6 class="small text-muted text-uppercase mb-2">Add new absence</h6>
+    <form method="post" action="/settings/people/absences" class="row g-2 align-items-end" data-absence-add>
+      <input type="hidden" name="personName" value="<%= detail.person %>">
+      <div class="col-sm-3">
+        <label class="form-label small mb-1">Type</label>
+        <select class="form-select form-select-sm" name="kind">
+          <% absenceKinds.forEach(function(kind) { %>
+            <option value="<%= kind %>"><%= kind %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-sm-2">
+        <label class="form-label small mb-1">From</label>
+        <input type="date" class="form-control form-control-sm" name="startDate" required>
+      </div>
+      <div class="col-sm-2">
+        <label class="form-label small mb-1">To</label>
+        <input type="date" class="form-control form-control-sm" name="endDate" required>
+      </div>
+      <div class="col-sm-3">
+        <label class="form-label small mb-1">Note</label>
+        <input class="form-control form-control-sm" name="note" maxlength="200" placeholder="Optional">
+      </div>
+      <div class="col-sm-2">
+        <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1"></i>Add</button>
+      </div>
+    </form>
+  </div>
+</div>

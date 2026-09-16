@@ -49,6 +49,35 @@
 
   /* ── Content swap ────────────────────────────────────────────── */
 
+  function saveCollapseState(container) {
+    var states = {};
+    container.querySelectorAll('.collapse').forEach(function (el) {
+      if (el.id) states[el.id] = el.classList.contains('show');
+    });
+    return states;
+  }
+
+  function restoreCollapseState(container, states) {
+    Object.keys(states).forEach(function (id) {
+      var el = container.querySelector('#' + id);
+      if (!el) return;
+      var toggle = container.querySelector('[data-bs-target="#' + id + '"]');
+      if (states[id]) {
+        el.classList.add('show');
+        if (toggle) {
+          toggle.classList.remove('collapsed');
+          toggle.setAttribute('aria-expanded', 'true');
+        }
+      } else {
+        el.classList.remove('show');
+        if (toggle) {
+          toggle.classList.add('collapsed');
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+      }
+    });
+  }
+
   function swapContent(cleanUrl, pushState = true) {
     if (swapping) return;
     swapping = true;
@@ -65,6 +94,9 @@
         /* Remember which tab was active so it survives the swap. */
         var activeTab = contentEl.querySelector('.nav-link.active');
         var activeTarget = activeTab ? activeTab.getAttribute('data-bs-target') : null;
+
+        /* Remember collapse states of all cards. */
+        var collapseStates = saveCollapseState(contentEl);
 
         /* Remember filter input values that live outside the server-rendered
            form (the assignment filter and timeline filter text boxes). */
@@ -88,6 +120,9 @@
 
         /* Re-initialise every JS module on the new DOM. */
         reinitAll(contentEl);
+
+        /* Restore collapse states. */
+        restoreCollapseState(contentEl, collapseStates);
 
         /* Restore the active tab. */
         if (activeTarget) {
@@ -134,6 +169,7 @@
     if (window.OPP_initTimelineScroll) window.OPP_initTimelineScroll(container);
     if (window.OPP_initTimelineDrag) window.OPP_initTimelineDrag();
     if (window.OPP_initViewState) window.OPP_initViewState(container);
+    if (window.OPP_updateExportHref) window.OPP_updateExportHref();
   }
 
   /* ── Perspective GET form ────────────────────────────────────── */
@@ -145,9 +181,66 @@
         e.preventDefault();
         var action = form.getAttribute('action') || '/management';
         var params = new URLSearchParams(new FormData(form));
-        swapContent(action + '?' + params.toString());
+        var url = action + '?' + params.toString();
+
+        /* When the People tab filter is submitted, refresh only the people
+           table instead of swapping the entire page. */
+        var peopleTab = form.closest('#tabPeople');
+        if (peopleTab) {
+          swapPeopleTable(url);
+          return;
+        }
+
+        swapContent(url);
       });
     });
+  }
+
+  /* Fetch the partial and swap only #tabPeople, preserving the other tabs
+     and the timeline / assignments state untouched. */
+  function swapPeopleTable(cleanUrl) {
+    if (swapping) return;
+    swapping = true;
+
+    var separator = cleanUrl.indexOf('?') === -1 ? '?' : '&';
+    var fetchUrl = cleanUrl + separator + 'partial=1';
+
+    fetch(fetchUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Server returned ' + res.status);
+        return res.text();
+      })
+      .then(function (html) {
+        var temp = document.createElement('div');
+        temp.innerHTML = html;
+        var newTab = temp.querySelector('#tabPeople');
+        var oldTab = contentEl.querySelector('#tabPeople');
+        if (!newTab || !oldTab) {
+          /* Fallback: full content swap. */
+          swapping = false;
+          swapContent(cleanUrl);
+          return;
+        }
+
+        var collapseStates = saveCollapseState(oldTab);
+        oldTab.innerHTML = newTab.innerHTML;
+
+        /* Re-init JS modules inside the replaced tab. */
+        if (window.OPP_initMultiselects) window.OPP_initMultiselects(oldTab);
+        if (window.OPP_initViewState) window.OPP_initViewState(oldTab);
+
+        restoreCollapseState(oldTab, collapseStates);
+        interceptForms();
+        interceptLinks();
+
+        if (typeof showToast === 'function') showToast('Filter applied.', 'success');
+      })
+      .catch(function (err) {
+        if (typeof showToast === 'function') {
+          showToast('Failed to update: ' + err.message, 'danger');
+        }
+      })
+      .finally(function () { swapping = false; });
   }
 
   /* ── Sort links & legend chips ───────────────────────────────── */

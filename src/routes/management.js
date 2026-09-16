@@ -1,10 +1,12 @@
 const express = require('express');
+const ExcelJS = require('exceljs');
 const { listOpportunities } = require('../services/opportunityService');
 const { listAssignments, addAssignment, updateAssignment, ALLOCATION_MODES } = require('../services/assignmentService');
-const { listPeople, getDailyHoursMap } = require('../services/peopleService');
+const { listPeople, getDailyHoursMap, getRoleMap, getCostMap, getManagerMap, PERSON_ROLES, COST_CURRENCY } = require('../services/peopleService');
 const {
   MONTHLY_CAPACITY,
   toDateText,
+  isHoldExpired,
 } = require('../services/dateService');
 const {
   TIMELINE_UNIT_OPTIONS,
@@ -19,6 +21,7 @@ const {
   capacityClass,
 } = require('../services/capacityService');
 const { listFirmStages } = require('../services/bookingService');
+const { listAbsences, listAllAbsences, ABSENCE_KINDS } = require('../services/absenceService');
 const { getViewDefaults, updateViewDefaults } = require('../config/settings');
 const { queryList, filterAgainst } = require('../services/filterService');
 const { STAGES, STATUSES } = require('../services/opportunityService');
@@ -73,6 +76,7 @@ router.get('/', async (req, res, next) => {
     ? filterAgainst(queryList(req.query.status), STATUSES)
     : filterAgainst(defaults.statuses, STATUSES);
   const requestedPeople = applied ? queryList(req.query.person) : defaults.people;
+  const requestedManagers = applied ? queryList(req.query.manager) : [];
 
   try {
     let loadError = null;
@@ -93,7 +97,21 @@ router.get('/', async (req, res, next) => {
     const personOptions = [
       ...new Set([...listPeople(), ...assignments.map((assignment) => assignment.PersonName).filter(Boolean)]),
     ].sort((a, b) => a.localeCompare(b));
-    const personFilters = filterAgainst(requestedPeople, personOptions);
+
+    // Manager options: anyone who is a manager of at least one person.
+    const managersMap = getManagerMap();
+    const managerOptions = [...new Set(Object.values(managersMap).map((m) => String(m).trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const managerFilters = filterAgainst(requestedManagers, managerOptions);
+
+    // When manager filter is active, narrow the person list to people reporting to those managers.
+    let personFilters = filterAgainst(requestedPeople, personOptions);
+    if (managerFilters.length > 0) {
+      const filteredByManager = personOptions.filter((name) => managerFilters.includes(managersMap[name]));
+      // If person filters were also applied, intersect; otherwise use the manager-filtered list.
+      personFilters = personFilters.length > 0
+        ? personFilters.filter((name) => filteredByManager.includes(name))
+        : filteredByManager;
+    }
 
     const view = buildManagementView({
       opportunities,
@@ -122,6 +140,7 @@ router.get('/', async (req, res, next) => {
       ...stageFilters.map((stage) => ['stage', stage]),
       ...statusFilters.map((status) => ['status', status]),
       ...personFilters.map((name) => ['person', name]),
+      ...managerFilters.map((name) => ['manager', name]),
     ];
     const current = {
       sort: view.sort.key,
@@ -147,11 +166,20 @@ router.get('/', async (req, res, next) => {
       statusOptions: STATUSES,
       personFilters,
       personOptions,
+      managerFilters,
+      managerOptions,
+      peopleManagers: managersMap,
       timelineFilterOptions: TIMELINE_FILTER_OPTIONS,
       timelineUnitOptions: TIMELINE_UNIT_OPTIONS,
       stageLegend: STAGE_LEGEND,
       people: listPeople(),
       peopleDailyHours: getDailyHoursMap(),
+      peopleRoles: getRoleMap(),
+      peopleCosts: getCostMap(),
+      personRoles: PERSON_ROLES,
+      costCurrency: COST_CURRENCY,
+      allAbsences: listAllAbsences(),
+      absenceKinds: ABSENCE_KINDS,
       projects: opportunities,
       view,
       assignmentSortFields: ASSIGNMENT_SORT_FIELDS,
@@ -165,6 +193,7 @@ router.get('/', async (req, res, next) => {
       stageAccentClass,
       capacityClass,
       toDateText,
+      isHoldExpired,
       today: toDateText(new Date()),
     });
   } catch (err) {
@@ -199,6 +228,25 @@ router.get('/people/:person', async (req, res, next) => {
 
     const detail = buildPersonDetail({ opportunities, assignments, perspective, unitsToShow, person });
 
+    // Build a timeline filtered to just this person.
+    const timelineView = buildManagementView({
+      opportunities,
+      assignments,
+      perspective,
+      unitsToShow,
+      stageFilter: [],
+      statusFilter: [],
+      personFilter: [person],
+    });
+
+    if (req.query.partial === 'absences') {
+      return res.render('partials/person-absences', {
+        detail,
+        allAbsences: listAbsences(person),
+        absenceKinds: ABSENCE_KINDS,
+      });
+    }
+
     res.render('person', {
       title: person,
       breadcrumb: [
@@ -209,11 +257,15 @@ router.get('/people/:person', async (req, res, next) => {
       perspective,
       unitsToShow,
       timelineUnitOptions: TIMELINE_UNIT_OPTIONS,
+      timeline: timelineView.timeline,
+      absenceKinds: ABSENCE_KINDS,
+      allAbsences: listAbsences(person),
       loadError,
       stageStatusLabel,
       stageAccentClass,
       capacityClass,
       toDateText,
+      isHoldExpired,
     });
   } catch (err) {
     next(err);
@@ -269,6 +321,102 @@ router.post('/assignments/:assignmentId/visibility', async (req, res, next) => {
     req.flash('error', err.message || String(err));
   }
   res.redirect(back);
+});
+
+/** Exports the assignments table (with current filters) as an xlsx file. */
+router.get('/assignments/export', async (req, res, next) => {
+  const defaults = getViewDefaults().management;
+  const applied = req.query.applied === '1';
+  const perspective = normalizePerspective(
+    req.query.perspective === undefined ? defaults.perspective : req.query.perspective,
+    defaults.perspective
+  );
+  const unitsToShow = normalizeUnits(req.query.units === undefined ? defaults.units : req.query.units, defaults.units);
+  const stageFilters = applied
+    ? filterAgainst(queryList(req.query.stage), TIMELINE_FILTER_OPTIONS)
+    : filterAgainst(defaults.stages, TIMELINE_FILTER_OPTIONS);
+  const statusFilters = applied
+    ? filterAgainst(queryList(req.query.status), STATUSES)
+    : filterAgainst(defaults.statuses, STATUSES);
+  const requestedPeople = applied ? queryList(req.query.person) : defaults.people;
+
+  try {
+    const [opportunities, assignments] = await Promise.all([
+      listOpportunities({ sort: 'name', dir: 'asc' }),
+      listAssignments({ includeHidden: true }),
+    ]);
+
+    const personOptions = [
+      ...new Set([...listPeople(), ...assignments.map((a) => a.PersonName).filter(Boolean)]),
+    ].sort((a, b) => a.localeCompare(b));
+    const personFilters = filterAgainst(requestedPeople, personOptions);
+
+    const view = buildManagementView({
+      opportunities,
+      assignments,
+      perspective,
+      unitsToShow,
+      stageFilter: stageFilters,
+      statusFilter: statusFilters,
+      personFilter: personFilters,
+      sort: req.query.sort,
+      dir: req.query.dir,
+    });
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Assignments');
+
+    const headers = [
+      'OPP-ID',
+      'Person',
+      'Opportunity',
+      'Stage',
+      'Status',
+      'Start Date',
+      'End Date',
+      'Project Allocation %',
+      'Allocated Hours',
+      'Booking',
+      'Hold Periods',
+      'Timeline Visible',
+    ];
+    ws.addRow(headers);
+
+    ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+
+    for (const row of view.assignmentRows) {
+      const holdText = (row.holds || [])
+        .map((h) => `${h.startDate} -> ${h.endDate}`)
+        .join('; ');
+      ws.addRow([
+        row.OppId || '',
+        row.PersonName || '',
+        row.OpportunityName || '',
+        row.Stage || '',
+        row.Status || '',
+        row.StartDate || '',
+        row.EndDate || '',
+        Number(row.InitialPercent || 0),
+        Number(row.AllocatedHours || 0),
+        row.IsCommitted ? 'Committed' : 'Soft',
+        holdText,
+        row.IsTimelineVisible ? 'Yes' : 'No',
+      ]);
+    }
+
+    const colWidths = [14, 20, 30, 18, 14, 14, 14, 16, 14, 14, 30, 14];
+    ws.columns.forEach((col, i) => { col.width = colWidths[i]; });
+    ws.getColumn(8).numFmt = '0.0"%"';
+    ws.getColumn(9).numFmt = '0.0';
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="assignments.xlsx"');
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

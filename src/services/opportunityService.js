@@ -7,6 +7,7 @@ const STATUSES = ['Open', 'On Hold', 'Closed'];
 
 const OpportunitySchema = z.object({
   name: z.string().min(1).max(200),
+  oppId: z.string().max(50).optional().nullable(),
   technologyStack: z.string().max(400).optional().nullable(),
   description: z.string().max(4000).optional().nullable(),
   techOwner: z.string().max(200).optional().nullable(),
@@ -20,7 +21,7 @@ const OpportunitySchema = z.object({
 
   nextStepSummary: z.string().max(500).optional().nullable(),
   nextStepDueDate: z.string().optional().nullable(),
-  opportunityHours: z.number().gt(0).max(100000),
+  opportunityHours: z.number().min(0).max(100000),
   opportunityTimeline: z.string().max(100).optional().nullable(),
   plannedStartDate: z.string().optional().nullable(),
   plannedEndDate: z.string().optional().nullable(),
@@ -45,6 +46,7 @@ function toGuid(id) {
 function bindOpportunity(request, body) {
   return request
     .input('Name', sql.NVarChar(200), body.name)
+    .input('OppId', sql.NVarChar(50), body.oppId ?? null)
     .input('TechnologyStack', sql.NVarChar(400), body.technologyStack ?? null)
     .input('Description', sql.NVarChar(4000), body.description ?? null)
     .input('TechOwner', sql.NVarChar(200), body.techOwner ?? null)
@@ -154,9 +156,9 @@ async function createOpportunity(payload) {
 
   await bindOpportunity(pool.request().input('Id', sql.UniqueIdentifier, newId), body).query(
     `INSERT INTO dbo.Opportunities
-       (Id, Name, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline, PlannedStartDate, PlannedEndDate, AllocationPercent, CountsTowardsCapacity)
+       (Id, Name, OppId, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline, PlannedStartDate, PlannedEndDate, AllocationPercent, CountsTowardsCapacity)
      VALUES
-       (@Id, @Name, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @CountsTowardsCapacity);`
+       (@Id, @Name, @OppId, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @CountsTowardsCapacity);`
   );
 
   return newId;
@@ -170,6 +172,7 @@ async function updateOpportunity(rawId, payload) {
   const result = await bindOpportunity(pool.request().input('Id', sql.UniqueIdentifier, id), body).query(
     `UPDATE dbo.Opportunities
      SET Name=@Name,
+         OppId=@OppId,
          TechnologyStack=@TechnologyStack,
          Description=@Description,
          TechOwner=@TechOwner,
