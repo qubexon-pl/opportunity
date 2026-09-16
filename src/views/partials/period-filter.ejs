@@ -1,6 +1,8 @@
 <%/* Compact period filter: a single-row form with timeline unit, horizon,
-    stage/status/person multiselects. Included at the top of every management
-    tab so the user can change the period without switching to Team capacity. */ %>
+    stage/status/manager/person multiselects. Included at the top of every
+    management tab so the user can change the period without switching to Team
+    capacity. Manager sits before Person because it narrows the person list:
+    picking a manager selects the people who report to them. */ %>
 <form method="get" action="/management" class="row g-2 align-items-end mgmt-period-filter" data-mgmt-form>
   <input type="hidden" name="applied" value="1">
   <div class="col-auto">
@@ -39,6 +41,18 @@
       allLabel: 'All statuses',
       selected: statusFilters,
       options: statusOptions.map(function(status) { return { value: status, label: status }; })
+    }) %>
+  </div>
+  <div class="col-auto">
+    <%- include('multiselect', {
+      id: 'pf-manager-' + pfId,
+      name: 'manager',
+      label: 'Manager',
+      labelClass: 'form-label small mb-0',
+      size: 'sm',
+      allLabel: 'All managers',
+      selected: managerFilters,
+      options: managerOptions.map(function(name) { return { value: name, label: name }; })
     }) %>
   </div>
   <div class="col-auto">

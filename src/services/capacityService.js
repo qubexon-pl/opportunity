@@ -663,6 +663,7 @@ function buildManagementView({
   stageFilter,
   statusFilter,
   personFilter,
+  personFilterActive,
   sort,
   dir,
   peopleSort,
@@ -672,12 +673,17 @@ function buildManagementView({
   const window = capacityWindow(perspective, unitsToShow);
   const allPeople = buildManagementPeople(assignmentRows, window);
 
-  // An empty person filter means everyone; an unknown name simply matches nobody.
+  // An empty person filter normally means everyone, but the caller can say the
+  // selection is active and simply empty - a manager nobody reports to matches
+  // no one, which is not the same as matching everyone.
   const selectedPeople = (Array.isArray(personFilter) ? personFilter : personFilter ? [personFilter] : [])
     .map((name) => String(name))
     .filter(Boolean);
+  const peopleFiltered = personFilterActive === undefined ? selectedPeople.length > 0 : !!personFilterActive;
+  const matchesPerson = (assignment) => !peopleFiltered || selectedPeople.includes(assignment.PersonName);
+
   const people = sortBy(
-    selectedPeople.length ? allPeople.filter((member) => selectedPeople.includes(member.person)) : allPeople,
+    peopleFiltered ? allPeople.filter((member) => selectedPeople.includes(member.person)) : allPeople,
     PEOPLE_SORT_FIELDS,
     peopleSort,
     peopleDir
@@ -691,24 +697,29 @@ function buildManagementView({
   const matchesStatus = (assignment) =>
     !selectedStatuses.length || selectedStatuses.includes(String(assignment.Status || '').toLowerCase());
 
-  const visibleRows = assignmentRows.filter(
-    (assignment) =>
-      (!selectedPeople.length || selectedPeople.includes(assignment.PersonName)) && matchesStatus(assignment)
-  );
-  const scheduled = visibleRows.filter((assignment) => assignment.IsTimelineVisible);
-
   // The filter accepts several stages at once; "free" is a pseudo-stage for the free bars.
   const selected = (Array.isArray(stageFilter) ? stageFilter : stageFilter ? [stageFilter] : [])
     .map((stage) => String(stage).toLowerCase())
     .filter(Boolean);
   const stagesOnly = selected.filter((stage) => stage !== 'free');
   const showFreeBars = selected.length === 0 || selected.includes('free');
-  const displayed =
-    selected.length === 0
-      ? scheduled
-      : stagesOnly.length === 0
-        ? []
-        : scheduled.filter((assignment) => stagesOnly.includes(String(assignment.Stage || '').toLowerCase()));
+  /*
+   * One predicate for the stage filter, used by both the timeline and the
+   * assignments table. They drifted apart before: the table ignored the stage
+   * filter entirely and listed rows the timeline was not drawing. Selecting
+   * only "Free capacity" picks no real stage, so no assignment matches.
+   */
+  const matchesStage = (assignment) =>
+    selected.length === 0 ||
+    (stagesOnly.length > 0 && stagesOnly.includes(String(assignment.Stage || '').toLowerCase()));
+
+  const visibleRows = assignmentRows.filter(
+    (assignment) => matchesPerson(assignment) && matchesStatus(assignment) && matchesStage(assignment)
+  );
+  const scheduled = assignmentRows.filter(
+    (assignment) => matchesPerson(assignment) && matchesStatus(assignment) && assignment.IsTimelineVisible
+  );
+  const displayed = scheduled.filter(matchesStage);
 
   const range = timelineRange(scheduled, perspective, unitsToShow);
   const units = buildTimelineUnits(range, perspective);
