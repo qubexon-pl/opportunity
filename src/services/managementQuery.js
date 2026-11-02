@@ -27,13 +27,34 @@ function normalizeUnits(value, fallback) {
 }
 
 /**
- * How far the window is shifted from the current period, in whole units.
- * Negative looks back at a period that has already happened; 0 starts today.
+ * Which way the window looks from today, in whole timeline units:
+ *
+ *   back    - the units immediately before this one (1 month back, in
+ *             November, is October)
+ *   current - this unit on its own, whatever the horizon says
+ *   next    - this unit and the ones after it (2 months, in November, is
+ *             November and December)
  */
-function normalizeOffset(value, fallback) {
-  const parsed = num(value);
-  const offset = parsed === null ? num(fallback) || 0 : parsed;
-  return Math.min(0, Math.max(-24, Math.trunc(offset)));
+const PERIOD_DIRECTIONS = ['back', 'current', 'next'];
+
+function normalizeDirection(value, fallback) {
+  const key = String(value || '').trim();
+  if (PERIOD_DIRECTIONS.includes(key)) return key;
+  return PERIOD_DIRECTIONS.includes(fallback) ? fallback : 'next';
+}
+
+/**
+ * Turns the direction and the requested horizon into the window the capacity
+ * service actually measures.
+ *
+ * "Current" deliberately ignores the horizon - it means this month, not this
+ * month and the next five - but the requested horizon is handed back untouched
+ * so the form can keep showing what the reader typed.
+ */
+function resolveWindow(direction, unitsToShow) {
+  if (direction === 'back') return { offsetUnits: -unitsToShow, effectiveUnits: unitsToShow };
+  if (direction === 'current') return { offsetUnits: 0, effectiveUnits: 1 };
+  return { offsetUnits: 0, effectiveUnits: unitsToShow };
 }
 
 /**
@@ -60,8 +81,10 @@ function resolvePeopleSelection({ requestedPeople, requestedManagers, personOpti
 }
 
 module.exports = {
+  PERIOD_DIRECTIONS,
   normalizePerspective,
   normalizeUnits,
-  normalizeOffset,
+  normalizeDirection,
+  resolveWindow,
   resolvePeopleSelection,
 };

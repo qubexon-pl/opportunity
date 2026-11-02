@@ -17,16 +17,16 @@
     <label class="form-label small mb-0" for="pf-units-<%= pfId %>">Horizon</label>
     <input type="number" class="form-control form-control-sm" id="pf-units-<%= pfId %>" name="units" min="1" max="24" value="<%= unitsToShow %>" style="width: 70px;">
   </div>
-  <%/* Negative offsets move the whole window into the past so a period that has
-       already happened can be analysed with the same numbers. */ %>
+  <%/* Back / Current / Next combine with the horizon above to pick the window
+       the figures are measured over. */ %>
   <div class="col-auto">
-    <%- include('offset-select', {
+    <%- include('period-select', {
       perspective: perspective,
-      offsetUnits: typeof offsetUnits === 'number' ? offsetUnits : 0,
-      offsetId: 'pf-offset-' + pfId,
-      offsetLabelClass: 'form-label small mb-0',
-      offsetSelectClass: 'form-select form-select-sm',
-      offsetStyle: 'width: 140px;',
+      periodDirection: typeof periodDirection === 'string' ? periodDirection : 'next',
+      periodId: 'pf-period-' + pfId,
+      periodLabelClass: 'form-label small mb-0',
+      periodSelectClass: 'form-select form-select-sm',
+      periodStyle: 'width: 110px;',
     }) %>
   </div>
   <div class="col-auto">

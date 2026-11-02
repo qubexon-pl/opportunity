@@ -15,7 +15,7 @@ const { listAssignments } = require('./assignmentService');
 const { listPeople, getManagerMap } = require('./peopleService');
 const { buildManagementView } = require('./capacityService');
 const { queryList, filterAgainst } = require('./filterService');
-const { normalizePerspective, normalizeUnits, normalizeOffset, resolvePeopleSelection } = require('./managementQuery');
+const { normalizePerspective, normalizeUnits, normalizeDirection, resolveWindow, resolvePeopleSelection } = require('./managementQuery');
 const { getViewDefaults } = require('../config/settings');
 
 const TIMELINE_FILTER_OPTIONS = [...STAGES, 'free'];
@@ -44,14 +44,17 @@ function bandFor(percent) {
 function resolveQuery(query, userId) {
   const defaults = getViewDefaults(userId).management;
   const applied = query.applied === '1';
+  const unitsToShow = normalizeUnits(query.units === undefined ? defaults.units : query.units, defaults.units);
+  const direction = normalizeDirection(query.period === undefined ? defaults.period : query.period, defaults.period);
+  const { offsetUnits, effectiveUnits } = resolveWindow(direction, unitsToShow);
 
   return {
     perspective: normalizePerspective(
       query.perspective === undefined ? defaults.perspective : query.perspective,
       defaults.perspective
     ),
-    unitsToShow: normalizeUnits(query.units === undefined ? defaults.units : query.units, defaults.units),
-    offsetUnits: normalizeOffset(query.offset === undefined ? defaults.offset : query.offset, defaults.offset),
+    unitsToShow: effectiveUnits,
+    offsetUnits,
     stageFilter: applied
       ? filterAgainst(queryList(query.stage), TIMELINE_FILTER_OPTIONS)
       : filterAgainst(defaults.stages, TIMELINE_FILTER_OPTIONS),
