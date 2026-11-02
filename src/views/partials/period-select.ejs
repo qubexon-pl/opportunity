@@ -1,0 +1,49 @@
+<%
+/*
+ * The period picker: which way the window looks from today.
+ *
+ *   Back    - the horizon's worth of units immediately before this one, so a
+ *             1-month horizon in November measures October
+ *   Current - this unit on its own, whatever the horizon says
+ *   Next    - this unit and the ones after it, so a 2-month horizon in
+ *             November measures November and December
+ *
+ * The wording follows the selected timeline unit, because "Previous month" is
+ * easier to act on than an abstract "previous period".
+ *
+ * Locals: perspective, periodDirection, and optionally periodId, periodName,
+ * periodLabelClass, periodSelectClass, periodStyle, periodHint. They carry the
+ * prefix so nothing in the including page can shadow them - EJS merges the
+ * caller's locals into the partial's scope.
+ */
+var periodId = typeof periodId !== 'undefined' ? periodId : 'period';
+var periodName = typeof periodName !== 'undefined' ? periodName : 'period';
+var periodLabelClass = typeof periodLabelClass !== 'undefined' ? periodLabelClass : 'form-label';
+var periodSelectClass = typeof periodSelectClass !== 'undefined' ? periodSelectClass : 'form-select';
+var periodStyle = typeof periodStyle !== 'undefined' ? periodStyle : '';
+var periodHint = typeof periodHint !== 'undefined' ? periodHint : '';
+var selectedDirection = typeof periodDirection === 'string' ? periodDirection : 'next';
+
+var UNIT_WORDS = {
+  weeks: { one: 'week', many: 'weeks' },
+  months: { one: 'month', many: 'months' },
+  quarters: { one: 'quarter', many: 'quarters' },
+  halfyears: { one: 'half-year', many: 'half-years' },
+};
+var words = UNIT_WORDS[perspective] || UNIT_WORDS.months;
+
+var DIRECTIONS = [
+  { key: 'back', label: 'Back', detail: 'the ' + words.many + ' before this one' },
+  { key: 'current', label: 'Current', detail: 'this ' + words.one + ' only' },
+  { key: 'next', label: 'Next', detail: 'this ' + words.one + ' and the ones after' },
+];
+%>
+<label class="<%= periodLabelClass %> d-flex align-items-baseline gap-2 flex-wrap" for="<%= periodId %>">
+  <span>Period</span>
+  <% if (periodHint) { %><span class="text-muted fw-normal small"><%= periodHint %></span><% } %>
+</label>
+<select class="<%= periodSelectClass %>" id="<%= periodId %>" name="<%= periodName %>"<%= periodStyle ? ' style="' + periodStyle + '"' : '' %>>
+  <% DIRECTIONS.forEach(function(direction) { %>
+    <option value="<%= direction.key %>" title="<%= direction.detail %>" <%= selectedDirection === direction.key ? 'selected' : '' %>><%= direction.label %></option>
+  <% }) %>
+</select>
