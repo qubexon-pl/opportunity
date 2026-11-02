@@ -418,8 +418,53 @@ body.sidebar-collapsed .main-content {
   color: var(--color-primary);
 }
 
-/* Account menu in the top bar: always-reachable sign-out */
-.btn-topbar-user {
+/* Team-health pill: chargeability over the selected period */
+.team-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 320px;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+.team-health-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.team-health.is-good {
+  color: var(--color-success, #198754);
+  border-color: color-mix(in srgb, var(--color-success, #198754) 40%, transparent);
+  background: color-mix(in srgb, var(--color-success, #198754) 12%, transparent);
+}
+.team-health.is-warn {
+  color: var(--color-warning, #b86e00);
+  border-color: color-mix(in srgb, var(--color-warning, #b86e00) 40%, transparent);
+  background: color-mix(in srgb, var(--color-warning, #b86e00) 12%, transparent);
+}
+.team-health.is-bad {
+  color: var(--color-danger, #dc3545);
+  border-color: color-mix(in srgb, var(--color-danger, #dc3545) 40%, transparent);
+  background: color-mix(in srgb, var(--color-danger, #dc3545) 12%, transparent);
+}
+/* Narrow screens have no room for a sentence beside the action buttons. */
+@media (max-width: 991.98px) {
+  .team-health {
+    display: none;
+  }
+}
+
+/* Account menu in the top bar: always-reachable sign-out */.btn-topbar-user {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;

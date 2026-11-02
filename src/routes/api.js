@@ -4,6 +4,8 @@ const { listOpportunities } = require('../services/opportunityService');
 const { listAssignments, addAssignment, updateAssignment, deleteAssignment } = require('../services/assignmentService');
 const { listPeople, getPersonDailyHours } = require('../services/peopleService');
 const { addAbsence, updateAbsence, removeAbsence } = require('../services/absenceService');
+const { teamHealth } = require('../services/teamHealthService');
+const { userKey } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -25,6 +27,21 @@ router.get('/health', async (_req, res) => {
 
 router.get('/people', (_req, res) => {
   res.json(listPeople().map((person) => ({ name: person, dailyHours: getPersonDailyHours(person) })));
+});
+
+/**
+ * Chargeability over the selected period for the top-bar pill. Accepts the same
+ * query the management page uses so the pill follows the filters on screen, and
+ * falls back to the reader's saved defaults everywhere else.
+ */
+router.get('/team-health', async (req, res) => {
+  try {
+    res.json(await teamHealth(req.query, userKey(req)));
+  } catch (err) {
+    // A missing database is not worth an error banner on every page.
+    const status = isDatabaseUnavailable(err) ? 200 : 500;
+    res.status(status).json({ ok: false, error: err.message || String(err) });
+  }
 });
 
 router.get('/opportunities', async (req, res, next) => {

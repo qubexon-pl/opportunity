@@ -164,6 +164,9 @@
     if (window.OPP_initHoldGroups) window.OPP_initHoldGroups(root);
     if (window.OPP_initOpportunityForm) window.OPP_initOpportunityForm(root);
     if (window.OPP_updateExportHref) window.OPP_updateExportHref();
+    /* The pill sits in the top bar, outside the region just replaced, so it
+       has to be told the numbers underneath it moved. */
+    if (window.OPP_refreshTeamHealth) window.OPP_refreshTeamHealth();
     if (window.bootstrap && bootstrap.Tooltip) {
       root.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
         bootstrap.Tooltip.getOrCreateInstance(el);

@@ -106,6 +106,13 @@
 
       <!-- Top bar actions -->
       <div class="topbar-actions">
+        <%/* Filled in by /js/team-health.js: a one-line verdict on the team over
+             the selected period, so the headline number is never more than a
+             glance away. */ %>
+        <div class="team-health is-loading" data-team-health hidden>
+          <span class="team-health-dot" aria-hidden="true"></span>
+          <span class="team-health-text" data-team-health-text></span>
+        </div>
         <button type="button" class="btn-palette" data-action="open-palette" title="Jump to an opportunity or person (Ctrl+K)" aria-label="Search (Ctrl+K)">
           <i class="bi bi-search" aria-hidden="true"></i><span class="btn-palette-text">Jump to…</span><kbd class="btn-palette-kbd">Ctrl K</kbd>
         </button>
