@@ -58,6 +58,11 @@ them. The first time that table is empty, the contents of `config.local.json` ar
 Without SQL the app falls back to `config.local.json` at the repository root (git-ignored).
 Each instance re-reads the settings at most every `SETTINGS_REFRESH_MS` (default 5000 ms).
 
+Azure deployments use `AZURE_SQL_AUTH=managed-identity` so the App Service identity connects
+to Azure SQL without a database password. The deployment sets `CONFIG_FILE` to an isolated
+temporary path so an ignored local `config.local.json` is never seeded into the Azure database.
+The deployment starts with an empty database; local opportunity data is not migrated.
+
 ### Sign-in
 
 The app does not run its own login. In Azure, turn on App Service Authentication with

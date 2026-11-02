@@ -1,0 +1,14 @@
+name: opportunities
+metadata:
+  template: azd-init
+
+services:
+  web:
+    project: .
+    language: js
+    host: appservice
+
+hooks:
+  postprovision:
+    shell: pwsh
+    run: ./scripts/post-provision.ps1

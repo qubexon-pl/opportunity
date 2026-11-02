@@ -5,11 +5,9 @@ let poolPromise;
 
 function buildConfig() {
   const cfg = getConfig().sql;
-  return {
+  const config = {
     server: cfg.server,
     database: cfg.database,
-    user: cfg.user,
-    password: cfg.password,
     options: {
       encrypt: cfg.encrypt,
       trustServerCertificate: false,
@@ -20,6 +18,18 @@ function buildConfig() {
       idleTimeoutMillis: 30000,
     },
   };
+
+  if (cfg.authentication === 'managed-identity') {
+    config.authentication = {
+      type: 'azure-active-directory-msi-app-service',
+      options: {},
+    };
+  } else {
+    config.user = cfg.user;
+    config.password = cfg.password;
+  }
+
+  return config;
 }
 
 async function getPool() {

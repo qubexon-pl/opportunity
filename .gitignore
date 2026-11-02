@@ -4,6 +4,8 @@ node_modules/
 # Env and local configuration
 .env
 config.local.json
+.azure/*
+!.azure/plan.md
 
 # OS
 .DS_Store
