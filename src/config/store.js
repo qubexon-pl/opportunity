@@ -19,7 +19,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const CONFIG_FILE = process.env.CONFIG_FILE || path.join(__dirname, '..', '..', 'config.local.json');
+// Hosted environments serve the app from a read-only package, so the deployment
+// points OPP_CONFIG_FILE at writable storage. Locally this stays in the project root.
+const CONFIG_FILE = path.resolve(
+  process.env.OPP_CONFIG_FILE || process.env.CONFIG_FILE || path.join(__dirname, '..', '..', 'config.local.json')
+);
 
 /* Other instances may have written since we last looked. Re-reading at most
    this often keeps every request cheap while changes still show up within a

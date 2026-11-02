@@ -47,10 +47,11 @@ function buildConfig(fileConfig) {
     sql: {
       server: process.env.AZURE_SQL_SERVER || '',
       database: process.env.AZURE_SQL_DATABASE || '',
-      authentication: process.env.AZURE_SQL_AUTH || 'password',
       user: process.env.AZURE_SQL_USER || '',
       password: process.env.AZURE_SQL_PASSWORD || '',
       encrypt: (process.env.AZURE_SQL_ENCRYPT || 'true') === 'true',
+      // Set when running under a user-assigned managed identity.
+      clientId: process.env.AZURE_CLIENT_ID || '',
     },
     people: {
       names: Array.isArray(fileConfig.people) && fileConfig.people.length ? fileConfig.people : DEFAULT_PEOPLE,
@@ -78,16 +79,6 @@ function validateConfig({ requireProductionSecrets = false } = {}) {
   }
   if (requireProductionSecrets && (!cfg.sql.server || !cfg.sql.database)) {
     errors.push('AZURE_SQL_SERVER and AZURE_SQL_DATABASE must be configured in production.');
-  }
-  if (!['password', 'managed-identity'].includes(cfg.sql.authentication)) {
-    errors.push('AZURE_SQL_AUTH must be either "password" or "managed-identity".');
-  }
-  if (
-    requireProductionSecrets &&
-    cfg.sql.authentication === 'password' &&
-    (!cfg.sql.user || !cfg.sql.password)
-  ) {
-    errors.push('AZURE_SQL_USER and AZURE_SQL_PASSWORD must be configured when using password authentication.');
   }
 
   if (errors.length) {

@@ -7,8 +7,3 @@ services:
     project: .
     language: js
     host: appservice
-
-hooks:
-  postprovision:
-    shell: pwsh
-    run: ./scripts/post-provision.ps1

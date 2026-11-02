@@ -8,11 +8,11 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
-    "sqlAdminObjectId": {
-      "value": "${AZURE_SQL_ADMIN_OBJECT_ID}"
+    "sqlServerFqdn": {
+      "value": "${AZURE_SQL_SERVER}"
     },
-    "sqlAdminLogin": {
-      "value": "${AZURE_SQL_ADMIN_LOGIN}"
+    "sqlDatabaseName": {
+      "value": "${AZURE_SQL_DATABASE}"
     }
   }
 }

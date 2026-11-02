@@ -5,7 +5,6 @@ process.env.NODE_ENV = 'production';
 process.env.SESSION_SECRET = 'test-session-secret-with-sufficient-entropy';
 process.env.AZURE_SQL_SERVER = 'opportunities.database.windows.net';
 process.env.AZURE_SQL_DATABASE = 'opportunities';
-process.env.AZURE_SQL_AUTH = 'managed-identity';
 delete process.env.AZURE_SQL_USER;
 delete process.env.AZURE_SQL_PASSWORD;
 

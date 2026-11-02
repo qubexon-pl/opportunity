@@ -1,52 +1,53 @@
 targetScope = 'subscription'
 
-@description('AZD environment name used for resource naming and tags.')
+@minLength(1)
+@maxLength(64)
+@description('Name of the azd environment, used to name the resource group.')
 param environmentName string
 
-@description('Azure region confirmed for this deployment.')
+@minLength(1)
+@description('Location for all resources.')
 param location string
 
-@description('Object ID of the Entra user who administers the new SQL server.')
-param sqlAdminObjectId string
+@description('Fully qualified name of the existing Azure SQL server.')
+param sqlServerFqdn string
 
-@description('User principal name of the Entra SQL administrator.')
-param sqlAdminLogin string
+@description('Name of the existing database on that server.')
+param sqlDatabaseName string
 
 @secure()
-@description('Bootstrap SQL password required by the SQL server resource. Entra-only authentication is enabled.')
-param sqlAdminPassword string = 'Aa1!${newGuid()}'
+@description('Signing key for session cookies. Regenerated per provision unless supplied.')
+param sessionSecret string = newGuid()
 
-var tags = {
-  'azd-env-name': environmentName
-  application: 'opportunities'
-}
+var tags = { 'azd-env-name': environmentName }
 
-resource resourceGroup 'Microsoft.Resources/resourceGroups@2023-07-01' = {
+resource rg 'Microsoft.Resources/resourceGroups@2023-07-01' = {
   name: 'rg-${environmentName}'
   location: location
   tags: tags
 }
 
-module opportunities './modules/opportunities.bicep' = {
-  name: 'opportunities-${environmentName}'
-  scope: resourceGroup
+module resources './modules/resources.bicep' = {
+  name: 'resources'
+  scope: rg
   params: {
-    environmentName: environmentName
+    name: environmentName
     location: location
-    sqlAdminObjectId: sqlAdminObjectId
-    sqlAdminLogin: sqlAdminLogin
-    sqlAdminPassword: sqlAdminPassword
     tags: tags
+    sqlServerFqdn: sqlServerFqdn
+    sqlDatabaseName: sqlDatabaseName
+    sessionSecret: sessionSecret
   }
 }
 
-output AZURE_RESOURCE_GROUP string = resourceGroup.name
-output AZURE_WEBAPP_NAME string = opportunities.outputs.webAppName
-output AZURE_WEBAPP_PRINCIPAL_ID string = opportunities.outputs.webAppPrincipalId
-output AZURE_SQL_SERVER string = opportunities.outputs.sqlServerFqdn
-output AZURE_SQL_SERVER_NAME string = opportunities.outputs.sqlServerName
-output AZURE_SQL_DATABASE string = opportunities.outputs.sqlDatabaseName
-output AZURE_KEY_VAULT_NAME string = opportunities.outputs.keyVaultName
-output AZURE_KEY_VAULT_ID string = opportunities.outputs.keyVaultId
-output AZURE_APP_URL string = opportunities.outputs.appUrl
-output AZURE_TENANT_ID string = tenant().tenantId
+output AZURE_RESOURCE_GROUP string = rg.name
+output AZURE_KEY_VAULT_NAME string = resources.outputs.keyVaultName
+output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = resources.outputs.logAnalyticsWorkspaceId
+
+output WEB_APP_NAME string = resources.outputs.webAppName
+output WEB_URL string = resources.outputs.webAppUrl
+
+// Needed to grant the identity access inside the database.
+output WEB_IDENTITY_NAME string = resources.outputs.identityName
+output WEB_IDENTITY_CLIENT_ID string = resources.outputs.identityClientId
+output WEB_IDENTITY_PRINCIPAL_ID string = resources.outputs.identityPrincipalId
