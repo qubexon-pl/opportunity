@@ -74,13 +74,11 @@
           <%/* Negative offsets shift the whole window back so a period that has
                already happened can be analysed with the same figures. */ %>
           <div class="col-lg-3 col-md-4 col-6">
-            <label class="form-label" for="offset">Starts</label>
-            <select class="form-select" id="offset" name="offset">
-              <% for (var back = 0; back <= 24; back++) { %>
-                <option value="<%= -back %>" <%= offsetUnits === -back ? 'selected' : '' %>><%= back === 0 ? 'Current period' : back + ' period' + (back === 1 ? '' : 's') + ' back' %></option>
-              <% } %>
-            </select>
-            <div class="form-text">Analysing <%= view.window.label %><%= view.window.isPast ? ' (past period)' : '' %></div>
+            <%- include('partials/offset-select', {
+              perspective: perspective,
+              offsetUnits: offsetUnits,
+              offsetHint: view.window.label + (view.window.isPast ? ' (past)' : ''),
+            }) %>
           </div>
           <div class="col-lg-3 col-md-4 col-6">
             <%- include('partials/multiselect', {

@@ -1,0 +1,45 @@
+<%
+/*
+ * The period picker: how far back the window starts, in whole timeline units.
+ *
+ * Offsets are always zero or negative - the page looks at now or at something
+ * that has already happened - and the wording follows the selected unit, so
+ * "Previous month" and "3 weeks back" read the way the reader set the timeline
+ * up rather than as an abstract "period".
+ *
+ * Locals: perspective, offsetUnits, and optionally offsetId, offsetName,
+ * offsetLabelClass, offsetSelectClass, offsetStyle, offsetHint. They carry the
+ * prefix so nothing in the including page can shadow them - EJS merges the
+ * caller's locals into the partial's scope.
+ */
+var offsetId = typeof offsetId !== 'undefined' ? offsetId : 'offset';
+var offsetName = typeof offsetName !== 'undefined' ? offsetName : 'offset';
+var offsetLabelClass = typeof offsetLabelClass !== 'undefined' ? offsetLabelClass : 'form-label';
+var offsetSelectClass = typeof offsetSelectClass !== 'undefined' ? offsetSelectClass : 'form-select';
+var offsetStyle = typeof offsetStyle !== 'undefined' ? offsetStyle : '';
+var offsetHint = typeof offsetHint !== 'undefined' ? offsetHint : '';
+var selectedOffset = typeof offsetUnits === 'number' ? offsetUnits : 0;
+
+var UNIT_WORDS = {
+  weeks: { one: 'week', many: 'weeks', current: 'This week' },
+  months: { one: 'month', many: 'months', current: 'This month' },
+  quarters: { one: 'quarter', many: 'quarters', current: 'This quarter' },
+  halfyears: { one: 'half-year', many: 'half-years', current: 'This half-year' },
+};
+var words = UNIT_WORDS[perspective] || UNIT_WORDS.months;
+
+function offsetLabel(back) {
+  if (back === 0) return words.current;
+  if (back === 1) return 'Previous ' + words.one;
+  return back + ' ' + words.many + ' back';
+}
+%>
+<label class="<%= offsetLabelClass %> d-flex align-items-baseline gap-2 flex-wrap" for="<%= offsetId %>">
+  <span>Period</span>
+  <% if (offsetHint) { %><span class="text-muted fw-normal small"><%= offsetHint %></span><% } %>
+</label>
+<select class="<%= offsetSelectClass %>" id="<%= offsetId %>" name="<%= offsetName %>"<%= offsetStyle ? ' style="' + offsetStyle + '"' : '' %>>
+  <% for (var back = 0; back <= 24; back++) { %>
+    <option value="<%= -back %>" <%= selectedOffset === -back ? 'selected' : '' %>><%= offsetLabel(back) %></option>
+  <% } %>
+</select>

@@ -6,7 +6,7 @@
 <form method="get" action="/management" class="row g-2 align-items-end mgmt-period-filter" data-mgmt-form>
   <input type="hidden" name="applied" value="1">
   <div class="col-auto">
-    <label class="form-label small mb-0" for="pf-perspective-<%= pfId %>">Period</label>
+    <label class="form-label small mb-0" for="pf-perspective-<%= pfId %>">Timeline unit</label>
     <select class="form-select form-select-sm" id="pf-perspective-<%= pfId %>" name="perspective">
       <% timelineUnitOptions.forEach(function(option) { %>
         <option value="<%= option.key %>" <%= perspective === option.key ? 'selected' : '' %>><%= option.label %></option>
@@ -20,13 +20,14 @@
   <%/* Negative offsets move the whole window into the past so a period that has
        already happened can be analysed with the same numbers. */ %>
   <div class="col-auto">
-    <label class="form-label small mb-0" for="pf-offset-<%= pfId %>">Starts</label>
-    <select class="form-select form-select-sm" id="pf-offset-<%= pfId %>" name="offset" style="width: 125px;">
-      <% var selectedOffset = typeof offsetUnits === 'number' ? offsetUnits : 0; %>
-      <% for (var back = 0; back <= 24; back++) { %>
-        <option value="<%= -back %>" <%= selectedOffset === -back ? 'selected' : '' %>><%= back === 0 ? 'Current period' : back + ' back' %></option>
-      <% } %>
-    </select>
+    <%- include('offset-select', {
+      perspective: perspective,
+      offsetUnits: typeof offsetUnits === 'number' ? offsetUnits : 0,
+      offsetId: 'pf-offset-' + pfId,
+      offsetLabelClass: 'form-label small mb-0',
+      offsetSelectClass: 'form-select form-select-sm',
+      offsetStyle: 'width: 140px;',
+    }) %>
   </div>
   <div class="col-auto">
     <%- include('multiselect', {
