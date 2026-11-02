@@ -12,7 +12,7 @@ const DEFAULT_FIRM_STAGES = ['Won'];
 
 const DEFAULT_VIEW_DEFAULTS = {
   pipeline: { stages: [], statuses: [] },
-  management: { stages: [], statuses: [], people: [], managers: [], perspective: 'months', units: 6 },
+  management: { stages: [], statuses: [], people: [], managers: [], perspective: 'months', units: 6, offset: 0 },
 };
 
 /* Settings are held in memory by the store and persisted to Azure SQL (or the
@@ -122,6 +122,7 @@ function normalizeViewDefaults(saved) {
   const management = (saved && saved.management) || {};
 
   const units = Number(management.units);
+  const offset = Number(management.offset);
 
   return {
     pipeline: {
@@ -135,6 +136,8 @@ function normalizeViewDefaults(saved) {
       managers: toStringArray(management.managers),
       perspective: management.perspective ? String(management.perspective) : DEFAULT_VIEW_DEFAULTS.management.perspective,
       units: Number.isFinite(units) && units > 0 ? units : DEFAULT_VIEW_DEFAULTS.management.units,
+      // Negative values look back at a period that has already happened.
+      offset: Number.isFinite(offset) ? Math.trunc(offset) : DEFAULT_VIEW_DEFAULTS.management.offset,
     },
   };
 }

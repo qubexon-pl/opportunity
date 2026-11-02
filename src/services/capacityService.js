@@ -286,10 +286,18 @@ function assignmentHoursInWindow(assignment, windowStart, windowEndExclusive, op
   return totalHours * (activeBusinessDays / totalBusinessDays);
 }
 
-function capacityWindow(perspective, unitsToShow) {
-  const start = startOfUnit(new Date(), perspective);
+/**
+ * The period under analysis. `offsetUnits` shifts the window away from the
+ * current unit: negative values look back over a period that has already
+ * happened, positive ones look further ahead. Zero keeps the default
+ * "starts today" behaviour.
+ */
+function capacityWindow(perspective, unitsToShow, offsetUnits) {
+  const offset = Number.isFinite(Number(offsetUnits)) ? Math.trunc(Number(offsetUnits)) : 0;
+  const current = startOfUnit(new Date(), perspective);
+  const start = offset === 0 ? current : startOfUnit(addUnit(current, perspective, offset), perspective);
   const units = Math.max(1, Number(unitsToShow || 1));
-  return { start, endExclusive: addUnit(start, perspective, units), units };
+  return { start, endExclusive: addUnit(start, perspective, units), units, offset };
 }
 
 /**
@@ -316,19 +324,38 @@ function personCapacity(personName, start, endExclusive) {
   };
 }
 
-function timelineRange(scheduled, perspective, unitsToShow) {
+/** "Mar 25 — Aug 25" style description of the window under analysis. */
+function describeWindow(window, perspective) {
+  const lastUnit = addUnit(window.start, perspective, window.units - 1);
+  const first = formatUnitLabel(window.start, perspective);
+  const last = formatUnitLabel(lastUnit, perspective);
+  return first === last ? first : `${first} – ${last}`;
+}
+
+/**
+ * The drawn range always contains the selected window, even when it sits in the
+ * past and every assignment starts after it, so the timeline keeps matching the
+ * numbers in the rest of the page.
+ */
+function timelineRange(scheduled, perspective, unitsToShow, window) {
   const horizonUnits = Math.max(1, Number(unitsToShow || 1));
   const dated = scheduled.filter((item) => item.StartDate && item.EndDate);
-  const nowStart = startOfUnit(new Date(), perspective);
+  const anchor = window ? startOfUnit(window.start, perspective) : startOfUnit(new Date(), perspective);
+  const lastWindowUnit = addUnit(anchor, perspective, horizonUnits - 1);
 
   if (!dated.length) {
-    return { start: nowStart, endExclusive: addUnit(nowStart, perspective, horizonUnits), units: horizonUnits };
+    return { start: anchor, endExclusive: addUnit(anchor, perspective, horizonUnits), units: horizonUnits };
   }
 
-  const minStart = new Date(Math.min(...dated.map((item) => new Date(item.StartDate).getTime())));
+  const minStart = new Date(
+    Math.min(anchor.getTime(), ...dated.map((item) => new Date(item.StartDate).getTime()))
+  );
   const maxEnd = new Date(Math.max(...dated.map((item) => new Date(item.EndDate).getTime())));
   const start = startOfUnit(minStart, perspective);
-  const units = Math.max(horizonUnits, unitsToCoverRange(start, maxEnd, perspective));
+  const units = Math.max(
+    unitsToCoverRange(start, lastWindowUnit, perspective),
+    unitsToCoverRange(start, maxEnd, perspective)
+  );
   return { start, endExclusive: addUnit(start, perspective, units), units };
 }
 
@@ -660,6 +687,7 @@ function buildManagementView({
   assignments,
   perspective,
   unitsToShow,
+  offsetUnits,
   stageFilter,
   statusFilter,
   personFilter,
@@ -670,7 +698,7 @@ function buildManagementView({
   peopleDir,
 }) {
   const assignmentRows = buildAssignmentRows(opportunities, assignments);
-  const window = capacityWindow(perspective, unitsToShow);
+  const window = capacityWindow(perspective, unitsToShow, offsetUnits);
   const allPeople = buildManagementPeople(assignmentRows, window);
 
   // An empty person filter normally means everyone, but the caller can say the
@@ -721,7 +749,7 @@ function buildManagementView({
   );
   const displayed = scheduled.filter(matchesStage);
 
-  const range = timelineRange(scheduled, perspective, unitsToShow);
+  const range = timelineRange(scheduled, perspective, unitsToShow, window);
   const units = buildTimelineUnits(range, perspective);
   const unitGroups = buildTimelineGroups(units);
 
@@ -820,7 +848,11 @@ function buildManagementView({
       windowStartText: toDateText(window.start),
       windowEndExclusiveText: toDateText(window.endExclusive),
     },
-    window,
+    window: {
+      ...window,
+      label: describeWindow(window, perspective),
+      isPast: window.endExclusive.getTime() <= Date.now(),
+    },
     capacityBusinessDays: countBusinessDays(window.start, window.endExclusive),
   };
 }
@@ -980,10 +1012,10 @@ function buildOpportunityAbsenceImpact(opportunity, assignments) {
  * assignment the hours are the portion falling inside that period, so the
  * figures reconcile with the timeline bars.
  */
-function buildPersonDetail({ opportunities, assignments, perspective, unitsToShow, person }) {
+function buildPersonDetail({ opportunities, assignments, perspective, unitsToShow, offsetUnits, person }) {
   const name = String(person || '');
   const assignmentRows = buildAssignmentRows(opportunities, assignments);
-  const window = capacityWindow(perspective, unitsToShow);
+  const window = capacityWindow(perspective, unitsToShow, offsetUnits);
   const member = buildManagementPeople(assignmentRows, window).find((candidate) => candidate.person === name) || null;
 
   const mine = assignmentRows

@@ -15,7 +15,7 @@
     </p>
   </div>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="/management?applied=1&perspective=<%= perspective %>&units=<%= unitsToShow %>">
+    <a class="btn btn-outline-secondary" href="/management?applied=1&perspective=<%= perspective %>&units=<%= unitsToShow %>&offset=<%= offsetUnits %>">
       <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to capacity
     </a>
   </div>
@@ -53,6 +53,14 @@
       <div class="col-lg-3 col-md-4 col-6">
         <label class="form-label" for="units">Horizon (units)</label>
         <input type="number" class="form-control" id="units" name="units" min="1" max="24" value="<%= unitsToShow %>">
+      </div>
+      <div class="col-lg-3 col-md-4 col-6">
+        <label class="form-label" for="offset">Starts</label>
+        <select class="form-select" id="offset" name="offset">
+          <% for (var back = 0; back <= 24; back++) { %>
+            <option value="<%= -back %>" <%= offsetUnits === -back ? 'selected' : '' %>><%= back === 0 ? 'Current period' : back + ' period' + (back === 1 ? '' : 's') + ' back' %></option>
+          <% } %>
+        </select>
       </div>
       <div class="col-lg-3 col-md-4">
         <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Apply</button>

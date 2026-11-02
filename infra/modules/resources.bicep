@@ -157,6 +157,13 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           value: '/home/data/config.local.json'
         }
         {
+          // The app sits behind App Service Authentication, so the identity
+          // headers it forwards can be trusted. Set explicitly rather than
+          // relying on the platform's WEBSITE_AUTH_ENABLED variable.
+          name: 'AUTH_PROVIDER'
+          value: 'easyauth'
+        }
+        {
           name: 'SESSION_SECRET'
           value: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=${sessionSecretName})'
         }

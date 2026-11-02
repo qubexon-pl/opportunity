@@ -418,6 +418,50 @@ body.sidebar-collapsed .main-content {
   color: var(--color-primary);
 }
 
+/* Account menu in the top bar: always-reachable sign-out */
+.btn-topbar-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 220px;
+  padding: 0.2rem 0.5rem 0.2rem 0.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-offset);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.btn-topbar-user:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.topbar-user-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.topbar-user-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar-user-caret {
+  font-size: 0.7rem;
+}
+.topbar-user .dropdown-menu {
+  min-width: 230px;
+}
+
 /* Density toggle */
 .btn-density-toggle {
   width: 34px;
