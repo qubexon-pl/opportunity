@@ -204,6 +204,49 @@ Deployed: 2026-11-02 13:05 UTC · `azd up` succeeded in 19m 3s (provision 2m 17s
 
 ---
 
+## 10. Continuous Deployment
+
+`.github/workflows/deploy.yml` runs on every push to `main` (and on demand via
+`workflow_dispatch`). It syntax-checks the app, then runs `azd up` and polls
+`/health` until the new revision answers.
+
+Authentication is OIDC — **no credentials are stored in GitHub**. The workflow
+exchanges a short-lived GitHub token for an Azure one via a federated credential
+scoped to `repo:qubexon-pl/opportunity:ref:refs/heads/main`.
+
+Set up once with:
+
+```
+node scripts/configure-github-oidc.js --repo qubexon-pl/opportunity --branch main --group rg-opportunities-dev
+```
+
+| Identity | Value |
+|----------|-------|
+| App registration | `opportunities-github-deploy` |
+| Client ID | `69917a93-c41b-465e-8876-a99e770425d1` |
+| Contributor | subscription scope — `infra/main.bicep` deploys at subscription scope and creates the resource group |
+| Role Based Access Control Administrator | `rg-opportunities-dev` only — needed for the Key Vault role assignment, kept off the subscription |
+
+**Repository configuration**
+
+| Secret | Purpose |
+|--------|---------|
+| `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` | OIDC sign-in |
+
+| Variable | Value |
+|----------|-------|
+| `AZURE_ENV_NAME` | `opportunities-dev` |
+| `AZURE_LOCATION` | `germanywestcentral` |
+| `AZURE_SQL_SERVER` | `data-team-sql-server.database.windows.net` |
+| `AZURE_SQL_DATABASE` | `opportunities` |
+
+**Deliberately not in the pipeline:** `grant-sql-access.js` needs the SQL Entra
+admin and `configure-auth.js` creates app registrations and secrets. Both are
+one-time, and neither privilege belongs on a push-triggered workflow. Re-run
+them by hand if the identity or the auth secret ever changes.
+
+---
+
 ## 7. Validation Proof
 
 | Check | Command Run | Result | Timestamp |

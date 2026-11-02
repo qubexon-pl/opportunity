@@ -1,0 +1,93 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Deployments take ~20 minutes, so never let two overlap on the same environment.
+concurrency:
+  group: deploy-${{ vars.AZURE_ENV_NAME }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  check:
+    name: Syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run check:js
+
+  deploy:
+    name: Provision and deploy
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_SQL_SERVER: ${{ vars.AZURE_SQL_SERVER }}
+      AZURE_SQL_DATABASE: ${{ vars.AZURE_SQL_DATABASE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: Sign in to Azure
+        run: |
+          azd auth login \
+            --client-id "$AZURE_CLIENT_ID" \
+            --tenant-id "$AZURE_TENANT_ID" \
+            --federated-credential-provider github
+
+      - name: Configure azd environment
+        run: |
+          azd env new "$AZURE_ENV_NAME" --no-prompt
+          azd env set AZURE_SUBSCRIPTION_ID "$AZURE_SUBSCRIPTION_ID"
+          azd env set AZURE_LOCATION "$AZURE_LOCATION"
+          azd env set AZURE_SQL_SERVER "$AZURE_SQL_SERVER"
+          azd env set AZURE_SQL_DATABASE "$AZURE_SQL_DATABASE"
+
+      - name: Provision and deploy
+        run: azd up --no-prompt
+
+      - name: Verify health
+        run: |
+          url="$(azd env get-value WEB_URL)"
+          echo "Checking ${url%/}/health"
+          for attempt in $(seq 1 20); do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' "${url%/}/health" || true)"
+            if [ "$code" = "200" ]; then
+              echo "Healthy after ${attempt} attempt(s)."
+              exit 0
+            fi
+            echo "Attempt ${attempt}: HTTP ${code}"
+            sleep 15
+          done
+          echo "Health check never returned 200."
+          exit 1
+
+      - name: Summarise
+        if: success()
+        run: |
+          {
+            echo "### Deployed :rocket:"
+            echo ""
+            echo "- Environment: \`$AZURE_ENV_NAME\`"
+            echo "- URL: $(azd env get-value WEB_URL)"
+          } >> "$GITHUB_STEP_SUMMARY"
