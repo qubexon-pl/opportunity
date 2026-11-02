@@ -1,4 +1,11 @@
-const store = require('./store');
+const fs = require('fs');
+const path = require('path');
+
+// Hosted environments serve the app from a read-only package, so the writable
+// location has to be configurable. Locally this stays in the project root.
+const CONFIG_FILE = process.env.OPP_CONFIG_FILE
+  ? path.resolve(process.env.OPP_CONFIG_FILE)
+  : path.join(__dirname, '..', '..', 'config.local.json');
 
 const DEFAULT_PEOPLE = [
   'Anna Wacholak',
@@ -22,7 +29,8 @@ function loadFileConfig() {
 }
 
 function saveFileConfig(config) {
-  return store.save(config);
+  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
 }
 
 let memo = { version: -1, value: null };
@@ -50,6 +58,8 @@ function buildConfig(fileConfig) {
       user: process.env.AZURE_SQL_USER || '',
       password: process.env.AZURE_SQL_PASSWORD || '',
       encrypt: (process.env.AZURE_SQL_ENCRYPT || 'true') === 'true',
+      // Set when running under a user-assigned managed identity.
+      clientId: process.env.AZURE_CLIENT_ID || '',
     },
     people: {
       names: Array.isArray(fileConfig.people) && fileConfig.people.length ? fileConfig.people : DEFAULT_PEOPLE,

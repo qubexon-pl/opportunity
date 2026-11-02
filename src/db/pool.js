@@ -5,11 +5,9 @@ let poolPromise;
 
 function buildConfig() {
   const cfg = getConfig().sql;
-  return {
+  const base = {
     server: cfg.server,
     database: cfg.database,
-    user: cfg.user,
-    password: cfg.password,
     options: {
       encrypt: cfg.encrypt,
       trustServerCertificate: false,
@@ -18,6 +16,21 @@ function buildConfig() {
       max: 10,
       min: 0,
       idleTimeoutMillis: 30000,
+    },
+  };
+
+  if (cfg.user && cfg.password) {
+    return { ...base, user: cfg.user, password: cfg.password };
+  }
+
+  // No credentials configured, so sign in with the managed identity the app is
+  // running as. This is how the hosted app connects, and it means no database
+  // password has to exist anywhere.
+  return {
+    ...base,
+    authentication: {
+      type: 'azure-active-directory-msi-app-service',
+      options: cfg.clientId ? { clientId: cfg.clientId } : {},
     },
   };
 }
