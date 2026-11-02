@@ -63,6 +63,16 @@ function normalizeUnits(value, fallback) {
 }
 
 /**
+ * How far the window is shifted from the current period, in whole units.
+ * Negative looks back at a period that has already happened; 0 starts today.
+ */
+function normalizeOffset(value, fallback) {
+  const parsed = num(value);
+  const offset = parsed === null ? (num(fallback) ?? 0) : parsed;
+  return Math.min(0, Math.max(-24, Math.trunc(offset)));
+}
+
+/**
  * Resolves the person selection, honouring the manager filter as a hierarchy:
  * picking a manager means "the people who report to them", and combining it
  * with named people keeps only the ones who do both.
@@ -102,6 +112,7 @@ router.get('/', async (req, res, next) => {
     : filterAgainst(defaults.statuses, STATUSES);
   const requestedPeople = applied ? queryList(req.query.person) : defaults.people;
   const requestedManagers = applied ? queryList(req.query.manager) : defaults.managers;
+  const offsetUnits = normalizeOffset(req.query.offset === undefined ? defaults.offset : req.query.offset, defaults.offset);
 
   try {
     let loadError = null;
@@ -141,6 +152,7 @@ router.get('/', async (req, res, next) => {
       assignments,
       perspective,
       unitsToShow,
+      offsetUnits,
       stageFilter: stageFilters,
       statusFilter: statusFilters,
       personFilter: selection.people,
@@ -162,6 +174,7 @@ router.get('/', async (req, res, next) => {
       ['applied', '1'],
       ['perspective', perspective],
       ['units', String(unitsToShow)],
+      ['offset', String(offsetUnits)],
       ...stageFilters.map((stage) => ['stage', stage]),
       ...statusFilters.map((status) => ['status', status]),
       ...personFilters.map((name) => ['person', name]),
@@ -186,6 +199,7 @@ router.get('/', async (req, res, next) => {
       hoursPerDay: HOURS_PER_DAY,
       perspective,
       unitsToShow,
+      offsetUnits,
       stageFilters,
       statusFilters,
       statusOptions: STATUSES,
@@ -217,7 +231,7 @@ router.get('/', async (req, res, next) => {
       queryWith,
       firmStages: listFirmStages(),
       savedDefaults: defaults,
-      filtersMatchDefault: sameStages && sameStatuses && samePeople && sameManagers && perspective === defaults.perspective && unitsToShow === defaults.units,
+      filtersMatchDefault: sameStages && sameStatuses && samePeople && sameManagers && perspective === defaults.perspective && unitsToShow === defaults.units && offsetUnits === defaults.offset,
       loadError,
       stageStatusLabel,
       stageAccentClass,
@@ -240,6 +254,7 @@ router.get('/people/:person', async (req, res, next) => {
   );
   const unitsToShow = normalizeUnits(req.query.units === undefined ? defaults.units : req.query.units, defaults.units);
   const person = String(req.params.person || '');
+  const offsetUnits = normalizeOffset(req.query.offset === undefined ? defaults.offset : req.query.offset, defaults.offset);
 
   try {
     let loadError = null;
@@ -256,7 +271,7 @@ router.get('/people/:person', async (req, res, next) => {
       loadError = err.message || String(err);
     }
 
-    const detail = buildPersonDetail({ opportunities, assignments, perspective, unitsToShow, person });
+    const detail = buildPersonDetail({ opportunities, assignments, perspective, unitsToShow, offsetUnits, person });
 
     // Build a timeline filtered to just this person.
     const timelineView = buildManagementView({
@@ -264,6 +279,7 @@ router.get('/people/:person', async (req, res, next) => {
       assignments,
       perspective,
       unitsToShow,
+      offsetUnits,
       stageFilter: [],
       statusFilter: [],
       personFilter: [person],
@@ -286,6 +302,7 @@ router.get('/people/:person', async (req, res, next) => {
       detail,
       perspective,
       unitsToShow,
+      offsetUnits,
       timelineUnitOptions: TIMELINE_UNIT_OPTIONS,
       timeline: timelineView.timeline,
       absenceKinds: ABSENCE_KINDS,
@@ -312,6 +329,7 @@ router.post('/defaults', async (req, res) => {
       managers: queryList(req.body.manager).map((name) => String(name)),
       perspective: normalizePerspective(req.body.perspective, 'months'),
       units: normalizeUnits(req.body.units, 6),
+      offset: normalizeOffset(req.body.offset, 0),
     }, userKey(req));
     req.flash('success', 'Saved as your default timeline view.');
   } catch (err) {
@@ -371,6 +389,7 @@ router.get('/assignments/export', async (req, res, next) => {
     : filterAgainst(defaults.statuses, STATUSES);
   const requestedPeople = applied ? queryList(req.query.person) : defaults.people;
   const requestedManagers = applied ? queryList(req.query.manager) : defaults.managers;
+  const offsetUnits = normalizeOffset(req.query.offset === undefined ? defaults.offset : req.query.offset, defaults.offset);
 
   try {
     const [opportunities, assignments] = await Promise.all([
@@ -399,6 +418,7 @@ router.get('/assignments/export', async (req, res, next) => {
       assignments,
       perspective,
       unitsToShow,
+      offsetUnits,
       stageFilter: stageFilters,
       statusFilter: statusFilters,
       personFilter: selection.people,

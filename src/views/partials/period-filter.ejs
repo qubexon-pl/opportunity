@@ -17,6 +17,17 @@
     <label class="form-label small mb-0" for="pf-units-<%= pfId %>">Horizon</label>
     <input type="number" class="form-control form-control-sm" id="pf-units-<%= pfId %>" name="units" min="1" max="24" value="<%= unitsToShow %>" style="width: 70px;">
   </div>
+  <%/* Negative offsets move the whole window into the past so a period that has
+       already happened can be analysed with the same numbers. */ %>
+  <div class="col-auto">
+    <label class="form-label small mb-0" for="pf-offset-<%= pfId %>">Starts</label>
+    <select class="form-select form-select-sm" id="pf-offset-<%= pfId %>" name="offset" style="width: 125px;">
+      <% var selectedOffset = typeof offsetUnits === 'number' ? offsetUnits : 0; %>
+      <% for (var back = 0; back <= 24; back++) { %>
+        <option value="<%= -back %>" <%= selectedOffset === -back ? 'selected' : '' %>><%= back === 0 ? 'Current period' : back + ' back' %></option>
+      <% } %>
+    </select>
+  </div>
   <div class="col-auto">
     <%- include('multiselect', {
       id: 'pf-stage-' + pfId,

@@ -71,6 +71,17 @@
             <label class="form-label" for="units">Horizon (units)</label>
             <input type="number" class="form-control" id="units" name="units" min="1" max="24" value="<%= unitsToShow %>">
           </div>
+          <%/* Negative offsets shift the whole window back so a period that has
+               already happened can be analysed with the same figures. */ %>
+          <div class="col-lg-3 col-md-4 col-6">
+            <label class="form-label" for="offset">Starts</label>
+            <select class="form-select" id="offset" name="offset">
+              <% for (var back = 0; back <= 24; back++) { %>
+                <option value="<%= -back %>" <%= offsetUnits === -back ? 'selected' : '' %>><%= back === 0 ? 'Current period' : back + ' period' + (back === 1 ? '' : 's') + ' back' %></option>
+              <% } %>
+            </select>
+            <div class="form-text">Analysing <%= view.window.label %><%= view.window.isPast ? ' (past period)' : '' %></div>
+          </div>
           <div class="col-lg-3 col-md-4 col-6">
             <%- include('partials/multiselect', {
               id: 'filter-timeline-stage',
@@ -121,6 +132,7 @@
         <form method="post" action="/management/defaults" class="mt-3 d-flex align-items-center gap-2 flex-wrap" data-mgmt-defaults>
           <input type="hidden" name="perspective" value="<%= perspective %>">
           <input type="hidden" name="units" value="<%= unitsToShow %>">
+          <input type="hidden" name="offset" value="<%= offsetUnits %>">
           <% stageFilters.forEach(function(stage) { %><input type="hidden" name="stage" value="<%= stage %>"><% }) %>
           <% statusFilters.forEach(function(status) { %><input type="hidden" name="status" value="<%= status %>"><% }) %>
           <% personFilters.forEach(function(name) { %><input type="hidden" name="person" value="<%= name %>"><% }) %>
@@ -196,7 +208,7 @@
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-start mb-2">
                     <div>
-                      <a class="fw-semibold person-link" href="/management/people/<%= encodeURIComponent(member.person) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>"><%= member.person %></a>
+                      <a class="fw-semibold person-link" href="/management/people/<%= encodeURIComponent(member.person) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>&offset=<%= offsetUnits %>"><%= member.person %></a>
                       <% if (member.role) { %><div class="person-role small text-muted"><%= member.role %></div><% } %>
                     </div>
                     <span class="small text-muted text-nowrap"><%= member.dailyHours %>h/day</span>
@@ -339,7 +351,7 @@
                 <% group.rows.forEach(function(assignment) { %>
                 <tr>
                   <td class="fw-semibold">
-                    <a class="person-link" href="/management/people/<%= encodeURIComponent(assignment.PersonName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>"><%= assignment.PersonName %></a>
+                    <a class="person-link" href="/management/people/<%= encodeURIComponent(assignment.PersonName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>&offset=<%= offsetUnits %>"><%= assignment.PersonName %></a>
                   </td>
                   <td>
                     <%
@@ -415,7 +427,7 @@
         </button>
         <div class="timeline-legend d-flex flex-wrap gap-2">
           <%
-            var baseQuery = 'applied=1&perspective=' + encodeURIComponent(perspective) + '&units=' + encodeURIComponent(unitsToShow);
+            var baseQuery = 'applied=1&perspective=' + encodeURIComponent(perspective) + '&units=' + encodeURIComponent(unitsToShow) + '&offset=' + encodeURIComponent(offsetUnits);
             statusFilters.forEach(function(s) { baseQuery += '&status=' + encodeURIComponent(s); });
             personFilters.forEach(function(p) { baseQuery += '&person=' + encodeURIComponent(p); });
             function toggleHref(value) {
@@ -484,7 +496,7 @@ Soft booked on top: <%= row.softHours %>h<%= row.heldHours ? '\nReleased by hold
 %><% if (row.absentDays) { %>
 Away <%= row.absentDays %>d, which removes <%= row.absenceHours %>h of capacity:<% row.absenceBands.forEach(function(band) { %>
   <%= band.kind %> <%= band.startDate %> &rarr; <%= band.endDate %> (<%= band.daysInWindow %>d in view)<% }) %><% } %>">
-                  <a class="person-link" href="/management/people/<%= encodeURIComponent(row.person) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>"><%= row.person %></a>
+                  <a class="person-link" href="/management/people/<%= encodeURIComponent(row.person) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>&offset=<%= offsetUnits %>"><%= row.person %></a>
                   <span class="timeline-person-load"><%= row.committedHours %>h / <%= row.capacityHours %>h (<%= row.utilizationPercent %>%)</span>
                 </div>
                 <div class="timeline-lane" style="--timeline-units: <%= view.timeline.units.length %>;">
@@ -635,7 +647,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
               %>
                 <tr>
                   <td>
-                    <a href="/management/people/<%= encodeURIComponent(personName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>" class="text-decoration-none fw-semibold">
+                    <a href="/management/people/<%= encodeURIComponent(personName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>&offset=<%= offsetUnits %>" class="text-decoration-none fw-semibold">
                       <i class="bi bi-person me-1" aria-hidden="true"></i><%= personName %>
                     </a>
                   </td>
@@ -651,7 +663,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                     <% } %>
                   </td>
                   <td>
-                    <a href="/management/people/<%= encodeURIComponent(personName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>" class="btn btn-sm btn-outline-primary">
+                    <a href="/management/people/<%= encodeURIComponent(personName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>&offset=<%= offsetUnits %>" class="btn btn-sm btn-outline-primary">
                       Details
                     </a>
                   </td>

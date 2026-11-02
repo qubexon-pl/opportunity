@@ -116,6 +116,31 @@
         <button type="button" class="btn-theme-toggle" data-action="toggle-theme" title="Toggle dark/light mode (Ctrl+Shift+D)" aria-label="Toggle dark mode">
           <i class="bi bi-moon" id="themeIcon" aria-hidden="true"></i>
         </button>
+        <%/* Signed-in person and sign-out. The sidebar carries the same block,
+             but it is below the fold on short screens, so the way out of the
+             app also lives here where it is always reachable. */ %>
+        <div class="dropdown topbar-user">
+          <button type="button" class="btn-topbar-user" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false"
+                  title="<%= user ? (user.name + (user.email ? ' (' + user.email + ')' : '')) : 'Not signed in' %>"
+                  aria-label="Account menu">
+            <span class="topbar-user-avatar" aria-hidden="true"><%= user ? (user.name || 'U').charAt(0).toUpperCase() : 'O' %></span>
+            <span class="topbar-user-name d-none d-lg-inline"><%= user ? user.name : 'Not signed in' %></span>
+            <i class="bi bi-chevron-down topbar-user-caret" aria-hidden="true"></i>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li class="dropdown-header">
+              <div class="fw-semibold"><%= user ? user.name : 'Local workspace' %></div>
+              <% if (user && user.email) { %><div class="small text-muted"><%= user.email %></div><% } %>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="/settings"><i class="bi bi-gear me-2" aria-hidden="true"></i>Configuration</a></li>
+            <% if (logoutUrl) { %>
+              <li><a class="dropdown-item text-danger" href="<%= logoutUrl %>"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Sign out</a></li>
+            <% } else { %>
+              <li><span class="dropdown-item-text small text-muted">Sign-in is handled by Microsoft Entra ID when the app runs on Azure.</span></li>
+            <% } %>
+          </ul>
+        </div>
       </div>
     </header>
 
