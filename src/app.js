@@ -5,8 +5,10 @@ const session = require('express-session');
 const flash = require('connect-flash');
 const cookieParser = require('cookie-parser');
 const path = require('path');
-const { getConfig } = require('./config/settings');
+const crypto = require('crypto');
+const { getConfig, refreshSettings } = require('./config/settings');
 const { securityHeaders, createRateLimiter } = require('./middleware/security');
+const { authenticate } = require('./middleware/auth');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -22,7 +24,20 @@ app.set('view engine', 'ejs');
 
 // Middleware
 app.use(securityHeaders);
-app.use(express.static(path.join(__dirname, 'public')));
+// Bootstrap, its icons and the Inter font are served from the installed
+// packages rather than public CDNs: no third-party requests, pinned versions,
+// and the app works on networks that block those CDNs.
+const vendorCache = { maxAge: isProduction ? '30d' : 0, immutable: isProduction };
+const packageDir = (name) => path.dirname(require.resolve(`${name}/package.json`));
+app.use('/vendor/bootstrap', express.static(path.join(packageDir('bootstrap'), 'dist'), vendorCache));
+app.use('/vendor/bootstrap-icons', express.static(path.join(packageDir('bootstrap-icons'), 'font'), vendorCache));
+app.use('/vendor/inter', express.static(packageDir('@fontsource-variable/inter'), vendorCache));
+app.use(
+  express.static(path.join(__dirname, 'public'), {
+    // Assets are referenced with a ?v= build stamp, so they can be cached hard.
+    maxAge: isProduction ? '7d' : 0,
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
@@ -49,10 +64,28 @@ app.use(
 app.use(flash());
 app.use('/api', createRateLimiter({ windowMs: 60 * 1000, max: 240 }));
 
+// Health check BEFORE DB-dependent middleware so it always responds instantly
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+app.use(authenticate);
+
+// People, absences and saved filters live in the database; make sure this
+// instance has a recent copy before anything reads them. Never blocks for long
+// and never fails the request: the last good copy is used if the store is down.
+app.use((_req, _res, next) => {
+  refreshSettings().then(() => next(), () => next());
+});
+
+// Cache-busting stamp for static assets, changed on every restart/deploy.
+const ASSET_VERSION = process.env.ASSET_VERSION || Date.now().toString(36);
+
 // Global context: current path for sidebar highlighting + auto-breadcrumb
 app.use((req, res, next) => {
   res.locals.currentPath = req.path;
   res.locals.currentUser = req.user || null;
+  res.locals.assetVersion = ASSET_VERSION;
   res.locals.flashSuccess = req.flash('success');
   res.locals.flashError = req.flash('error');
 
@@ -75,11 +108,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check BEFORE DB-dependent routes so it always responds instantly
-app.get('/health', (_req, res) => {
-  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
-});
-
 // Routes
 app.use('/', require('./routes/index'));
 app.use('/opportunities', require('./routes/opportunities'));
@@ -97,12 +125,19 @@ app.use((req, res) => {
   });
 });
 
-// Error handler
+// Error handler: the detail goes to the log with a reference, the person sees
+// a plain message they can quote back. Development still shows the real error.
 app.use((err, req, res, _next) => {
-  console.error('Unhandled error:', err);
+  const reference = crypto.randomBytes(4).toString('hex');
+  console.error(`Unhandled error [${reference}] ${req.method} ${req.originalUrl}:`, err);
+  const detail = isProduction ? null : err.message || String(err);
+  if (req.path.startsWith('/api/') || req.get('X-Requested-With') === 'XMLHttpRequest') {
+    return res.status(500).json({ ok: false, error: detail || `Something went wrong (reference ${reference}).`, reference });
+  }
   res.status(500).render('error', {
-    title: 'Error',
-    message: err.message || 'An unexpected error occurred.',
+    title: 'Something went wrong',
+    message: detail || 'Something went wrong on our side. Please try again in a moment.',
+    reference,
     currentPath: req.path,
     breadcrumb: [{ label: 'Error', href: '#' }],
   });

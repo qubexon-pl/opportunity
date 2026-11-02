@@ -82,12 +82,28 @@ function toFilterArray(value) {
   return [...new Set(list.map((item) => String(item).trim()).filter(Boolean))];
 }
 
-async function listOpportunities({ q = '', sort = 'updated', dir = 'desc', stage = '', status = '' } = {}) {
-  const sortColumn = sort === 'name' ? 'Name' : sort === 'created' ? 'CreatedAt' : 'UpdatedAt';
+/** The pipeline shows this many rows at first; more are loaded on request. */
+const PAGE_SIZE = 500;
+
+/**
+ * Lists opportunities matching the filters.
+ *
+ * `limit` caps the rows returned (the pipeline pages through them); leave it
+ * out to get every match, which is what the capacity views need. The array
+ * carries `total`, the number of matches before the cap, so a capped list can
+ * say how much is missing instead of silently dropping rows.
+ */
+async function listOpportunities({ q = '', sort = 'updated', dir = 'desc', stage = '', status = '', limit } = {}) {
+  const sortColumn = sort === 'name' ? 'Name' : sort === 'created' ? 'CreatedAt' : sort === 'hours' ? 'OpportunityHours' : sort === 'stage' ? 'Stage' : sort === 'owner' ? 'TechOwner' : 'UpdatedAt';
   const sortDir = String(dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+  // SQL Server rejects a column listed twice in ORDER BY, so the tie-breaker
+  // must differ from the sort column.
+  const tieBreaker = sortColumn === 'Name' ? 'Id ASC' : 'Name ASC';
 
   const stages = toFilterArray(stage);
   const statuses = toFilterArray(status);
+  const cap = Number(limit);
+  const top = Number.isInteger(cap) && cap > 0 ? `TOP (${Math.min(cap, 100000)}) ` : '';
 
   const pool = await getPool();
   const request = pool.request().input('q', sql.NVarChar(220), q ? `%${q}%` : null);
@@ -96,50 +112,42 @@ async function listOpportunities({ q = '', sort = 'updated', dir = 'desc', stage
   const statusClause = buildInClause(request, 'Status', statuses, 'status', sql.NVarChar(30));
 
   const result = await request.query(
-    `SELECT TOP 500 *
+    `SELECT ${top}*, COUNT(*) OVER () AS TotalCount
      FROM dbo.Opportunities
-     WHERE (@q IS NULL OR Name LIKE @q OR TechOwner LIKE @q OR BusinessOwner LIKE @q OR Tags LIKE @q)${stageClause}${statusClause}
-     ORDER BY ${sortColumn} ${sortDir};`
+     WHERE (@q IS NULL OR Name LIKE @q OR TechOwner LIKE @q OR BusinessOwner LIKE @q OR Tags LIKE @q OR OppId LIKE @q)${stageClause}${statusClause}
+     ORDER BY ${sortColumn} ${sortDir}, ${tieBreaker};`
   );
 
-  return result.recordset;
+  const rows = result.recordset;
+  rows.total = rows.length ? Number(rows[0].TotalCount) : 0;
+  return rows;
 }
 
 async function getOpportunity(rawId) {
   const id = toGuid(rawId);
   const pool = await getPool();
 
-  const opp = await pool
-    .request()
-    .input('id', sql.UniqueIdentifier, id)
-    .query('SELECT * FROM dbo.Opportunities WHERE Id = @id;');
-
-  if (!opp.recordset[0]) return null;
-
-  const notes = await pool
-    .request()
-    .input('id', sql.UniqueIdentifier, id)
-    .query('SELECT * FROM dbo.OpportunityNotes WHERE OpportunityId = @id ORDER BY NoteDate DESC, CreatedAt DESC;');
-
-  const steps = await pool
-    .request()
-    .input('id', sql.UniqueIdentifier, id)
-    .query('SELECT * FROM dbo.OpportunityNextSteps WHERE OpportunityId = @id ORDER BY IsDone ASC, DueDate ASC, CreatedAt DESC;');
-
-  let assignments = { recordset: [] };
-  try {
-    assignments = await pool
-      .request()
-      .input('id', sql.UniqueIdentifier, id)
+  // Four independent reads: run them side by side rather than one after another,
+  // so the page waits for one round trip to Azure SQL instead of four.
+  const byId = () => pool.request().input('id', sql.UniqueIdentifier, id);
+  const [opp, notes, steps, assignments] = await Promise.all([
+    byId().query('SELECT * FROM dbo.Opportunities WHERE Id = @id;'),
+    byId().query('SELECT * FROM dbo.OpportunityNotes WHERE OpportunityId = @id ORDER BY NoteDate DESC, CreatedAt DESC;'),
+    byId().query('SELECT * FROM dbo.OpportunityNextSteps WHERE OpportunityId = @id ORDER BY IsDone ASC, DueDate ASC, CreatedAt DESC;'),
+    byId()
       .query(
         `SELECT *
          FROM dbo.OpportunityAssignments
          WHERE OpportunityId = @id
          ORDER BY IsTimelineVisible DESC, PlannedStartDate ASC, CreatedAt ASC;`
-      );
-  } catch (err) {
-    if (!isMissingAssignmentsTable(err)) throw err;
-  }
+      )
+      .catch((err) => {
+        if (!isMissingAssignmentsTable(err)) throw err;
+        return { recordset: [] };
+      }),
+  ]);
+
+  if (!opp.recordset[0]) return null;
 
   return {
     opportunity: opp.recordset[0],
@@ -189,7 +197,8 @@ async function updateOpportunity(rawId, payload) {
          PlannedStartDate=@PlannedStartDate,
          PlannedEndDate=@PlannedEndDate,
          AllocationPercent=@AllocationPercent,
-         CountsTowardsCapacity=@CountsTowardsCapacity
+         CountsTowardsCapacity=@CountsTowardsCapacity,
+         UpdatedAt=SYSUTCDATETIME()
      WHERE Id=@Id;
      SELECT @@ROWCOUNT as affected;`
   );
@@ -206,9 +215,46 @@ async function setBookingFlag(rawId, flag) {
     .input('Id', sql.UniqueIdentifier, id)
     .input('CountsTowardsCapacity', sql.Bit, flag === null || flag === undefined ? null : !!flag)
     .query(
-      `UPDATE dbo.Opportunities SET CountsTowardsCapacity=@CountsTowardsCapacity WHERE Id=@Id;
+      `UPDATE dbo.Opportunities SET CountsTowardsCapacity=@CountsTowardsCapacity, UpdatedAt=SYSUTCDATETIME() WHERE Id=@Id;
        SELECT @@ROWCOUNT as affected;`
     );
+  return result.recordset[0].affected > 0;
+}
+
+const QuickUpdateSchema = z
+  .object({
+    stage: z.enum(STAGES).optional(),
+    status: z.enum(STATUSES).optional(),
+    techOwner: z.string().max(200).nullable().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to update.' });
+
+/**
+ * Changes a single field from the pipeline (table cell or board drag) without
+ * re-sending the whole form, so nothing else on the record can be overwritten.
+ */
+async function quickUpdateOpportunity(rawId, patch) {
+  const id = toGuid(rawId);
+  const body = QuickUpdateSchema.parse(patch);
+  const pool = await getPool();
+  const request = pool.request().input('Id', sql.UniqueIdentifier, id);
+  const sets = [];
+  if (body.stage !== undefined) {
+    request.input('Stage', sql.NVarChar(60), body.stage);
+    sets.push('Stage=@Stage');
+  }
+  if (body.status !== undefined) {
+    request.input('Status', sql.NVarChar(30), body.status);
+    sets.push('Status=@Status');
+  }
+  if (body.techOwner !== undefined) {
+    request.input('TechOwner', sql.NVarChar(200), body.techOwner || null);
+    sets.push('TechOwner=@TechOwner');
+  }
+  const result = await request.query(
+    `UPDATE dbo.Opportunities SET ${sets.join(', ')}, UpdatedAt=SYSUTCDATETIME() WHERE Id=@Id;
+     SELECT @@ROWCOUNT as affected;`
+  );
   return result.recordset[0].affected > 0;
 }
 
@@ -294,8 +340,9 @@ async function deleteStep(rawStepId) {
 }
 
 /**
- * Open next steps across every opportunity. This is what drives the pipeline's
- * "Upcoming actions" card now that the duplicated summary fields are gone.
+ * Open next steps across every opportunity, dated ones first. This drives the
+ * pipeline's "Upcoming actions" card (which keeps only the dated ones) and its
+ * "Next step" column (which also shows steps nobody has put a date on yet).
  */
 async function listOpenNextSteps() {
   const pool = await getPool();
@@ -303,8 +350,8 @@ async function listOpenNextSteps() {
     `SELECT s.Id, s.OpportunityId, s.Title, s.DueDate, o.Name as OpportunityName, o.Stage, o.Status
      FROM dbo.OpportunityNextSteps s
      INNER JOIN dbo.Opportunities o ON o.Id = s.OpportunityId
-     WHERE s.IsDone = 0 AND s.DueDate IS NOT NULL AND o.Status <> 'Closed'
-     ORDER BY s.DueDate ASC;`
+     WHERE s.IsDone = 0 AND o.Status <> 'Closed'
+     ORDER BY CASE WHEN s.DueDate IS NULL THEN 1 ELSE 0 END, s.DueDate ASC, s.CreatedAt ASC;`
   );
   return result.recordset;
 }
@@ -312,6 +359,7 @@ async function listOpenNextSteps() {
 module.exports = {
   STAGES,
   STATUSES,
+  PAGE_SIZE,
   OpportunitySchema,
   toGuid,
   listOpportunities,
@@ -320,6 +368,7 @@ module.exports = {
   createOpportunity,
   updateOpportunity,
   setBookingFlag,
+  quickUpdateOpportunity,
   deleteOpportunity,
   addNote,
   deleteNote,

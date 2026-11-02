@@ -131,46 +131,56 @@
   }
 
   /*
-   * Collapsible card sections: the collapsed state is remembered across page
-   * reloads so that filter changes (which reload the page) don't undo it.
+   * Collapsible card sections open by default; whatever the person opens or
+   * closes is remembered per screen (all opportunity pages share one memory),
+   * across reloads and visits, so each page comes back the way they left it.
    */
-  function collapsibleCards() {
-    var toggles = document.querySelectorAll('.card-collapse-toggle[data-bs-target]:not([data-cc-init])');
+  function cardMemoryKey() {
+    var path = window.location.pathname.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ':id');
+    return 'opp-cards:' + path;
+  }
+
+  function readCardMemory() {
+    try {
+      return JSON.parse(localStorage.getItem(cardMemoryKey()) || '{}') || {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function writeCardMemory(targetId, open) {
+    try {
+      var data = readCardMemory();
+      data[targetId] = open;
+      localStorage.setItem(cardMemoryKey(), JSON.stringify(data));
+    } catch (error) {
+      /* storage disabled: the cards just start in their default state */
+    }
+  }
+
+  function setCardOpen(toggle, target, open) {
+    target.classList.toggle('show', open);
+    toggle.classList.toggle('collapsed', !open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function collapsibleCards(root) {
+    var toggles = (root || document).querySelectorAll('.card-collapse-toggle[data-bs-target]:not([data-cc-init])');
     if (!toggles.length) return;
 
-    var key = 'opp-collapsed:' + window.location.pathname;
-
-    try {
-      var saved = JSON.parse(sessionStorage.getItem(key) || '{}');
-      toggles.forEach(function (toggle) {
-        toggle.setAttribute('data-cc-init', '');
-        var targetId = toggle.getAttribute('data-bs-target');
-        var target = targetId && document.querySelector(targetId);
-        if (!target) return;
-        if (saved[targetId]) {
-          target.classList.remove('show');
-          toggle.classList.add('collapsed');
-          toggle.setAttribute('aria-expanded', 'false');
-        }
-      });
-    } catch (error) {
-      /* storage disabled */
-    }
-
+    var saved = readCardMemory();
     toggles.forEach(function (toggle) {
-      toggle.addEventListener('click', function () {
-        var targetId = toggle.getAttribute('data-bs-target');
-        var target = targetId && document.querySelector(targetId);
-        if (!target) return;
-        var isCollapsed = !target.classList.contains('show');
-        try {
-          var data = JSON.parse(sessionStorage.getItem(key) || '{}');
-          if (isCollapsed) data[targetId] = true;
-          else delete data[targetId];
-          sessionStorage.setItem(key, JSON.stringify(data));
-        } catch (error) {
-          /* storage disabled */
-        }
+      toggle.setAttribute('data-cc-init', '');
+      var targetId = toggle.getAttribute('data-bs-target');
+      var target = targetId && document.querySelector(targetId);
+      if (!target) return;
+      if (typeof saved[targetId] === 'boolean') setCardOpen(toggle, target, saved[targetId]);
+
+      target.addEventListener('shown.bs.collapse', function (event) {
+        if (event.target === target) writeCardMemory(targetId, true);
+      });
+      target.addEventListener('hidden.bs.collapse', function (event) {
+        if (event.target === target) writeCardMemory(targetId, false);
       });
     });
   }
@@ -208,7 +218,7 @@
 
   function initViewState(container) {
     container = container || document;
-    collapsibleCards();
+    collapsibleCards(container);
     timelineFullPage();
 
     var sortSelect = container.querySelector('#peopleSort:not([data-ps-init])');
@@ -224,6 +234,7 @@
   }
 
   window.OPP_initViewState = initViewState;
+  window.OPP_cardMemory = { read: readCardMemory, key: cardMemoryKey };
 
   document.addEventListener('DOMContentLoaded', function () {
     keepScrollPosition();

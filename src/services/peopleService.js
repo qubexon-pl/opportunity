@@ -115,14 +115,14 @@ function writePerson(name, { dailyHours, role, cost, manager }) {
     else delete managerMap[name];
   }
 
-  updatePeopleConfig({ people, personDailyHours: dailyHoursMap, personRoles: roleMap, personCosts: costMap, personManagers: managerMap });
+  return updatePeopleConfig({ people, personDailyHours: dailyHoursMap, personRoles: roleMap, personCosts: costMap, personManagers: managerMap });
 }
 
-function addPerson(personName, dailyHours, role, cost, manager) {
+async function addPerson(personName, dailyHours, role, cost, manager) {
   const name = String(personName || '').trim();
   if (!name) throw new Error('Person name is required.');
 
-  writePerson(name, {
+  return writePerson(name, {
     dailyHours: normalizeDailyHours(dailyHours),
     role: normalizeRole(role),
     cost: normalizeCost(cost),
@@ -130,7 +130,7 @@ function addPerson(personName, dailyHours, role, cost, manager) {
   });
 }
 
-function removePerson(personName) {
+async function removePerson(personName) {
   const name = String(personName || '').trim();
   if (!name) throw new Error('Person name is required.');
 
@@ -146,7 +146,7 @@ function removePerson(personName) {
   delete managerMap[name];
   delete absenceMap[name];
 
-  updatePeopleConfig({
+  return updatePeopleConfig({
     people,
     personDailyHours: dailyHoursMap,
     personRoles: roleMap,
@@ -157,11 +157,11 @@ function removePerson(personName) {
 }
 
 /** Saves the editable columns of a configured person in one go. */
-function updatePersonProfile(personName, { dailyHours, role, cost, manager }) {
+async function updatePersonProfile(personName, { dailyHours, role, cost, manager }) {
   const name = String(personName || '').trim();
   if (!name) throw new Error('Person name is required.');
 
-  writePerson(name, {
+  return writePerson(name, {
     dailyHours: normalizeDailyHours(dailyHours),
     role: normalizeRole(role),
     cost: normalizeCost(cost),
@@ -169,10 +169,10 @@ function updatePersonProfile(personName, { dailyHours, role, cost, manager }) {
   });
 }
 
-function updateDailyHours(personName, dailyHours) {
+async function updateDailyHours(personName, dailyHours) {
   const name = String(personName || '').trim();
   if (!name) throw new Error('Person name is required.');
-  writePerson(name, { dailyHours: normalizeDailyHours(dailyHours) });
+  return writePerson(name, { dailyHours: normalizeDailyHours(dailyHours) });
 }
 
 module.exports = {

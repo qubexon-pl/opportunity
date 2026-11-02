@@ -1,8 +1,8 @@
 <%- include('partials/header') %>
 
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+<div class="page-hero">
   <div>
-    <h2><i class="bi bi-person-badge me-2"></i><%= detail.person %></h2>
+    <h2><i class="bi bi-person-badge me-2" aria-hidden="true"></i><%= detail.person %></h2>
     <p class="text-muted mb-0">
       <% if (detail.member) { %>
         <% if (detail.member.role) { %><%= detail.member.role %> &middot; <% } %>
@@ -16,29 +16,29 @@
   </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="/management?applied=1&perspective=<%= perspective %>&units=<%= unitsToShow %>">
-      <i class="bi bi-arrow-left me-1"></i>Back to capacity
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to capacity
     </a>
   </div>
 </div>
 
 <% if (typeof loadError !== 'undefined' && loadError) { %>
   <div class="alert alert-warning">
-    <i class="bi bi-exclamation-triangle me-2"></i>Could not load assignment data: <%= loadError %>
+    <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>Could not load assignment data: <%= loadError %>
   </div>
 <% } %>
 
 <% if (!detail.isKnown) { %>
   <div class="alert alert-info">
-    <i class="bi bi-info-circle me-2"></i><%= detail.person %> is not configured and has no assignments.
+    <i class="bi bi-info-circle me-2" aria-hidden="true"></i><%= detail.person %> is not configured and has no assignments.
     Add them in <a href="/settings">Configuration</a>.
   </div>
 <% } else { %>
 
 <div class="card mb-4">
   <div class="card-header">
-    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePeriod" aria-expanded="false">
-      <i class="bi bi-chevron-down"></i><span><i class="bi bi-sliders me-2"></i>Period</span>
-    </a>
+    <button type="button" class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePeriod" aria-expanded="false">
+      <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-sliders me-2" aria-hidden="true"></i>Period</span>
+    </button>
   </div>
   <div class="card-body collapse" id="collapsePeriod">
     <form method="get" class="row g-3 align-items-end">
@@ -55,7 +55,7 @@
         <input type="number" class="form-control" id="units" name="units" min="1" max="24" value="<%= unitsToShow %>">
       </div>
       <div class="col-lg-3 col-md-4">
-        <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Apply</button>
       </div>
     </form>
   </div>
@@ -110,12 +110,12 @@
 
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseCapacityPeriod" aria-expanded="false">
-      <i class="bi bi-chevron-down"></i><span><i class="bi bi-calendar3 me-2"></i>Capacity by period</span>
-    </a>
+    <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseCapacityPeriod" aria-expanded="true">
+      <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-calendar3 me-2" aria-hidden="true"></i>Capacity by period</span>
+    </button>
     <span class="text-muted small">Committed + free = capacity, so each row is 100%</span>
   </div>
-  <div class="card-body collapse p-0" id="collapseCapacityPeriod">
+  <div class="card-body collapse p-0 show" id="collapseCapacityPeriod">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0 person-period-table">
         <thead>
@@ -125,7 +125,7 @@
             <th class="text-end">Committed</th>
             <th class="text-end">Free</th>
             <th class="text-end">Soft</th>
-            <th style="width: 130px;">Split</th>
+            <th class="col-w130">Split</th>
             <th>Breakdown</th>
           </tr>
         </thead>
@@ -150,7 +150,7 @@
               </td>
               <% if (fullyAbsent) { %>
                 <td class="text-muted text-center" colspan="5">
-                  <i class="bi bi-calendar-x me-1"></i>Away for the whole period, so there is no capacity to share out
+                  <i class="bi bi-calendar-x me-1" aria-hidden="true"></i>Away for the whole period, so there is no capacity to share out
                 </td>
               <% } else { %>
                 <td class="text-end"><%= period.committedHours %>h <span class="text-muted small">(<%= period.usedPercent %>%)</span></td>
@@ -184,14 +184,14 @@
 
 <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseAllocations" aria-expanded="false">
-      <i class="bi bi-chevron-down"></i><span><i class="bi bi-list-check me-2"></i>Allocations in this period (<%= detail.inWindow.length %>)</span>
-    </a>
+    <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseAllocations" aria-expanded="true">
+      <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-list-check me-2" aria-hidden="true"></i>Allocations in this period (<%= detail.inWindow.length %>)</span>
+    </button>
     <% if (detail.hiddenCount) { %>
       <span class="text-muted small"><%= detail.hiddenCount %> hidden from the timeline</span>
     <% } %>
   </div>
-  <div class="card-body collapse p-0" id="collapseAllocations">
+  <div class="card-body collapse p-0 show" id="collapseAllocations">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
         <thead>
@@ -220,7 +220,7 @@
                 <% if (row.hasHolds) { %>
                   <% (row.holds || []).forEach(function(hold) { %>
                     <div class="hold-hint small<%= isHoldExpired(hold) ? ' text-decoration-line-through text-muted' : '' %>">
-                      <i class="bi bi-pause-circle me-1"></i>On hold <%= hold.startDate %> &rarr; <%= hold.endDate %>
+                      <i class="bi bi-pause-circle me-1" aria-hidden="true"></i>On hold <%= hold.startDate %> &rarr; <%= hold.endDate %>
                     </div>
                   <% }) %>
                   <% if (row.releasedByHoldHours > 0) { %>
@@ -269,9 +269,9 @@
 
 <div class="card mb-4">
   <div class="card-header">
-    <a class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapsePersonTimeline" aria-expanded="true">
-      <i class="bi bi-chevron-down"></i><span><i class="bi bi-bar-chart-steps me-2"></i>Timeline</span>
-    </a>
+    <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapsePersonTimeline" aria-expanded="true">
+      <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-bar-chart-steps me-2" aria-hidden="true"></i>Timeline</span>
+    </button>
   </div>
   <div class="card-body collapse show" id="collapsePersonTimeline">
     <% if (timeline && timeline.rows.length) { %>
@@ -346,7 +346,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                   <% }) %>
                   <a class="timeline-chip-body" href="/opportunities/<%= chip.OpportunityId %>#assignments">
                     <span class="timeline-chip-title">
-                      <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %><%
+                      <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1" aria-hidden="true"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1" aria-hidden="true"></i><% } %><%= chip.OpportunityName %><%
                       %><span class="timeline-chip-stage <%= chip.accentClass %>"><%= stageStatusLabel(chip.Stage) %></span>
                     </span>
                     <span class="timeline-chip-meta" data-role="meta"><%
@@ -378,7 +378,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                       <span class="timeline-free-secondary">no capacity</span>
                     <% } else if (segment.isOver) { %>
                       <span class="timeline-free-primary">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i><%= segment.overHours %>h over
+                        <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i><%= segment.overHours %>h over
                       </span>
                       <span class="timeline-free-secondary"><%= segment.usedPercent %>%<% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %></span>
                     <% } else { %>
@@ -418,6 +418,4 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
 
 <% } %>
 
-<script src="/js/person-absences.js"></script>
-<script src="/js/timeline.js"></script>
-<%- include('partials/footer') %>
+<%- include('partials/footer', { pageScripts: ['/js/multiselect.js', '/js/timeline-scroll.js', '/js/person-absences.js', '/js/timeline.js'] }) %>

@@ -27,6 +27,8 @@ const { queryList, filterAgainst } = require('../services/filterService');
 const { STAGES, STATUSES } = require('../services/opportunityService');
 const { isDatabaseUnavailable } = require('../db/pool');
 
+const { userKey } = require('../middleware/auth');
+
 const router = express.Router();
 
 /** Stage options for the timeline filter, plus the "free capacity" pseudo-stage. */
@@ -84,7 +86,7 @@ function resolvePeopleSelection({ requestedPeople, requestedManagers, personOpti
 }
 
 router.get('/', async (req, res, next) => {
-  const defaults = getViewDefaults().management;
+  const defaults = getViewDefaults(userKey(req)).management;
 
   const applied = req.query.applied === '1';
   const perspective = normalizePerspective(
@@ -231,7 +233,7 @@ router.get('/', async (req, res, next) => {
 
 /** One person's capacity for the selected window, broken down period by period. */
 router.get('/people/:person', async (req, res, next) => {
-  const defaults = getViewDefaults().management;
+  const defaults = getViewDefaults(userKey(req)).management;
   const perspective = normalizePerspective(
     req.query.perspective === undefined ? defaults.perspective : req.query.perspective,
     defaults.perspective
@@ -301,16 +303,16 @@ router.get('/people/:person', async (req, res, next) => {
 });
 
 /** Remembers the current timeline filter as the management default. */
-router.post('/defaults', (req, res) => {
+router.post('/defaults', async (req, res) => {
   try {
-    updateViewDefaults('management', {
+    await updateViewDefaults('management', {
       stages: filterAgainst(queryList(req.body.stage), TIMELINE_FILTER_OPTIONS),
       statuses: filterAgainst(queryList(req.body.status), STATUSES),
       people: queryList(req.body.person).map((name) => String(name)),
       managers: queryList(req.body.manager).map((name) => String(name)),
       perspective: normalizePerspective(req.body.perspective, 'months'),
       units: normalizeUnits(req.body.units, 6),
-    });
+    }, userKey(req));
     req.flash('success', 'Saved as your default timeline view.');
   } catch (err) {
     req.flash('error', err.message || String(err));
@@ -354,7 +356,7 @@ router.post('/assignments/:assignmentId/visibility', async (req, res, next) => {
 
 /** Exports the assignments table (with current filters) as an xlsx file. */
 router.get('/assignments/export', async (req, res, next) => {
-  const defaults = getViewDefaults().management;
+  const defaults = getViewDefaults(userKey(req)).management;
   const applied = req.query.applied === '1';
   const perspective = normalizePerspective(
     req.query.perspective === undefined ? defaults.perspective : req.query.perspective,

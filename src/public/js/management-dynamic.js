@@ -12,6 +12,7 @@
   function init() {
     contentEl = document.getElementById('managementContent');
     if (!contentEl) return;
+    updateExportHref();
 
     initTabPersistence();
     interceptForms();
@@ -49,53 +50,19 @@
 
   /* ── Content swap ────────────────────────────────────────────── */
 
-  function saveCollapseState(container) {
-    var states = {};
-    container.querySelectorAll('.collapse').forEach(function (el) {
-      if (el.id) states[el.id] = el.classList.contains('show');
-    });
-    return states;
-  }
-
-  /* Capture everything that makes the page feel "where I left it": scroll
-     position, open sections, active tab, the timeline's own horizontal
-     scroll and the focused field. Falls back to collapse states alone if
-     live-update.js is not on the page. */
+  /* State capture, restore and re-initialisation are shared with every other
+     screen through live-update.js (OPP_viewState), which is loaded on every
+     page, so the management view behaves the same as the rest of the app. */
   function captureState(container) {
-    if (window.OPP_viewState) return window.OPP_viewState.capture(container);
-    return { legacyCollapses: saveCollapseState(container) };
+    return window.OPP_viewState.capture(container);
   }
 
   function restoreState(container, state) {
-    if (window.OPP_viewState && !state.legacyCollapses) {
-      window.OPP_viewState.restore(container, state);
-      return;
-    }
-    restoreCollapseState(container, state.legacyCollapses || {});
+    window.OPP_viewState.restore(container, state);
   }
 
-  function restoreCollapseState(container, states) {
-    Object.keys(states).forEach(function (id) {
-      var el = container.querySelector('#' + id);
-      if (!el) return;
-      var toggle = container.querySelector('[data-bs-target="#' + id + '"]');
-      if (states[id]) {
-        el.classList.add('show');
-        if (toggle) {
-          toggle.classList.remove('collapsed');
-          toggle.setAttribute('aria-expanded', 'true');
-        }
-      } else {
-        el.classList.remove('show');
-        if (toggle) {
-          toggle.classList.add('collapsed');
-          toggle.setAttribute('aria-expanded', 'false');
-        }
-      }
-    });
-  }
-
-  function swapContent(cleanUrl, pushState = true) {
+  function swapContent(cleanUrl, pushState) {
+    if (pushState === undefined) pushState = true;
     if (swapping) return;
     swapping = true;
 
@@ -114,7 +81,7 @@
 
         /* Remember filter input values that live outside the server-rendered
            form (the assignment filter and timeline filter text boxes). */
-        var assignmentFilter = contentEl.querySelector('#collapseAssignments input[oninput*="filterGroupedTable"]');
+        var assignmentFilter = contentEl.querySelector('#collapseAssignments input[data-filter-grouped]');
         var assignmentFilterVal = assignmentFilter ? assignmentFilter.value : '';
         var timelineFilter = contentEl.querySelector('[data-timeline-filter]');
         var timelineFilterVal = timelineFilter ? timelineFilter.value : '';
@@ -125,20 +92,13 @@
           history.pushState({ mgmt: true }, '', cleanUrl);
         }
 
-        /* Update people daily hours from the embedded JSON script. */
-        var hoursScript = contentEl.querySelector('#mgmtPeopleDailyHours');
-        if (hoursScript) {
-          try { window.OPP_PEOPLE_DAILY_HOURS = JSON.parse(hoursScript.textContent); }
-          catch (err) { /* ignore */ }
-        }
-
         /* Re-initialise every JS module on the new DOM. */
         reinitAll(contentEl);
 
         /* Restore filter text boxes before the scroll is put back, because
            filtering rows changes the page height. */
         if (assignmentFilterVal) {
-          var newAf = contentEl.querySelector('#collapseAssignments input[oninput*="filterGroupedTable"]');
+          var newAf = contentEl.querySelector('#collapseAssignments input[data-filter-grouped]');
           if (newAf) { newAf.value = assignmentFilterVal; newAf.dispatchEvent(new Event('input')); }
         }
         if (timelineFilterVal) {
@@ -169,13 +129,20 @@
   };
 
   function reinitAll(container) {
-    if (window.OPP_initMultiselects) window.OPP_initMultiselects(container);
-    if (window.OPP_initAllocationForms) window.OPP_initAllocationForms(container);
-    if (window.OPP_initTimelineScroll) window.OPP_initTimelineScroll(container);
-    if (window.OPP_initTimelineDrag) window.OPP_initTimelineDrag();
-    if (window.OPP_initViewState) window.OPP_initViewState(container);
-    if (window.OPP_updateExportHref) window.OPP_updateExportHref();
+    window.OPP_viewState.reinit(container);
+    updateExportHref();
   }
+
+  /* The export button always downloads what the filters currently show. */
+  function updateExportHref() {
+    var btn = document.getElementById('exportAssignmentsBtn');
+    if (!btn) return;
+    var params = new URLSearchParams(window.location.search);
+    params.delete('partial');
+    params.set('applied', '1');
+    btn.href = '/management/assignments/export?' + params.toString();
+  }
+  window.OPP_updateExportHref = updateExportHref;
 
   /* ── Perspective GET form ────────────────────────────────────── */
 

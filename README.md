@@ -8,7 +8,9 @@ Power BI Governance app): no client build step, no SPA, everything is rendered o
 ## Stack
 
 - Node.js + Express 4
-- EJS views with Bootstrap 5 and a shared design system (`src/public/css/style.css`)
+- EJS views with Bootstrap 5 and one stylesheet (`src/public/css/main.css`)
+- Bootstrap, Bootstrap Icons and the Inter font are installed from npm and served from
+  `/vendor/*`, so the app needs no CDN and runs under a strict Content Security Policy
 - Azure SQL (`mssql`) for persistence
 - `zod` for input validation
 
@@ -18,9 +20,10 @@ Power BI Governance app): no client build step, no SPA, everything is rendered o
 src/
   app.js               Express app wiring (security, sessions, flash, routes, errors)
   server.js            HTTP entry point
-  config/settings.js   Environment + config.local.json settings
+  config/settings.js   Environment settings and the people/capacity settings API
+  config/store.js      Settings store: Azure SQL (dbo.AppSettings) or config.local.json
   db/pool.js           Azure SQL connection pool
-  middleware/          Security headers and rate limiting
+  middleware/          Sign-in (Easy Auth), security headers and rate limiting
   routes/              index (pipeline), opportunities, management, settings, api
   services/            Business logic: dates, people, opportunities, assignments, capacity
   sql/                 Database migrations
@@ -48,12 +51,28 @@ gracefully and shows a hint naming the script to apply.
 
 ## Configuration
 
-People and their daily working hours are stored in `config.local.json` at the repository
-root (created automatically, git-ignored) and are editable from the **Configuration** page.
+People, daily hours, roles, costs, absences, committed stages and saved view defaults are
+edited from the **Configuration** page. When Azure SQL is configured they are stored in
+`dbo.AppSettings` (one row per setting), so every instance shares them and a redeploy keeps
+them. The first time that table is empty, the contents of `config.local.json` are copied in.
+Without SQL the app falls back to `config.local.json` at the repository root (git-ignored).
+Each instance re-reads the settings at most every `SETTINGS_REFRESH_MS` (default 5000 ms).
+
+### Sign-in
+
+The app does not run its own login. In Azure, turn on App Service Authentication with
+Microsoft Entra ID; the signed-in person's name appears in the top bar and their saved
+pipeline defaults are kept per person. Settings:
+
+| Variable | Meaning |
+| --- | --- |
+| `AUTH_PROVIDER=easyauth` | Trust the Easy Auth headers (detected automatically on App Service) |
+| `AUTH_REQUIRED=true` | Refuse requests with nobody signed in |
+| `DEV_USER_NAME`, `DEV_USER_EMAIL` | Act as this person locally (ignored in production) |
 
 ## Pages
 
-- `/` &mdash; pipeline list with filters and upcoming actions
+- `/` &mdash; pipeline as a table or a stage board, with inline edits, next steps and Excel export
 - `/opportunities/new`, `/opportunities/:id` &mdash; create and edit opportunities, notes, next steps, assignments
 - `/management` &mdash; team capacity cards, assignment table, and the allocation timeline
 - `/settings` &mdash; people and daily capacity
@@ -67,4 +86,10 @@ root (created automatically, git-ignored) and are editable from the **Configurat
 | `npm start` | Start the server |
 | `npm run dev` | Start with `--watch` |
 | `npm run check:js` | Syntax-check all JavaScript under `src/` and `test/` |
-| `npm run check` | Same as `check:js` |
+| `npm test` | Run the unit tests (`node --test`) |
+| `npm run check` | `check:js` and the tests; this is what CI runs |
+
+## Keyboard
+
+`Ctrl+K` jumps to any opportunity, person or page; `Shift+N` starts a new opportunity;
+`Ctrl+S` saves the opportunity form; `?` lists every shortcut.

@@ -2,6 +2,4 @@
 <div id="pipelineContent">
   <%- include('pipeline-content') %>
 </div>
-<script src="/js/upcoming-actions.js"></script>
-<script src="/js/pipeline-dynamic.js"></script>
-<%- include('partials/footer') %>
+<%- include('partials/footer', { pageScripts: ['/js/multiselect.js', '/js/pipeline-dynamic.js'] }) %>

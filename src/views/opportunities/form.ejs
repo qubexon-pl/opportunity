@@ -11,10 +11,10 @@
 %>
 
 <div id="opportunityDetail">
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+<div class="page-hero">
   <div>
     <h2>
-      <i class="bi <%= isNew ? 'bi-plus-circle' : 'bi-briefcase' %> me-2"></i>
+      <i class="bi <%= isNew ? 'bi-plus-circle' : 'bi-briefcase' %> me-2" aria-hidden="true"></i>
       <%= isNew ? 'Create opportunity' : o.Name %>
     </h2>
     <p class="text-muted mb-0">
@@ -23,13 +23,10 @@
     </p>
   </div>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="/"><i class="bi bi-arrow-left me-1"></i>Back</a>
-    <button class="btn btn-primary" type="submit" form="opportunityForm">
-      <i class="bi bi-check-lg me-1"></i><%= isNew ? 'Create' : 'Save' %>
-    </button>
+    <a class="btn btn-outline-secondary" href="/"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back</a>
     <% if (!isNew) { %>
       <form method="post" action="/opportunities/<%= o.Id %>/delete" data-confirm="Delete this opportunity and all of its notes, steps, and assignments?" data-confirm-title="Delete opportunity">
-        <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>Delete</button>
+        <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
       </form>
     <% } %>
   </div>
@@ -64,16 +61,42 @@
   </div>
 <% } %>
 
-<form method="post" action="<%= actionUrl %>" id="opportunityForm">
+<% if (!isNew) { %>
+  <%
+    var openSteps = stepsList.filter(function(step) { return !step.IsDone; }).length;
+  %>
+  <ul class="nav nav-tabs mb-3 opportunity-tabs" id="opportunityTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="tab-overview" data-bs-toggle="tab" data-bs-target="#paneOverview" data-tab-key="overview" type="button" role="tab" aria-controls="paneOverview" aria-selected="true">
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>Overview
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-assignments" data-bs-toggle="tab" data-bs-target="#paneAssignments" data-tab-key="assignments" type="button" role="tab" aria-controls="paneAssignments" aria-selected="false">
+        <i class="bi bi-people me-1" aria-hidden="true"></i>Assignments <span class="badge rounded-pill text-bg-light"><%= assignmentList.length %></span>
+        <% if (absence && absence.items.length) { %><i class="bi bi-exclamation-triangle-fill text-warning ms-1" title="Planned absence affects this timeline" aria-hidden="true"></i><span class="visually-hidden">(planned absence affects this timeline)</span><% } %>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-activity" data-bs-toggle="tab" data-bs-target="#paneActivity" data-tab-key="activity" type="button" role="tab" aria-controls="paneActivity" aria-selected="false">
+        <i class="bi bi-journal-check me-1" aria-hidden="true"></i>Notes and next steps <span class="badge rounded-pill text-bg-light"><%= openSteps %> open</span>
+      </button>
+    </li>
+  </ul>
+<% } %>
+
+<div class="<%= isNew ? '' : 'tab-content' %>">
+<div class="<%= isNew ? '' : 'tab-pane fade show active' %>" id="paneOverview" role="<%= isNew ? 'region' : 'tabpanel' %>" aria-labelledby="tab-overview">
+<form method="post" action="<%= actionUrl %>" id="opportunityForm" data-track-changes>
   <div class="row g-3">
     <div class="col-lg-6">
       <div class="card h-100">
         <div class="card-header">
-          <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseBasic" aria-expanded="false">
-            <i class="bi bi-chevron-down"></i><span><i class="bi bi-info-circle me-2"></i>Basic information</span>
-          </a>
+          <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseBasic" aria-expanded="true">
+            <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-info-circle me-2" aria-hidden="true"></i>Basic information</span>
+          </button>
         </div>
-        <div class="card-body row g-3 collapse" id="collapseBasic">
+        <div class="card-body row g-3 collapse show" id="collapseBasic">
           <div class="col-12">
             <label class="form-label" for="name">Opportunity name</label>
             <input class="form-control" id="name" name="name" required maxlength="200" value="<%= o.Name || '' %>">
@@ -121,11 +144,11 @@
     <div class="col-lg-6">
       <div class="card h-100">
         <div class="card-header">
-          <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePlanning" aria-expanded="false">
-            <i class="bi bi-chevron-down"></i><span><i class="bi bi-calendar3 me-2"></i>Planning and capacity</span>
-          </a>
+          <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapsePlanning" aria-expanded="true">
+            <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-calendar3 me-2" aria-hidden="true"></i>Planning and capacity</span>
+          </button>
         </div>
-        <div class="card-body row g-3 collapse" id="collapsePlanning">
+        <div class="card-body row g-3 collapse show" id="collapsePlanning">
           <div class="col-md-4">
             <label class="form-label" for="stage">Stage</label>
             <select class="form-select" id="stage" name="stage">
@@ -193,19 +216,21 @@
     </div>
   </div>
 </form>
+</div><!-- /#paneOverview -->
 
 <% if (!isNew) { %>
+<div class="tab-pane fade" id="paneAssignments" role="tabpanel" aria-labelledby="tab-assignments">
   <% if (absence && absence.items.length) { %>
-    <div class="card mt-4 absence-impact-card <%= absence.shiftsPlannedEnd || absence.blocksDelivery ? 'is-at-risk' : '' %>" id="absence-impact">
+    <div class="card mb-4 absence-impact-card <%= absence.shiftsPlannedEnd || absence.blocksDelivery ? 'is-at-risk' : '' %>" id="absence-impact">
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseAbsence" aria-expanded="false">
-          <i class="bi bi-chevron-down"></i><span><i class="bi bi-calendar-x me-2"></i>Planned absence affecting this timeline</span>
-        </a>
+        <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseAbsence" aria-expanded="true">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-calendar-x me-2" aria-hidden="true"></i>Planned absence affecting this timeline</span>
+        </button>
         <span class="badge <%= absence.shiftsPlannedEnd || absence.blocksDelivery ? 'text-bg-danger' : 'text-bg-warning' %>">
           <%= absence.daysLost %> working <%= absence.daysLost === 1 ? 'day' : 'days' %> lost &middot; <%= absence.hoursAtRisk %>h at risk
         </span>
       </div>
-      <div class="card-body collapse" id="collapseAbsence">
+      <div class="card-body collapse show" id="collapseAbsence">
         <p class="text-muted small">
           <%= absence.peopleAffected.length === 1 ? absence.peopleAffected[0] + ' is' : absence.peopleAffected.length + ' people are' %>
           away on days this project was counting on.
@@ -217,12 +242,12 @@
 
         <% if (absence.blocksDelivery) { %>
           <div class="alert alert-danger py-2 small mb-3">
-            <i class="bi bi-exclamation-octagon me-1"></i>
+            <i class="bi bi-exclamation-octagon me-1" aria-hidden="true"></i>
             At least one allocation has no working days left at all once absence is taken out &mdash; it cannot deliver in its current window.
           </div>
         <% } else if (absence.shiftsPlannedEnd) { %>
           <div class="alert alert-warning py-2 small mb-3">
-            <i class="bi bi-exclamation-triangle me-1"></i>
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
             Recovering the lost days runs past the planned end of <strong><%= absence.plannedEndDate %></strong>,
             to <strong><%= absence.latestSuggestedEnd %></strong>.
           </div>
@@ -278,18 +303,18 @@
     </div>
   <% } %>
 
-  <div class="card mt-4" id="assignments">
+  <div class="card" id="assignments">
     <div class="card-header">
-      <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseAssignments" aria-expanded="false">
-        <i class="bi bi-chevron-down"></i><span><i class="bi bi-people me-2"></i>Assignments for timeline</span>
-      </a>
+      <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseAssignments" aria-expanded="true">
+        <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-people me-2" aria-hidden="true"></i>Assignments for timeline</span>
+      </button>
     </div>
-    <div class="card-body collapse" id="collapseAssignments">
+    <div class="card-body collapse show" id="collapseAssignments">
       <form method="post" action="/opportunities/<%= o.Id %>/assignments" class="allocation-form row g-2 align-items-end mb-4"
             data-opportunity-hours="<%= o.OpportunityHours || 0 %>">
         <div class="col-lg-3 col-md-6">
           <label class="form-label">Person</label>
-          <select class="form-select" name="personName" data-role="person" required>
+          <select aria-label="Person" class="form-select" name="personName" data-role="person" required>
             <option value="">Select person</option>
             <% people.forEach(function(person) { %>
               <option value="<%= person %>" <%= (o.TechOwner || '') === person ? 'selected' : '' %>><%= person %></option>
@@ -298,15 +323,15 @@
         </div>
         <div class="col-lg-2 col-md-3 col-6">
           <label class="form-label">Start date</label>
-          <input type="date" class="form-control" name="plannedStartDate" data-role="start" required value="<%= toDateText(o.PlannedStartDate) || todayText %>">
+          <input aria-label="Start date" type="date" class="form-control" name="plannedStartDate" data-role="start" required value="<%= toDateText(o.PlannedStartDate) || todayText %>">
         </div>
         <div class="col-lg-2 col-md-3 col-6">
           <label class="form-label">End date</label>
-          <input type="date" class="form-control" name="plannedEndDate" data-role="end" required value="<%= toDateText(o.PlannedEndDate) || todayText %>">
+          <input aria-label="End date" type="date" class="form-control" name="plannedEndDate" data-role="end" required value="<%= toDateText(o.PlannedEndDate) || todayText %>">
         </div>
         <div class="col-lg-2 col-md-4 col-6">
           <label class="form-label">Allocation mode</label>
-          <select class="form-select" name="allocationMode" data-role="mode">
+          <select aria-label="Allocation mode" class="form-select" name="allocationMode" data-role="mode">
             <option value="percent">Percent of total hours</option>
             <option value="total-hours">Total hours for period</option>
             <option value="monthly-hours">Hours per month</option>
@@ -314,7 +339,7 @@
         </div>
         <div class="col-lg-2 col-md-4 col-6">
           <label class="form-label" data-role="value-label">Allocation %</label>
-          <input type="number" class="form-control" data-role="value" min="0.5" step="0.5" value="50">
+          <input aria-label="Allocation %" type="number" class="form-control" data-role="value" min="0.5" step="0.5" value="50">
         </div>
         <div class="col-lg-1 col-md-4 col-12">
           <button class="btn btn-primary w-100" type="submit">Add</button>
@@ -351,10 +376,10 @@
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <span class="assignment-person"><%= assignment.PersonName %></span>
               <% if (onHold) { %>
-                <span class="badge text-bg-info"><i class="bi bi-pause-circle me-1"></i>On hold</span>
+                <span class="badge text-bg-info"><i class="bi bi-pause-circle me-1" aria-hidden="true"></i>On hold</span>
               <% } %>
               <% if (!assignment.IsTimelineVisible) { %>
-                <span class="badge text-bg-light"><i class="bi bi-eye-slash me-1"></i>Hidden</span>
+                <span class="badge text-bg-light"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hidden</span>
               <% } %>
             </div>
             <div class="assignment-facts">
@@ -363,118 +388,14 @@
               </span>
               <% if (wasResized) { %>
                 <span class="assignment-fact-resized" title="The bar was broadened or squeezed on the timeline, which rescaled the real hours">
-                  <i class="bi bi-arrows-expand me-1"></i><strong><%= currentHours %>h</strong> after resize
+                  <i class="bi bi-arrows-expand me-1" aria-hidden="true"></i><strong><%= currentHours %>h</strong> after resize
                 </span>
               <% } %>
               <span class="text-nowrap"><%= startText || '-' %> &rarr; <%= endText || '-' %></span>
             </div>
           </div>
 
-          <form method="post" id="<%= formId %>"
-                action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>"
-                class="allocation-form assignment-edit-form"
-                data-opportunity-hours="<%= o.OpportunityHours || 0 %>"
-                data-allocated-hours="<%= currentHours %>"
-                data-allocation-percent="<%= formPercent %>">
-            <div class="assignment-group">
-              <div class="assignment-group-title"><i class="bi bi-calendar-range me-1"></i>Schedule</div>
-              <div class="row g-2">
-                <div class="col-lg-4 col-md-6">
-                  <label class="form-label small">Person</label>
-                  <select class="form-select form-select-sm" name="personName" data-role="person">
-                    <% people.forEach(function(person) { %>
-                      <option value="<%= person %>" <%= assignment.PersonName === person ? 'selected' : '' %>><%= person %></option>
-                    <% }) %>
-                    <% if (assignment.PersonName && people.indexOf(assignment.PersonName) === -1) { %>
-                      <option value="<%= assignment.PersonName %>" selected><%= assignment.PersonName %></option>
-                    <% } %>
-                  </select>
-                </div>
-                <div class="col-lg-4 col-md-3 col-6">
-                  <label class="form-label small">Start date</label>
-                  <input type="date" class="form-control form-control-sm" name="plannedStartDate" data-role="start" value="<%= startText %>">
-                </div>
-                <div class="col-lg-4 col-md-3 col-6">
-                  <label class="form-label small">End date</label>
-                  <input type="date" class="form-control form-control-sm" name="plannedEndDate" data-role="end" value="<%= endText %>">
-                </div>
-              </div>
-            </div>
 
-            <div class="assignment-group">
-              <div class="assignment-group-title"><i class="bi bi-speedometer2 me-1"></i>Allocation</div>
-              <div class="row g-2">
-                <div class="col-lg-4 col-md-6">
-                  <label class="form-label small">Allocation mode</label>
-                  <select class="form-select form-select-sm" name="allocationMode" data-role="mode">
-                    <option value="percent" <%= allocationMode === 'percent' ? 'selected' : '' %>>Percent of total hours</option>
-                    <option value="total-hours" <%= allocationMode === 'total-hours' ? 'selected' : '' %>>Total hours for period</option>
-                    <option value="monthly-hours" <%= allocationMode === 'monthly-hours' ? 'selected' : '' %>>Hours per month</option>
-                  </select>
-                </div>
-                <div class="col-lg-4 col-md-6">
-                  <label class="form-label small" data-role="value-label">Allocation %</label>
-                  <input type="number" class="form-control form-control-sm" data-role="value" min="0.5" step="0.5" value="<%= formPercent %>" title="<%= wasResized ? 'This reflects the ' + currentHours + 'h currently on the timeline. Saving makes it the new agreed allocation.' : 'Share of the ' + oppHours + 'h project total' %>">
-                </div>
-                <div class="col-lg-4 d-flex align-items-end">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="visible-<%= assignment.Id %>" name="isTimelineVisible" <%= assignment.IsTimelineVisible ? 'checked' : '' %>>
-                    <label class="form-check-label small" for="visible-<%= assignment.Id %>">Visible on timeline</label>
-                  </div>
-                </div>
-                <div class="col-12">
-                  <div class="allocation-preview" data-role="preview">&nbsp;</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="assignment-group" data-role="hold-group">
-              <div class="assignment-group-title"><i class="bi bi-pause-circle me-1"></i>Hold periods &mdash; frees capacity for each period</div>
-              <div class="hold-periods" data-role="hold-periods">
-                <% parseHolds(assignment.Holds).forEach(function(hold, idx) { %>
-                  <div class="hold-period-row row g-2 mb-1" data-role="hold-row">
-                    <div class="col-lg-4 col-md-5 col-5">
-                      <label class="form-label small">Hold from</label>
-                      <input type="date" class="form-control form-control-sm" name="holdStartDate" value="<%= hold.startDate %>">
-                    </div>
-                    <div class="col-lg-4 col-md-5 col-5">
-                      <label class="form-label small">Hold until</label>
-                      <div class="input-group input-group-sm">
-                        <input type="date" class="form-control form-control-sm rounded" name="holdEndDate" value="<%= hold.endDate %>">
-                        <button type="button" class="btn btn-outline-danger rounded-end px-2" data-role="remove-hold" title="Remove this hold period">
-                          <i class="bi bi-trash"></i>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                <% }) %>
-                <% if (!parseHolds(assignment.Holds).length) { %>
-                  <div class="hold-period-row row g-2 mb-1" data-role="hold-row">
-                    <div class="col-lg-4 col-md-5 col-5">
-                      <label class="form-label small">Hold from</label>
-                      <input type="date" class="form-control form-control-sm" name="holdStartDate" value="">
-                    </div>
-                    <div class="col-lg-4 col-md-5 col-5">
-                      <label class="form-label small">Hold until</label>
-                      <div class="input-group input-group-sm">
-                        <input type="date" class="form-control form-control-sm rounded" name="holdEndDate" value="">
-                        <button type="button" class="btn btn-outline-danger rounded-end px-2" data-role="remove-hold" title="Remove this hold period">
-                          <i class="bi bi-trash"></i>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                <% } %>
-              </div>
-              <button type="button" class="btn btn-sm btn-outline-secondary mt-1" data-role="add-hold">
-                <i class="bi bi-plus-circle me-1"></i>Add hold period
-              </button>
-              <div class="form-text">Leave both empty for no hold. Assigned hours stay unchanged.</div>
-            </div>
-
-            <input type="hidden" name="allocationPercent" data-role="percent-field">
-            <input type="hidden" name="allocatedHours" data-role="hours-field">
-          </form>
 
           <%# Kept outside the edit form; the buttons reach them via the form attribute. %>
           <form method="post" id="stretch-minus-<%= assignment.Id %>" class="d-none" action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>/stretch">
@@ -493,17 +414,131 @@
 
           <div class="assignment-toolbar">
             <button class="btn btn-sm btn-outline-secondary" type="submit" form="stretch-minus-<%= assignment.Id %>" title="Shorten the window by a week">
-              <i class="bi bi-dash-lg"></i> 7d
+              <i class="bi bi-dash-lg" aria-hidden="true"></i> 7d
             </button>
-            <button class="btn btn-primary" type="submit" form="<%= formId %>">
-              <i class="bi bi-check2 me-1"></i>Save
+            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#assignment-edit-<%= assignment.Id %>" aria-expanded="false" aria-controls="assignment-edit-<%= assignment.Id %>">
+              <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
             </button>
             <button class="btn btn-sm btn-outline-secondary" type="submit" form="stretch-plus-<%= assignment.Id %>" title="Extend the window by a week">
-              <i class="bi bi-plus-lg"></i> 7d
+              <i class="bi bi-plus-lg" aria-hidden="true"></i> 7d
             </button>
             <button class="btn btn-sm btn-outline-danger" type="submit" form="assignment-delete-<%= assignment.Id %>">
-              <i class="bi bi-trash me-1"></i>Delete
+              <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
             </button>
+          </div>
+          <%# Editing is folded away: the card shows the facts, Edit opens the form. %>
+          <div class="collapse assignment-edit" id="assignment-edit-<%= assignment.Id %>">
+          <form method="post" id="<%= formId %>"
+                action="/opportunities/<%= o.Id %>/assignments/<%= assignment.Id %>"
+                class="allocation-form assignment-edit-form"
+                data-opportunity-hours="<%= o.OpportunityHours || 0 %>"
+                data-allocated-hours="<%= currentHours %>"
+                data-allocation-percent="<%= formPercent %>">
+            <div class="assignment-group">
+              <div class="assignment-group-title"><i class="bi bi-calendar-range me-1" aria-hidden="true"></i>Schedule</div>
+              <div class="row g-2">
+                <div class="col-lg-4 col-md-6">
+                  <label class="form-label small">Person</label>
+                  <select aria-label="Person" class="form-select form-select-sm" name="personName" data-role="person">
+                    <% people.forEach(function(person) { %>
+                      <option value="<%= person %>" <%= assignment.PersonName === person ? 'selected' : '' %>><%= person %></option>
+                    <% }) %>
+                    <% if (assignment.PersonName && people.indexOf(assignment.PersonName) === -1) { %>
+                      <option value="<%= assignment.PersonName %>" selected><%= assignment.PersonName %></option>
+                    <% } %>
+                  </select>
+                </div>
+                <div class="col-lg-4 col-md-3 col-6">
+                  <label class="form-label small">Start date</label>
+                  <input aria-label="Start date" type="date" class="form-control form-control-sm" name="plannedStartDate" data-role="start" value="<%= startText %>">
+                </div>
+                <div class="col-lg-4 col-md-3 col-6">
+                  <label class="form-label small">End date</label>
+                  <input aria-label="End date" type="date" class="form-control form-control-sm" name="plannedEndDate" data-role="end" value="<%= endText %>">
+                </div>
+              </div>
+            </div>
+
+            <div class="assignment-group">
+              <div class="assignment-group-title"><i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Allocation</div>
+              <div class="row g-2">
+                <div class="col-lg-4 col-md-6">
+                  <label class="form-label small">Allocation mode</label>
+                  <select aria-label="Allocation mode" class="form-select form-select-sm" name="allocationMode" data-role="mode">
+                    <option value="percent" <%= allocationMode === 'percent' ? 'selected' : '' %>>Percent of total hours</option>
+                    <option value="total-hours" <%= allocationMode === 'total-hours' ? 'selected' : '' %>>Total hours for period</option>
+                    <option value="monthly-hours" <%= allocationMode === 'monthly-hours' ? 'selected' : '' %>>Hours per month</option>
+                  </select>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                  <label class="form-label small" data-role="value-label">Allocation %</label>
+                  <input aria-label="Allocation %" type="number" class="form-control form-control-sm" data-role="value" min="0.5" step="0.5" value="<%= formPercent %>" title="<%= wasResized ? 'This reflects the ' + currentHours + 'h currently on the timeline. Saving makes it the new agreed allocation.' : 'Share of the ' + oppHours + 'h project total' %>">
+                </div>
+                <div class="col-lg-4 d-flex align-items-end">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="visible-<%= assignment.Id %>" name="isTimelineVisible" <%= assignment.IsTimelineVisible ? 'checked' : '' %>>
+                    <label class="form-check-label small" for="visible-<%= assignment.Id %>">Visible on timeline</label>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <div class="allocation-preview" data-role="preview">&nbsp;</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="assignment-group" data-role="hold-group">
+              <div class="assignment-group-title"><i class="bi bi-pause-circle me-1" aria-hidden="true"></i>Hold periods &mdash; frees capacity for each period</div>
+              <div class="hold-periods" data-role="hold-periods">
+                <% parseHolds(assignment.Holds).forEach(function(hold, idx) { %>
+                  <div class="hold-period-row row g-2 mb-1" data-role="hold-row">
+                    <div class="col-lg-4 col-md-5 col-5">
+                      <label class="form-label small">Hold from</label>
+                      <input aria-label="Hold from" type="date" class="form-control form-control-sm" name="holdStartDate" value="<%= hold.startDate %>">
+                    </div>
+                    <div class="col-lg-4 col-md-5 col-5">
+                      <label class="form-label small">Hold until</label>
+                      <div class="input-group input-group-sm">
+                        <input aria-label="Hold until" type="date" class="form-control form-control-sm rounded" name="holdEndDate" value="<%= hold.endDate %>">
+                        <button type="button" class="btn btn-outline-danger rounded-end px-2" data-role="remove-hold" title="Remove this hold period">
+                          <i class="bi bi-trash" aria-hidden="true"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                <% }) %>
+                <% if (!parseHolds(assignment.Holds).length) { %>
+                  <div class="hold-period-row row g-2 mb-1" data-role="hold-row">
+                    <div class="col-lg-4 col-md-5 col-5">
+                      <label class="form-label small">Hold from</label>
+                      <input aria-label="Hold from" type="date" class="form-control form-control-sm" name="holdStartDate" value="">
+                    </div>
+                    <div class="col-lg-4 col-md-5 col-5">
+                      <label class="form-label small">Hold until</label>
+                      <div class="input-group input-group-sm">
+                        <input aria-label="Hold until" type="date" class="form-control form-control-sm rounded" name="holdEndDate" value="">
+                        <button type="button" class="btn btn-outline-danger rounded-end px-2" data-role="remove-hold" title="Remove this hold period">
+                          <i class="bi bi-trash" aria-hidden="true"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                <% } %>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary mt-1" data-role="add-hold">
+                <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Add hold period
+              </button>
+              <div class="form-text">Leave both empty for no hold. Assigned hours stay unchanged.</div>
+            </div>
+
+            <input type="hidden" name="allocationPercent" data-role="percent-field">
+            <input type="hidden" name="allocatedHours" data-role="hours-field">
+          </form>
+            <div class="assignment-edit-actions">
+              <button class="btn btn-primary btn-sm" type="submit" form="<%= formId %>">
+                <i class="bi bi-check2 me-1" aria-hidden="true"></i>Save assignment
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#assignment-edit-<%= assignment.Id %>">Cancel</button>
+            </div>
           </div>
         </div>
       <% }) %>
@@ -513,15 +548,18 @@
     </div>
   </div>
 
-  <div class="row g-3 mt-1">
+</div><!-- /#paneAssignments -->
+
+<div class="tab-pane fade" id="paneActivity" role="tabpanel" aria-labelledby="tab-activity">
+  <div class="row g-3">
     <div class="col-lg-6" id="notes">
       <div class="card h-100">
         <div class="card-header">
-          <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseNotes" aria-expanded="false">
-            <i class="bi bi-chevron-down"></i><span><i class="bi bi-journal-text me-2"></i>Notes</span>
-          </a>
+          <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseNotes" aria-expanded="true">
+            <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-journal-text me-2" aria-hidden="true"></i>Notes</span>
+          </button>
         </div>
-        <div class="card-body collapse" id="collapseNotes">
+        <div class="card-body collapse show" id="collapseNotes">
           <form method="post" action="/opportunities/<%= o.Id %>/notes" class="row g-2 mb-3">
             <div class="col-4">
               <input type="date" class="form-control" name="noteDate" value="<%= todayText %>" required>
@@ -542,7 +580,7 @@
                   <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
                 </form>
               </div>
-              <div class="mt-2" style="white-space: pre-wrap;"><%= note.Content %></div>
+              <div class="mt-2 pre-wrap"><%= note.Content %></div>
             </div>
           <% }) %>
           <% if (!notesList.length) { %>
@@ -555,11 +593,11 @@
     <div class="col-lg-6" id="steps">
       <div class="card h-100">
         <div class="card-header">
-          <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseSteps" aria-expanded="false">
-            <i class="bi bi-chevron-down"></i><span><i class="bi bi-check2-square me-2"></i>Next steps</span>
-          </a>
+          <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseSteps" aria-expanded="true">
+            <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-check2-square me-2" aria-hidden="true"></i>Next steps</span>
+          </button>
         </div>
-        <div class="card-body collapse" id="collapseSteps">
+        <div class="card-body collapse show" id="collapseSteps">
           <form method="post" action="/opportunities/<%= o.Id %>/steps" class="row g-2 mb-3">
             <div class="col-7">
               <input class="form-control" name="title" placeholder="Next step..." required maxlength="250">
@@ -578,7 +616,7 @@
                 <form method="post" action="/opportunities/<%= o.Id %>/steps/<%= step.Id %>/toggle">
                   <input type="hidden" name="isDone" value="<%= step.IsDone ? 'false' : 'true' %>">
                   <button class="btn btn-sm btn-link p-0" type="submit" title="Toggle done">
-                    <i class="bi <%= step.IsDone ? 'bi-check-square-fill text-success' : 'bi-square' %>"></i>
+                    <i class="bi <%= step.IsDone ? 'bi-check-square-fill text-success' : 'bi-square' %>" aria-hidden="true"></i>
                   </button>
                 </form>
                 <div>
@@ -598,65 +636,19 @@
       </div>
     </div>
   </div>
+</div><!-- /#paneActivity -->
 <% } %>
+</div><!-- /.tab-content -->
 
-<script>
-  window.OPP_PEOPLE_DAILY_HOURS = <%- JSON.stringify((typeof peopleDailyHours !== 'undefined' && peopleDailyHours) || {}) %>;
-</script>
-<script src="/js/allocation.js"></script>
-<script src="/js/opportunity-form-dynamic.js"></script>
-<script>
-(function () {
-  function initHoldGroups() {
-    document.querySelectorAll('[data-role="hold-group"]').forEach(function (group) {
-      if (group._holdInit) return;
-      group._holdInit = true;
+<%# Save stays in reach wherever the reader is on the page. %>
+<div class="sticky-save-bar" data-save-bar>
+  <span class="sticky-save-status" data-save-status aria-live="polite"><%= isNew ? 'New opportunity' : 'All changes saved' %></span>
+  <span class="text-muted small d-none d-md-inline">Ctrl+S to save</span>
+  <button class="btn btn-primary" type="submit" form="opportunityForm">
+    <i class="bi bi-check-lg me-1" aria-hidden="true"></i><%= isNew ? 'Create opportunity' : 'Save changes' %>
+  </button>
+</div>
 
-      var container = group.querySelector('[data-role="hold-periods"]');
-      var addBtn = group.querySelector('[data-role="add-hold"]');
-
-      function createRow() {
-        var row = document.createElement('div');
-        row.className = 'hold-period-row row g-2 mb-1';
-        row.setAttribute('data-role', 'hold-row');
-        row.innerHTML =
-          '<div class="col-lg-4 col-md-5 col-5">' +
-            '<label class="form-label small">Hold from</label>' +
-            '<input type="date" class="form-control form-control-sm" name="holdStartDate" value="">' +
-          '</div>' +
-          '<div class="col-lg-4 col-md-5 col-5">' +
-            '<label class="form-label small">Hold until</label>' +
-            '<div class="input-group input-group-sm">' +
-              '<input type="date" class="form-control form-control-sm rounded" name="holdEndDate" value="">' +
-              '<button type="button" class="btn btn-outline-danger rounded-end px-2" data-role="remove-hold" title="Remove this hold period">' +
-                '<i class="bi bi-trash"></i>' +
-              '</button>' +
-            '</div>' +
-          '</div>';
-        return row;
-      }
-
-      group.addEventListener('click', function (e) {
-        var removeBtn = e.target.closest('[data-role="remove-hold"]');
-        if (removeBtn) {
-          removeBtn.closest('[data-role="hold-row"]').remove();
-          return;
-        }
-        if (e.target.closest('[data-role="add-hold"]')) {
-          container.appendChild(createRow());
-        }
-      });
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initHoldGroups);
-  } else {
-    initHoldGroups();
-  }
-
-  window.OPP_initHoldGroups = initHoldGroups;
-})();
-</script>
+<script type="application/json" id="peopleDailyHoursData"><%- JSON.stringify((typeof peopleDailyHours !== 'undefined' && peopleDailyHours) || {}).replace(/</g, '\\u003c') %></script>
 </div><!-- /#opportunityDetail -->
-<% if (!partial) { %><%- include('../partials/footer') %><% } %>
+<% if (!partial) { %><%- include('../partials/footer', { pageScripts: ['/js/allocation.js', '/js/hold-periods.js', '/js/opportunity-form-dynamic.js'] }) %><% } %>

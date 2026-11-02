@@ -161,6 +161,8 @@
     if (window.OPP_initTimelineDrag) window.OPP_initTimelineDrag();
     if (window.OPP_initViewState) window.OPP_initViewState(root);
     if (window.OPP_initAbsenceCard) window.OPP_initAbsenceCard(root);
+    if (window.OPP_initHoldGroups) window.OPP_initHoldGroups(root);
+    if (window.OPP_initOpportunityForm) window.OPP_initOpportunityForm(root);
     if (window.OPP_updateExportHref) window.OPP_updateExportHref();
     if (window.bootstrap && bootstrap.Tooltip) {
       root.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
@@ -281,11 +283,11 @@
     });
   });
 
-  /* Back and forward reload the view in place. Management has its own
-     popstate handling, so this steps aside there rather than both of them
-     fetching the same page. */
+  /* Back and forward reload the view in place. Management and the pipeline
+     have their own popstate handling, so this steps aside there rather than
+     both of them fetching the same page. */
   window.addEventListener('popstate', function () {
-    if (typeof window.OPP_mgmtSwap === 'function') return;
+    if (typeof window.OPP_mgmtSwap === 'function' || typeof window.OPP_pipelineSwap === 'function') return;
     load(window.location.href);
   });
 

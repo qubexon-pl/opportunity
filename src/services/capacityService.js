@@ -839,6 +839,7 @@ function buildUpcoming(opportunities, periodKey, nextSteps) {
     .filter((step) => openIds.size === 0 || openIds.has(String(step.OpportunityId)))
     .map((step) => ({
       id: step.OpportunityId,
+      stepId: step.Id,
       name: step.OpportunityName,
       stage: step.Stage || 'Unspecified',
       summary: step.Title || 'Untitled next step',
@@ -862,6 +863,33 @@ function buildUpcoming(opportunities, periodKey, nextSteps) {
     .map((item) => ({ ...item, dueText: toDateText(item.due) }));
 
   return { items, label: `${formatShortDate(start)} - ${formatShortDate(endInclusive)}` };
+}
+
+/**
+ * The first open next step of each opportunity, so the pipeline can show what
+ * happens next without opening every record. Dated steps come before undated
+ * ones; an overdue step is flagged so it stands out.
+ */
+function nextStepByOpportunity(nextSteps, today = new Date()) {
+  const todayText = toDateText(today);
+  const map = {};
+  (Array.isArray(nextSteps) ? nextSteps : []).forEach((step) => {
+    const key = String(step.OpportunityId);
+    const due = toDate(step.DueDate);
+    const dueText = due ? toDateText(due) : '';
+    const current = map[key];
+    const earlier = !current || (dueText && (!current.dueText || dueText < current.dueText));
+    if (earlier) {
+      map[key] = {
+        stepId: step.Id,
+        title: step.Title || 'Untitled next step',
+        dueText,
+        overdue: !!dueText && dueText < todayText,
+        dueToday: dueText === todayText,
+      };
+    }
+  });
+  return map;
 }
 
 /**
@@ -1036,6 +1064,7 @@ module.exports = {
   TIMELINE_UNIT_OPTIONS,
   STAGE_LEGEND,
   UPCOMING_PERIODS,
+  nextStepByOpportunity,
   ASSIGNMENT_SORT_FIELDS,
   PEOPLE_SORT_FIELDS,
   stageStatusLabel,
