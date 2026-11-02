@@ -1,7 +1,4 @@
-const fs = require('fs');
-const path = require('path');
-
-const CONFIG_FILE = path.join(__dirname, '..', '..', 'config.local.json');
+const store = require('./store');
 
 const DEFAULT_PEOPLE = [
   'Anna Wacholak',
@@ -18,24 +15,29 @@ const DEFAULT_VIEW_DEFAULTS = {
   management: { stages: [], statuses: [], people: [], managers: [], perspective: 'months', units: 6 },
 };
 
+/* Settings are held in memory by the store and persisted to Azure SQL (or the
+   local file when there is no database), so reading them here is cheap. */
 function loadFileConfig() {
-  try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-    }
-  } catch (err) {
-    console.error('[Settings] Error loading config file:', err.message);
-  }
-  return {};
+  return store.snapshot();
 }
 
 function saveFileConfig(config) {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+  return store.save(config);
 }
 
-function getConfig() {
-  const fileConfig = loadFileConfig();
+let memo = { version: -1, value: null };
 
+function getConfig() {
+  // Called many times per request by the capacity maths, so the result is
+  // built once per settings version rather than on every call.
+  const version = store.currentVersion();
+  if (memo.version === version) return memo.value;
+  const fileConfig = store.peek();
+  memo = { version, value: buildConfig(fileConfig) };
+  return memo.value;
+}
+
+function buildConfig(fileConfig) {
   return {
     env: process.env.NODE_ENV || 'development',
     port: parseInt(process.env.PORT || '4000', 10),
@@ -92,24 +94,30 @@ function updatePeopleConfig({ people, personDailyHours, personRoles, personCosts
   if (personCosts && typeof personCosts === 'object') fileConfig.personCosts = personCosts;
   if (personManagers && typeof personManagers === 'object') fileConfig.personManagers = personManagers;
   if (personAbsences && typeof personAbsences === 'object') fileConfig.personAbsences = personAbsences;
-  saveFileConfig(fileConfig);
+  return saveFileConfig(fileConfig);
 }
 
 function updateFirmStages(stages) {
   const fileConfig = loadFileConfig();
   fileConfig.firmStages = Array.isArray(stages) ? stages.map((stage) => String(stage)) : [];
-  saveFileConfig(fileConfig);
+  return saveFileConfig(fileConfig);
 }
 
 function toStringArray(value) {
   return Array.isArray(value) ? value.map((item) => String(item)) : [];
 }
 
-/** Saved filter defaults for the pipeline and management screens. */
-function getViewDefaults() {
-  const saved = loadFileConfig().viewDefaults || {};
-  const pipeline = saved.pipeline || {};
-  const management = saved.management || {};
+/* Each signed-in person keeps their own saved filters; the shared key is what
+   anyone without saved filters of their own (or without sign-in) starts from. */
+const SHARED_VIEW_DEFAULTS_KEY = 'viewDefaults';
+
+function viewDefaultsKey(userId) {
+  return userId ? `${SHARED_VIEW_DEFAULTS_KEY}:user:${String(userId).toLowerCase()}` : SHARED_VIEW_DEFAULTS_KEY;
+}
+
+function normalizeViewDefaults(saved) {
+  const pipeline = (saved && saved.pipeline) || {};
+  const management = (saved && saved.management) || {};
 
   const units = Number(management.units);
 
@@ -129,19 +137,25 @@ function getViewDefaults() {
   };
 }
 
-function updateViewDefaults(scope, values) {
+/** Saved filter defaults for the pipeline and management screens, for one person when given. */
+function getViewDefaults(userId) {
+  const config = loadFileConfig();
+  const own = userId ? config[viewDefaultsKey(userId)] : null;
+  return normalizeViewDefaults(own || config[SHARED_VIEW_DEFAULTS_KEY] || {});
+}
+
+function updateViewDefaults(scope, values, userId) {
   if (scope !== 'pipeline' && scope !== 'management') throw new Error(`Unknown view scope: ${scope}`);
 
   const fileConfig = loadFileConfig();
-  const current = getViewDefaults();
-  fileConfig.viewDefaults = { ...current, [scope]: { ...current[scope], ...values } };
-  saveFileConfig(fileConfig);
-  return fileConfig.viewDefaults[scope];
+  const current = getViewDefaults(userId);
+  const key = viewDefaultsKey(userId);
+  fileConfig[key] = { ...current, [scope]: { ...current[scope], ...values } };
+  return saveFileConfig(fileConfig).then(() => fileConfig[key][scope]);
 }
 
 function isSqlConfigured() {
-  const cfg = getConfig();
-  return !!(cfg.sql.server && cfg.sql.database);
+  return !!(process.env.AZURE_SQL_SERVER && process.env.AZURE_SQL_DATABASE);
 }
 
 module.exports = {
@@ -155,4 +169,5 @@ module.exports = {
   getViewDefaults,
   updateViewDefaults,
   isSqlConfigured,
+  refreshSettings: store.refresh,
 };

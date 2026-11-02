@@ -1,4 +1,30 @@
+const crypto = require('crypto');
+
+/*
+ * Scripts run only from this origin, plus the one small inline script in the
+ * page head (theme before first paint) which carries a per-request nonce.
+ * Styles still allow inline attributes: the timeline and capacity bars size
+ * themselves with computed style="left/width" values.
+ */
+function contentSecurityPolicy(nonce) {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}'`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
+
 function securityHeaders(_req, res, next) {
+  const nonce = crypto.randomBytes(16).toString('base64');
+  res.locals.cspNonce = nonce;
+  res.setHeader('Content-Security-Policy', contentSecurityPolicy(nonce));
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -30,4 +56,4 @@ function createRateLimiter({ windowMs = 60 * 1000, max = 120 } = {}) {
   };
 }
 
-module.exports = { securityHeaders, createRateLimiter };
+module.exports = { securityHeaders, createRateLimiter, contentSecurityPolicy };

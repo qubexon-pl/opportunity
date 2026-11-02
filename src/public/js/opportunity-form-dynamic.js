@@ -1,139 +1,180 @@
 /**
  * opportunity-form-dynamic.js
  *
- * Intercepts the opportunity detail form save so the page doesn't reload.
- * After a successful save, fetches the updated content as a partial and
- * swaps it in while preserving the collapse state of all cards.
+ * The opportunity page:
+ * - Saving the details form happens in the background; the page is then
+ *   refreshed in place through the shared view-state helper, so the open tab,
+ *   open cards and scroll position all stay where they were.
+ * - The sticky save bar says whether there are unsaved changes, Ctrl+S saves,
+ *   and leaving the page with unsaved edits asks first.
+ * - Tabs follow the URL hash (#assignments, #notes, #steps, #activity), so a
+ *   link or a redirect after adding a note lands on the right tab.
  */
 (function () {
   'use strict';
 
-  var swapUrl = window.location.pathname + '?partial=detail';
+  var dirty = false;
+  var saving = false;
 
-  function saveCollapseState(container) {
-    var states = {};
-    container.querySelectorAll('.collapse[id]').forEach(function (el) {
-      states[el.id] = el.classList.contains('show');
-    });
-    return states;
+  function form() {
+    return document.getElementById('opportunityForm');
   }
 
-  function syncSessionStorage(container) {
-    var key = 'opp-collapsed:' + window.location.pathname;
-    var data = {};
-    container.querySelectorAll('.collapse[id]').forEach(function (el) {
-      var toggle = container.querySelector('[data-bs-target="#' + el.id + '"]');
-      if (toggle && toggle.classList.contains('card-collapse-toggle')) {
-        if (!el.classList.contains('show')) data['#' + el.id] = true;
-      }
-    });
-    try { sessionStorage.setItem(key, JSON.stringify(data)); } catch (e) { /* storage disabled */ }
+  function isNewForm(el) {
+    var action = (el && el.getAttribute('action')) || '';
+    return action === '/opportunities' || action.endsWith('/opportunities');
   }
 
-  function restoreCollapseState(container, states) {
-    container.querySelectorAll('.collapse[id]').forEach(function (el) {
-      var isOpen = !!states[el.id];
-      if (isOpen) {
-        el.classList.add('show');
-      } else {
-        el.classList.remove('show');
-      }
-      var toggle = container.querySelector('[data-bs-target="#' + el.id + '"]');
-      if (toggle) {
-        if (isOpen) {
-          toggle.classList.remove('collapsed');
-          toggle.setAttribute('aria-expanded', 'true');
-        } else {
-          toggle.classList.add('collapsed');
-          toggle.setAttribute('aria-expanded', 'false');
-        }
-      }
-    });
+  function serialise(el) {
+    return new URLSearchParams(new FormData(el)).toString();
   }
 
-  function init() {
-    var form = document.getElementById('opportunityForm');
-    if (!form) return;
-    // Only intercept on edit pages (action contains an ID), not new
-    var action = form.getAttribute('action') || '';
-    if (action === '/opportunities' || action.endsWith('/opportunities')) return;
-    if (form.dataset.oppFormInit === 'true') return;
-    form.dataset.oppFormInit = 'true';
+  function setStatus(text, state) {
+    var status = document.querySelector('[data-save-status]');
+    var bar = document.querySelector('[data-save-bar]');
+    if (status) status.textContent = text;
+    if (bar) {
+      bar.classList.toggle('is-dirty', state === 'dirty');
+      bar.classList.toggle('is-saving', state === 'saving');
+    }
+  }
 
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var container = document.getElementById('opportunityDetail');
-      if (!container) return;
+  function markDirty(el) {
+    var now = serialise(el) !== el.dataset.initialState;
+    if (now === dirty) return;
+    dirty = now;
+    if (dirty) setStatus('Unsaved changes', 'dirty');
+    else setStatus(isNewForm(el) ? 'New opportunity' : 'All changes saved', 'clean');
+    syncSaveBar();
+  }
 
-      var submitBtn = form.querySelector('button[type="submit"]');
-      var originalHtml = submitBtn ? submitBtn.innerHTML : '';
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-      }
+  /* The bar saves the Overview form, so it only shows there, or anywhere
+     while that form has unsaved changes. */
+  function syncSaveBar() {
+    var bar = document.querySelector('[data-save-bar]');
+    if (!bar) return;
+    var active = document.querySelector('#opportunityTabs .nav-link.active');
+    var onOverview = !active || active.getAttribute('data-tab-key') === 'overview';
+    bar.classList.toggle('is-hidden', !onOverview && !dirty);
+  }
 
-      var formData = new FormData(form);
-      var params = new URLSearchParams();
-      formData.forEach(function (value, key) {
-        params.append(key, value);
+  /* ── Tabs follow the hash ────────────────────────────────────── */
+
+  function activateTabFor(hash) {
+    if (!hash || hash.length < 2 || !window.bootstrap) return;
+    var target = null;
+    try {
+      target = document.querySelector('[data-tab-key="' + hash.slice(1) + '"]') ||
+        document.querySelector(hash);
+    } catch (e) {
+      return;
+    }
+    if (!target) return;
+    var trigger = target.matches('[data-bs-toggle="tab"]') ? target : null;
+    if (!trigger) {
+      var pane = target.closest('.tab-pane');
+      if (pane) trigger = document.querySelector('[data-bs-toggle="tab"][data-bs-target="#' + pane.id + '"]');
+    }
+    if (trigger) bootstrap.Tab.getOrCreateInstance(trigger).show();
+  }
+
+  function initTabs(root) {
+    (root || document).querySelectorAll('#opportunityTabs [data-bs-toggle="tab"]:not([data-tab-init])').forEach(function (tab) {
+      tab.setAttribute('data-tab-init', '');
+      tab.addEventListener('shown.bs.tab', function () {
+        var key = tab.getAttribute('data-tab-key');
+        if (key && history.replaceState) history.replaceState(history.state, '', '#' + key);
+        syncSaveBar();
       });
+    });
+    syncSaveBar();
+  }
 
-      fetch(form.action, {
+  /* ── Save ────────────────────────────────────────────────────── */
+
+  function initForm(root) {
+    var el = form();
+    if (!el) return;
+    initTabs(root);
+    el.dataset.initialState = serialise(el);
+    dirty = false;
+    if (el.dataset.oppFormInit === 'true') return;
+    el.dataset.oppFormInit = 'true';
+
+    el.addEventListener('input', function () { markDirty(el); });
+    el.addEventListener('change', function () { markDirty(el); });
+
+    // A new opportunity is a normal post: it redirects to the record it made.
+    if (isNewForm(el)) {
+      el.addEventListener('submit', function () {
+        dirty = false;
+      });
+      return;
+    }
+
+    el.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (saving) return;
+      saving = true;
+      setStatus('Saving…', 'saving');
+
+      fetch(el.action, {
         method: 'POST',
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: params.toString(),
+        body: serialise(el),
       })
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (!data.ok) {
+            setStatus('Not saved', 'dirty');
             if (typeof showToast === 'function') showToast(data.error || 'Save failed.', 'error');
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalHtml; }
-            return;
+            return null;
           }
-          // Fetch updated partial
-          return fetch(swapUrl).then(function (r) { return r.text(); }).then(function (html) {
-            var states = saveCollapseState(container);
-            // Parse the fetched HTML — it includes the #opportunityDetail wrapper
-            var temp = document.createElement('div');
-            temp.innerHTML = html;
-            var newContainer = temp.querySelector('#opportunityDetail');
-            if (!newContainer) {
-              // Fallback: use whatever was returned
-              container.innerHTML = html;
-            } else {
-              container.replaceWith(newContainer);
-              container = newContainer;
-            }
-            // Sync sessionStorage so OPP_initViewState applies correct state
-            syncSessionStorage(container);
-            // Re-init view state (reads sessionStorage, adds click listeners)
-            if (window.OPP_initViewState) window.OPP_initViewState(container);
-            // Override with captured states for non-card-collapse elements
-            restoreCollapseState(container, states);
-            // Re-init allocation.js
-            if (window.OPP_initAllocationForms) window.OPP_initAllocationForms(container);
-            // Re-init multiselects
-            if (window.OPP_initMultiselects) {
-              window.OPP_initMultiselects(container);
-            }
-            // Re-init the form interceptor on the new DOM
-            init();
-            if (typeof showToast === 'function') showToast('Opportunity saved.', 'success');
-          });
+          dirty = false;
+          if (typeof showToast === 'function') showToast('Opportunity saved.', 'success');
+          // Re-render in place: summary tiles, title and tabs pick up the change.
+          return window.OPP_refreshView ? window.OPP_refreshView() : window.location.reload();
         })
         .catch(function () {
+          setStatus('Not saved', 'dirty');
           if (typeof showToast === 'function') showToast('Network error.', 'error');
-          if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalHtml; }
+        })
+        .finally(function () {
+          saving = false;
         });
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 's' || e.key === 'S')) {
+      var el = form();
+      if (!el) return;
+      e.preventDefault();
+      if (el.requestSubmit) el.requestSubmit();
+      else el.submit();
+    }
+  });
+
+  window.addEventListener('beforeunload', function (e) {
+    if (!dirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
+  window.OPP_initOpportunityForm = initForm;
+
+  function start() {
+    initForm(document);
+    activateTabFor(window.location.hash);
   }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
+  window.addEventListener('hashchange', function () { activateTabFor(window.location.hash); });
 })();

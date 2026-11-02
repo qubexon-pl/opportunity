@@ -1,5 +1,5 @@
 const express = require('express');
-const { getPool } = require('../db/pool');
+const { getPool, isDatabaseUnavailable } = require('../db/pool');
 const { listOpportunities } = require('../services/opportunityService');
 const { listAssignments, addAssignment, updateAssignment, deleteAssignment } = require('../services/assignmentService');
 const { listPeople, getPersonDailyHours } = require('../services/peopleService');
@@ -19,7 +19,7 @@ router.get('/health', async (_req, res) => {
     await pool.request().query('SELECT 1 as ok');
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ ok: false, error: String(err) });
+    res.status(500).json({ ok: false, error: 'Database unavailable.' });
   }
 });
 
@@ -27,20 +27,46 @@ router.get('/people', (_req, res) => {
   res.json(listPeople().map((person) => ({ name: person, dailyHours: getPersonDailyHours(person) })));
 });
 
-router.get('/opportunities', async (req, res) => {
+router.get('/opportunities', async (req, res, next) => {
   try {
     res.json(await listOpportunities(req.query));
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    next(err);
   }
 });
 
-router.get('/assignments', async (req, res) => {
+/**
+ * Jump-to search behind the Ctrl+K palette: opportunities by name, owner, tag
+ * or OPP ID, and configured people by name. Small and fast on purpose.
+ */
+router.get('/search', async (req, res, next) => {
+  const q = String(req.query.q || '').trim();
+  const needle = q.toLowerCase();
+  const people = listPeople()
+    .filter((name) => !needle || name.toLowerCase().includes(needle))
+    .slice(0, 5)
+    .map((name) => ({ type: 'person', label: name, url: `/management/people/${encodeURIComponent(name)}` }));
+  try {
+    const rows = await listOpportunities({ q, sort: 'updated', dir: 'desc', limit: 8 });
+    const opportunities = rows.map((o) => ({
+      type: 'opportunity',
+      label: o.Name,
+      detail: [o.OppId, o.Stage, o.TechOwner].filter(Boolean).join(' · '),
+      url: `/opportunities/${o.Id}`,
+    }));
+    res.json({ results: [...opportunities, ...people] });
+  } catch (err) {
+    if (isDatabaseUnavailable(err)) return res.json({ results: people, warning: 'Opportunities are unavailable right now.' });
+    next(err);
+  }
+});
+
+router.get('/assignments', async (req, res, next) => {
   try {
     const includeHidden = String(req.query.includeHidden || 'true').toLowerCase() === 'true';
     res.json(await listAssignments({ includeHidden }));
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    next(err);
   }
 });
 
@@ -87,10 +113,10 @@ router.delete('/assignments/:assignmentId', async (req, res) => {
   }
 });
 
-router.post('/people/:person/absences', (req, res) => {
+router.post('/people/:person/absences', async (req, res) => {
   try {
     const person = decodeURIComponent(req.params.person);
-    const created = addAbsence(person, {
+    const created = await addAbsence(person, {
       startDate: String(req.body.startDate || '').slice(0, 10),
       endDate: String(req.body.endDate || '').slice(0, 10),
       kind: req.body.kind,
@@ -102,10 +128,10 @@ router.post('/people/:person/absences', (req, res) => {
   }
 });
 
-router.patch('/people/:person/absences/:absenceId', (req, res) => {
+router.patch('/people/:person/absences/:absenceId', async (req, res) => {
   try {
     const person = decodeURIComponent(req.params.person);
-    const updated = updateAbsence(person, req.params.absenceId, {
+    const updated = await updateAbsence(person, req.params.absenceId, {
       startDate: String(req.body.startDate || '').slice(0, 10),
       endDate: String(req.body.endDate || '').slice(0, 10),
       kind: req.body.kind,
@@ -117,10 +143,10 @@ router.patch('/people/:person/absences/:absenceId', (req, res) => {
   }
 });
 
-router.delete('/people/:person/absences/:absenceId', (req, res) => {
+router.delete('/people/:person/absences/:absenceId', async (req, res) => {
   try {
     const person = decodeURIComponent(req.params.person);
-    removeAbsence(person, req.params.absenceId);
+    await removeAbsence(person, req.params.absenceId);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message || String(err) });

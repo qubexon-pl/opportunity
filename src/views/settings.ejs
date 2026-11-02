@@ -1,7 +1,7 @@
 <%- include('partials/header') %>
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+<div class="page-hero">
   <div>
-    <h2><i class="bi bi-gear me-2"></i>Configuration</h2>
+    <h2><i class="bi bi-gear me-2" aria-hidden="true"></i>Configuration</h2>
     <p class="text-muted mb-0">People, roles, internal cost and daily capacity used for timeline and allocation calculations. Absence is managed on each person's detail page.</p>
   </div>
 </div>
@@ -10,12 +10,12 @@
   <div class="col-lg-8">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePeopleMgmt" aria-expanded="false">
-          <i class="bi bi-chevron-down"></i><span><i class="bi bi-people me-2"></i>People management</span>
-        </a>
+        <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapsePeopleMgmt" aria-expanded="true">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-people me-2" aria-hidden="true"></i>People management</span>
+        </button>
         <span class="text-muted small">Default <%= defaultDailyHours %>h/day &middot; <%= monthlyCapacity %>h/month</span>
       </div>
-      <div class="card-body collapse p-0" id="collapsePeopleMgmt">
+      <div class="card-body collapse p-0 show" id="collapsePeopleMgmt">
         <datalist id="managerOptions">
           <% people.forEach(function(person) { %><option value="<%= person.name %>"><% }) %>
           <% managerOptions.forEach(function(mgr) { %><option value="<%= mgr %>"><% }) %>
@@ -25,11 +25,11 @@
             <thead>
               <tr>
                 <th>Person</th>
-                <th style="width: 240px;">Role</th>
-                <th style="width: 200px;">Manager</th>
-                <th style="width: 110px;">Daily hours</th>
-                <th style="width: 140px;">Internal cost</th>
-                <th class="text-end" style="width: 160px;">Actions</th>
+                <th class="col-w240">Role</th>
+                <th class="col-w200">Manager</th>
+                <th class="col-w110">Daily hours</th>
+                <th class="col-w140">Internal cost</th>
+                <th class="text-end col-w160">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -43,7 +43,7 @@
                     </form>
                   </td>
                   <td>
-                    <select class="form-select form-select-sm" name="role" form="<%= rowFormId %>">
+                    <select class="form-select form-select-sm" name="role" form="<%= rowFormId %>" aria-label="Role for <%= person.name %>">
                       <option value="">Not set</option>
                       <% personRoles.forEach(function(role) { %>
                         <option value="<%= role %>" <%= person.role === role ? 'selected' : '' %>><%= role %></option>
@@ -51,16 +51,16 @@
                     </select>
                   </td>
                   <td>
-                    <input type="text" class="form-control form-control-sm" name="manager" form="<%= rowFormId %>"
+                    <input type="text" class="form-control form-control-sm" name="manager" form="<%= rowFormId %>" aria-label="Manager of <%= person.name %>"
                            list="managerOptions" value="<%= person.manager %>" placeholder="&mdash;">
                   </td>
                   <td>
-                    <input type="number" class="form-control form-control-sm" name="dailyHours" form="<%= rowFormId %>"
+                    <input type="number" class="form-control form-control-sm" name="dailyHours" form="<%= rowFormId %>" aria-label="Daily hours for <%= person.name %>"
                            min="1" max="24" step="0.5" value="<%= person.dailyHours %>">
                   </td>
                   <td>
                     <div class="input-group input-group-sm">
-                      <input type="number" class="form-control" name="internalCost" form="<%= rowFormId %>"
+                      <input type="number" class="form-control" name="internalCost" form="<%= rowFormId %>" aria-label="Internal cost for <%= person.name %>"
                              min="0" step="0.01" value="<%= person.cost === null ? '' : person.cost %>" placeholder="&mdash;">
                       <span class="input-group-text"><%= costCurrency %></span>
                     </div>
@@ -89,9 +89,9 @@
   <div class="col-lg-4">
     <div class="card">
       <div class="card-header">
-        <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseBookingRule" aria-expanded="false">
-          <i class="bi bi-chevron-down"></i><span><i class="bi bi-shield-check me-2"></i>Capacity booking rule</span>
-        </a>
+        <button type="button" class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseBookingRule" aria-expanded="false">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-shield-check me-2" aria-hidden="true"></i>Capacity booking rule</span>
+        </button>
       </div>
       <div class="card-body collapse" id="collapseBookingRule">
         <p class="text-muted small">
@@ -112,16 +112,16 @@
               </div>
             <% }) %>
           </div>
-          <button class="btn btn-primary mt-3" type="submit"><i class="bi bi-check-lg me-1"></i>Save booking rule</button>
+          <button class="btn btn-primary mt-3" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Save booking rule</button>
         </form>
       </div>
     </div>
 
     <div class="card mt-3">
       <div class="card-header">
-        <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseAddPerson" aria-expanded="false">
-          <i class="bi bi-chevron-down"></i><span><i class="bi bi-person-plus me-2"></i>Add person</span>
-        </a>
+        <button type="button" class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseAddPerson" aria-expanded="false">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-person-plus me-2" aria-hidden="true"></i>Add person</span>
+        </button>
       </div>
       <div class="card-body collapse" id="collapseAddPerson">
         <form method="post" action="/settings/people" class="row g-3">
@@ -154,7 +154,7 @@
             </div>
           </div>
           <div class="col-12">
-            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1"></i>Add person</button>
+            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add person</button>
           </div>
         </form>
         <p class="text-muted small mb-0 mt-3">

@@ -1,8 +1,9 @@
-<div class="card mb-4" id="upcomingCard">
+<div class="card mb-3" id="upcomingCard">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <a class="card-collapse-toggle<%= typeof collapsed !== 'undefined' && collapsed ? ' collapsed' : (typeof collapsed === 'undefined' ? ' collapsed' : '') %>" data-bs-toggle="collapse" data-bs-target="#collapseUpcoming" aria-expanded="<%= typeof collapsed !== 'undefined' && !collapsed ? 'true' : 'false' %>">
-      <i class="bi bi-chevron-down"></i><span><i class="bi bi-calendar-event me-2"></i>Upcoming actions and decisions</span>
-    </a>
+    <% var upcomingOpen = typeof collapsed === 'undefined' || !collapsed; %>
+    <button type="button" class="card-collapse-toggle<%= upcomingOpen ? '' : ' collapsed' %>" data-bs-toggle="collapse" data-bs-target="#collapseUpcoming" aria-expanded="<%= upcomingOpen ? 'true' : 'false' %>">
+      <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-calendar-event me-2" aria-hidden="true"></i>Upcoming actions and decisions</span>
+    </button>
     <form class="d-flex align-items-center gap-2" data-upcoming-filter>
       <input type="hidden" name="applied" value="1">
       <input type="hidden" name="q" value="<%= filters.q %>">
@@ -10,23 +11,35 @@
       <% filters.status.forEach(function(status) { %><input type="hidden" name="status" value="<%= status %>"><% }) %>
       <input type="hidden" name="sort" value="<%= filters.sort %>">
       <label class="form-label mb-0 text-nowrap" for="period">Period</label>
-      <select class="form-select form-select-sm" id="period" name="period" style="max-width: 170px;">
+      <select class="form-select form-select-sm w-auto" id="period" name="period">
         <% upcomingPeriods.forEach(function(option) { %>
           <option value="<%= option.key %>" <%= upcomingPeriod === option.key ? 'selected' : '' %>><%= option.label %></option>
         <% }) %>
       </select>
     </form>
   </div>
-  <div class="card-body collapse<%= typeof collapsed !== 'undefined' && !collapsed ? ' show' : '' %>" id="collapseUpcoming">
+  <div class="card-body collapse<%= upcomingOpen ? ' show' : '' %>" id="collapseUpcoming">
     <div class="upcoming-window small mb-2"><%= upcoming.label %></div>
     <% if (upcoming.items.length) { %>
       <div class="upcoming-list">
         <% upcoming.items.forEach(function(item) { %>
-          <a class="upcoming-item" href="/opportunities/<%= item.id %>">
-            <div class="upcoming-title"><%= item.name %></div>
-            <div class="upcoming-meta"><%= item.stage %> &middot; Due <%= item.dueText %></div>
-            <div class="upcoming-summary"><%= item.summary %></div>
-          </a>
+          <div class="upcoming-item">
+            <a class="upcoming-link" href="/opportunities/<%= item.id %>#steps">
+              <div class="upcoming-title"><%= item.name %></div>
+              <div class="upcoming-meta"><%= item.stage %> &middot; Due <%= item.dueText %></div>
+              <div class="upcoming-summary"><%= item.summary %></div>
+            </a>
+            <div class="upcoming-actions">
+              <% if (item.stepId) { %>
+                <button type="button" class="btn btn-sm btn-outline-success" data-step-done="<%= item.stepId %>" data-opportunity-id="<%= item.id %>" title="Mark this step as done">
+                  <i class="bi bi-check2" aria-hidden="true"></i><span class="visually-hidden">Mark &ldquo;<%= item.summary %>&rdquo; done</span>
+                </button>
+              <% } %>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-quick-step data-opportunity-id="<%= item.id %>" data-opportunity-name="<%= item.name %>" title="Add the next step">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add a next step to <%= item.name %></span>
+              </button>
+            </div>
+          </div>
         <% }) %>
       </div>
     <% } else { %>

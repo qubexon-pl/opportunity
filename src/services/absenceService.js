@@ -73,7 +73,7 @@ function normalizeInput({ startDate, endDate, kind, note }) {
   return { startDate: start, endDate: end, kind: value, note: String(note || '').trim().slice(0, 200) };
 }
 
-function addAbsence(personName, input) {
+async function addAbsence(personName, input) {
   const person = String(personName || '').trim();
   if (!person) throw new Error('Person name is required.');
 
@@ -91,11 +91,11 @@ function addAbsence(personName, input) {
     ...absence,
   });
 
-  updatePeopleConfig({ personAbsences: toStored(map) });
+  await updatePeopleConfig({ personAbsences: toStored(map) });
   return absence;
 }
 
-function removeAbsence(personName, absenceId) {
+async function removeAbsence(personName, absenceId) {
   const person = String(personName || '').trim();
   const id = String(absenceId || '');
   if (!person || !id) throw new Error('Person and absence are required.');
@@ -106,10 +106,10 @@ function removeAbsence(personName, absenceId) {
   if (remaining.length === existing.length) throw new Error('That absence no longer exists.');
 
   map[person] = remaining;
-  updatePeopleConfig({ personAbsences: toStored(map) });
+  await updatePeopleConfig({ personAbsences: toStored(map) });
 }
 
-function updateAbsence(personName, absenceId, input) {
+async function updateAbsence(personName, absenceId, input) {
   const person = String(personName || '').trim();
   const id = String(absenceId || '');
   if (!person || !id) throw new Error('Person and absence are required.');
@@ -127,7 +127,7 @@ function updateAbsence(personName, absenceId, input) {
 
   existing[idx] = { id, ...normalized };
   map[person] = existing;
-  updatePeopleConfig({ personAbsences: toStored(map) });
+  await updatePeopleConfig({ personAbsences: toStored(map) });
   return normalized;
 }
 
@@ -183,10 +183,10 @@ function absenceBusinessDaysFor(absence, from, toExclusive) {
   return days;
 }
 
-function removeAllForPerson(personName) {
+async function removeAllForPerson(personName) {
   const map = absenceMap();
   delete map[String(personName || '').trim()];
-  updatePeopleConfig({ personAbsences: toStored(map) });
+  return updatePeopleConfig({ personAbsences: toStored(map) });
 }
 
 /** Strips derived fields so the config file only ever holds what was entered. */

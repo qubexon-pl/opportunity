@@ -2,26 +2,4 @@
 <div id="managementContent">
   <%- include('management-content') %>
 </div>
-<script>
-  (function () {
-    var el = document.getElementById('mgmtPeopleDailyHours');
-    try { window.OPP_PEOPLE_DAILY_HOURS = el ? JSON.parse(el.textContent) : {}; }
-    catch (e) { window.OPP_PEOPLE_DAILY_HOURS = {}; }
-  })();
-
-  (function () {
-    function updateExportHref() {
-      var btn = document.getElementById('exportAssignmentsBtn');
-      if (!btn) return;
-      var params = new URLSearchParams(window.location.search);
-      params.delete('partial');
-      params.set('applied', '1');
-      btn.href = '/management/assignments/export?' + params.toString();
-    }
-    updateExportHref();
-    window.OPP_updateExportHref = updateExportHref;
-  })();
-</script>
-<script src="/js/timeline.js"></script>
-<script src="/js/allocation.js"></script>
-<%- include('partials/footer') %>
+<%- include('partials/footer', { pageScripts: ['/js/multiselect.js', '/js/timeline-scroll.js', '/js/timeline.js', '/js/allocation.js', '/js/management-dynamic.js'] }) %>

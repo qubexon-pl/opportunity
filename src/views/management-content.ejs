@@ -1,7 +1,7 @@
-<script type="application/json" id="mgmtPeopleDailyHours"><%- JSON.stringify(peopleDailyHours || {}) %></script>
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+<script type="application/json" id="mgmtPeopleDailyHours"><%- JSON.stringify(peopleDailyHours || {}).replace(/</g, '\\u003c') %></script>
+<div class="page-hero">
   <div>
-    <h2><i class="bi bi-diagram-3 me-2"></i>Team capacity</h2>
+    <h2><i class="bi bi-diagram-3 me-2" aria-hidden="true"></i>Team capacity</h2>
     <p class="text-muted mb-0">
       Capacity window: <%= toDateText(view.window.start) %> &rarr; <%= toDateText(view.window.endExclusive) %>
       (<%= view.capacityBusinessDays %> working days, baseline <%= monthlyCapacity %>h/month).
@@ -18,29 +18,29 @@
 
 <% if (typeof loadError !== 'undefined' && loadError) { %>
   <div class="alert alert-warning">
-    <i class="bi bi-exclamation-triangle me-2"></i>Could not load assignment data: <%= loadError %>
+    <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>Could not load assignment data: <%= loadError %>
   </div>
 <% } %>
 
 <ul class="nav nav-tabs mb-4" id="managementTabs" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabCapacity" type="button" role="tab">
-      <i class="bi bi-people me-1"></i>Team capacity
+      <i class="bi bi-people me-1" aria-hidden="true"></i>Team capacity
     </button>
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabAssignments" type="button" role="tab">
-      <i class="bi bi-list-ul me-1"></i>Assignments
+      <i class="bi bi-list-ul me-1" aria-hidden="true"></i>Assignments
     </button>
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabTimeline" type="button" role="tab">
-      <i class="bi bi-bar-chart-steps me-1"></i>Timeline
+      <i class="bi bi-bar-chart-steps me-1" aria-hidden="true"></i>Timeline
     </button>
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPeople" type="button" role="tab">
-      <i class="bi bi-person-lines-fill me-1"></i>People
+      <i class="bi bi-person-lines-fill me-1" aria-hidden="true"></i>People
     </button>
   </li>
 </ul>
@@ -52,9 +52,9 @@
 
     <div class="card mb-4">
       <div class="card-header">
-        <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePerspective" aria-expanded="false">
-          <i class="bi bi-chevron-down"></i><span><i class="bi bi-sliders me-2"></i>Perspective</span>
-        </a>
+        <button type="button" class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePerspective" aria-expanded="false">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-sliders me-2" aria-hidden="true"></i>Perspective</span>
+        </button>
       </div>
       <div class="card-body collapse" id="collapsePerspective">
         <form method="get" action="/management" class="row g-3 align-items-end" data-mgmt-form>
@@ -114,8 +114,8 @@
             }) %>
           </div>
           <div class="col-lg-12 col-md-8 d-flex gap-2">
-            <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
-            <a class="btn btn-outline-secondary" href="/management?applied=1" title="Reset" data-mgmt-link><i class="bi bi-x-lg"></i></a>
+            <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Apply</button>
+            <a class="btn btn-outline-secondary" href="/management?applied=1" title="Reset" data-mgmt-link><i class="bi bi-x-lg" aria-hidden="true"></i></a>
           </div>
         </form>
         <form method="post" action="/management/defaults" class="mt-3 d-flex align-items-center gap-2 flex-wrap" data-mgmt-defaults>
@@ -126,7 +126,7 @@
           <% personFilters.forEach(function(name) { %><input type="hidden" name="person" value="<%= name %>"><% }) %>
           <% managerFilters.forEach(function(name) { %><input type="hidden" name="manager" value="<%= name %>"><% }) %>
           <button class="btn btn-sm btn-outline-primary" type="submit" <%= filtersMatchDefault ? 'disabled' : '' %>>
-            <i class="bi bi-pin-angle me-1"></i>Save as my default
+            <i class="bi bi-pin-angle me-1" aria-hidden="true"></i>Save as my default
           </button>
           <span class="text-muted small">
             Current default: <%= savedDefaults.perspective %> &middot; <%= savedDefaults.units %> units &middot;
@@ -141,9 +141,9 @@
 
     <div class="card mb-4">
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <a class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapsePeople" aria-expanded="true">
-          <i class="bi bi-chevron-down"></i><span><i class="bi bi-people me-2"></i>People summary</span>
-        </a>
+        <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapsePeople" aria-expanded="true">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-people me-2" aria-hidden="true"></i>People summary</span>
+        </button>
         <div class="d-flex align-items-center gap-3 flex-wrap">
           <div class="d-flex align-items-center gap-2">
             <label class="text-muted small mb-0" for="peopleSort">Sort by</label>
@@ -167,7 +167,7 @@
           <% if (view.chargeability.absenceHours > 0) { %>
             <span class="absence-impact small"
                   title="Absence removes working days from the window, so the same committed hours are measured against a smaller base.">
-              <i class="bi bi-calendar-x me-1"></i>
+              <i class="bi bi-calendar-x me-1" aria-hidden="true"></i>
               <%= view.chargeability.absenceHours %>h absence across <%= view.chargeability.absentPeople %>
               <%= view.chargeability.absentPeople === 1 ? 'person' : 'people' %>
               <% if (view.chargeability.absencePercentPoints > 0) { %>
@@ -233,7 +233,7 @@
                   <% if (member.absentDays > 0) { %>
                     <div class="absence-impact small mt-2"
                          title="<%= member.absences.map(function(a) { return a.kind + ' ' + a.startDate + ' to ' + a.endDate + ' (' + a.daysInWindow + 'd)'; }).join('\n') %>&#10;Absence removes days from the window, so the same committed hours are measured against a smaller base.">
-                      <i class="bi bi-calendar-x me-1"></i>
+                      <i class="bi bi-calendar-x me-1" aria-hidden="true"></i>
                       Absence removes <strong><%= member.absenceHours %>h</strong> (<%= member.absentDays %>d)
                       <% if (member.absencePercentPoints > 0) { %>
                         &middot; utilization <%= member.chargeabilityReal %>% instead of
@@ -246,7 +246,7 @@
                   <% if (member.heldHours > 0) { %>
                     <div class="hold-impact small mt-2"
                          title="<%= member.heldAssignments %> assignment<%= member.heldAssignments === 1 ? '' : 's' %> paused in this window. Without the hold this person would be at <%= member.chargeabilityWithoutHolds %>% instead of <%= member.chargeabilityReal %>.">
-                      <i class="bi bi-pause-circle me-1"></i>
+                      <i class="bi bi-pause-circle me-1" aria-hidden="true"></i>
                       Holds free <strong><%= member.heldHours %>h</strong> &middot;
                       utilization <%= member.chargeabilityReal %>% instead of <%= member.chargeabilityWithoutHolds %>%
                       (&minus;<%= member.holdPercentPoints %> pts)
@@ -280,13 +280,13 @@
 
     <div class="card mb-4">
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseAssignments" aria-expanded="false">
-          <i class="bi bi-chevron-down"></i><span><i class="bi bi-list-ul me-2"></i>Assignments (<%= view.assignmentRows.length %>)</span>
-        </a>
+        <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseAssignments" aria-expanded="true">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-list-ul me-2" aria-hidden="true"></i>Assignments (<%= view.assignmentRows.length %>)</span>
+        </button>
         <div class="d-flex align-items-center gap-2">
-          <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Filter rows..." oninput="filterGroupedTable(this, 'assignmentTable')">
+          <input type="search" class="form-control form-control-sm inline-filter" placeholder="Filter rows..." aria-label="Filter assignments" data-filter-grouped="assignmentTable">
           <a class="btn btn-sm btn-outline-success" id="exportAssignmentsBtn" href="/management/assignments/export" title="Export assignments to Excel">
-            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export
+            <i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>Export
           </a>
         </div>
       </div>
@@ -311,7 +311,7 @@
                     <a class="sort-link <%= view.sort.key === field.key ? 'is-active' : '' %>"
                        href="<%= sortHref(field.key) %>"
                        data-mgmt-link
-                       title="Sort by <%= field.label %>"><%= field.label %><i class="bi <%= sortIcon(field.key) %> ms-1"></i></a>
+                       title="Sort by <%= field.label %>"><%= field.label %><i class="bi <%= sortIcon(field.key) %> ms-1" aria-hidden="true"></i></a>
                   </th>
                 <% }) %>
               </tr>
@@ -332,7 +332,7 @@
               <% assignmentGroups.forEach(function(group) { %>
                 <tr class="assignment-group-header">
                   <td colspan="9">
-                    <i class="bi bi-folder2-open me-2"></i><%= group.name %>
+                    <i class="bi bi-folder2-open me-2" aria-hidden="true"></i><%= group.name %>
                     <span class="badge text-bg-secondary ms-1"><%= group.rows.length %></span>
                   </td>
                 </tr>
@@ -356,7 +356,7 @@
                     %>
                     <a href="/opportunities/<%= assignment.OpportunityId %>#assignments"><%= assignment.OpportunityName %></a>
                     <% if (scopeIcon) { %>
-                      <i class="bi <%= scopeIcon %> scope-arrow <%= scopeClass %>" title="<%= scopeTitle %>"></i>
+                      <i class="bi <%= scopeIcon %> scope-arrow <%= scopeClass %>" title="<%= scopeTitle %>" aria-hidden="true"></i>
                       <div class="scope-hint small <%= scopeClass %>" title="<%= scopeTitle %>">
                         <%= scope.assignedHours %>h / <%= scope.scopeHours %>h
                         <%= scope.state === 'over' ? '(+' + scope.differenceHours + 'h over)' : '(' + Math.abs(scope.differenceHours) + 'h left)' %>
@@ -369,7 +369,7 @@
                     <%= assignment.StartDate || '-' %> &rarr; <%= assignment.EndDate || '-' %>
                     <% if (assignment.hasHolds) { %>
                       <% assignment.holds.forEach(function(hold) { %>
-                        <div class="hold-hint small<%= isHoldExpired(hold) ? ' text-decoration-line-through text-muted' : '' %>"><i class="bi bi-pause-circle me-1"></i>On hold <%= hold.startDate %> &rarr; <%= hold.endDate %></div>
+                        <div class="hold-hint small<%= isHoldExpired(hold) ? ' text-decoration-line-through text-muted' : '' %>"><i class="bi bi-pause-circle me-1" aria-hidden="true"></i>On hold <%= hold.startDate %> &rarr; <%= hold.endDate %></div>
                       <% }) %>
                     <% } %>
                   </td>
@@ -410,9 +410,9 @@
 
     <div class="card mb-4" id="timelineCard">
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <a class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseTimeline" aria-expanded="true">
-          <i class="bi bi-chevron-down"></i><span><i class="bi bi-bar-chart-steps me-2"></i>Timeline</span>
-        </a>
+        <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapseTimeline" aria-expanded="true">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-bar-chart-steps me-2" aria-hidden="true"></i>Timeline</span>
+        </button>
         <div class="timeline-legend d-flex flex-wrap gap-2">
           <%
             var baseQuery = 'applied=1&perspective=' + encodeURIComponent(perspective) + '&units=' + encodeURIComponent(unitsToShow);
@@ -439,17 +439,16 @@
              data-mgmt-link>Free capacity</a>
           <span class="legend-chip legend-absence" title="Days a person is away. Capacity is removed for these days, so free capacity drops with it.">Absence</span>
         </div>
-        <input type="text" class="form-control form-control-sm" data-timeline-filter
-               style="max-width: 200px;" placeholder="Filter person / project..."
-               oninput="filterTimeline(this)">
+        <input type="search" class="form-control form-control-sm inline-filter inline-filter-sm" data-timeline-filter
+               placeholder="Filter person / project..." aria-label="Filter the timeline by person or project">
         <button class="btn btn-sm btn-outline-secondary timeline-fullpage-toggle" type="button"
                 data-timeline-fullpage
                 aria-pressed="false"
                 title="Show the timeline full page (F)">
-          <i class="bi bi-arrows-fullscreen me-1"></i><span data-timeline-fullpage-label>Full page</span>
+          <i class="bi bi-arrows-fullscreen me-1" aria-hidden="true"></i><span data-timeline-fullpage-label>Full page</span>
         </button>
       </div>
-      <div class="card-body collapse" id="collapseTimeline">
+      <div class="card-body collapse show" id="collapseTimeline">
         <div class="timeline-scroll" data-scroll-key="management-timeline">
           <div class="timeline-grid" id="timelineGrid"
                data-perspective="<%= view.timeline.perspective %>"
@@ -522,7 +521,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                       <% }) %>
                       <a class="timeline-chip-body" href="/opportunities/<%= chip.OpportunityId %>#assignments">
                         <span class="timeline-chip-title">
-                          <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1"></i><% } %><%= chip.OpportunityName %><%
+                          <% if (chip.IsOnHold) { %><i class="bi bi-pause-circle me-1" aria-hidden="true"></i><% } %><% if (!chip.IsCommitted) { %><i class="bi bi-hourglass-split me-1" aria-hidden="true"></i><% } %><%= chip.OpportunityName %><%
                           %><span class="timeline-chip-stage <%= chip.accentClass %>"><%= stageStatusLabel(chip.Stage) %></span>
                         </span>
                         <span class="timeline-chip-meta" data-role="meta"><%
@@ -554,7 +553,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                           <span class="timeline-free-secondary">no capacity</span>
                         <% } else if (segment.isOver) { %>
                           <span class="timeline-free-primary">
-                            <i class="bi bi-exclamation-triangle-fill me-1"></i><%= segment.overHours %>h over
+                            <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i><%= segment.overHours %>h over
                           </span>
                           <span class="timeline-free-secondary"><%= segment.usedPercent %>%<% if (segment.absentDays) { %> &middot; <%= segment.absentDays %>d away<% } %></span>
                         <% } else { %>
@@ -602,9 +601,9 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
 
     <div class="card mb-4">
       <div class="card-header">
-        <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePeopleList" aria-expanded="false">
-          <i class="bi bi-chevron-down"></i><span><i class="bi bi-people me-2"></i>People (<%= (peopleSelectionActive ? people.filter(function(name) { return selectedPeople.indexOf(name) !== -1; }) : people).length %>)</span>
-        </a>
+        <button type="button" class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePeopleList" aria-expanded="false">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-people me-2" aria-hidden="true"></i>People (<%= (peopleSelectionActive ? people.filter(function(name) { return selectedPeople.indexOf(name) !== -1; }) : people).length %>)</span>
+        </button>
       </div>
       <div class="card-body collapse p-0" id="collapsePeopleList">
         <div class="table-responsive">
@@ -612,12 +611,12 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
             <thead>
               <tr>
                 <th>Name</th>
-                <th style="width: 200px;">Role</th>
-                <th style="width: 180px;">Manager</th>
-                <th class="text-end" style="width: 100px;">Daily hours</th>
-                <th class="text-end" style="width: 120px;">Cost (<%= costCurrency %>/day)</th>
-                <th class="text-end" style="width: 120px;">Absences</th>
-                <th style="width: 80px;"></th>
+                <th class="col-w200">Role</th>
+                <th class="col-w180">Manager</th>
+                <th class="text-end col-w100">Daily hours</th>
+                <th class="text-end col-w120">Cost (<%= costCurrency %>/day)</th>
+                <th class="text-end col-w120">Absences</th>
+                <th class="col-w80"></th>
               </tr>
             </thead>
             <tbody>
@@ -637,7 +636,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                 <tr>
                   <td>
                     <a href="/management/people/<%= encodeURIComponent(personName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>" class="text-decoration-none fw-semibold">
-                      <i class="bi bi-person me-1"></i><%= personName %>
+                      <i class="bi bi-person me-1" aria-hidden="true"></i><%= personName %>
                     </a>
                   </td>
                   <td class="text-muted small"><%= role %></td>

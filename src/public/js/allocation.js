@@ -4,8 +4,21 @@
   var HOURS_PER_DAY_FALLBACK = 8;
   var MODES = ['percent', 'total-hours', 'monthly-hours'];
 
+  /* Daily hours per person are embedded in the page as JSON (no inline script,
+     so the page works under a strict Content Security Policy). */
+  function peopleDailyHours() {
+    if (window.OPP_PEOPLE_DAILY_HOURS) return window.OPP_PEOPLE_DAILY_HOURS;
+    var el = document.getElementById('peopleDailyHoursData') || document.getElementById('mgmtPeopleDailyHours');
+    if (!el) return {};
+    try {
+      return JSON.parse(el.textContent) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
   function dailyHoursFor(person) {
-    var map = window.OPP_PEOPLE_DAILY_HOURS || {};
+    var map = peopleDailyHours();
     var value = Number(map[person]);
     return Number.isFinite(value) && value > 0 ? value : HOURS_PER_DAY_FALLBACK;
   }

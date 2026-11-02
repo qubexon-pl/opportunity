@@ -1,22 +1,12 @@
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
-  <div>
-    <h2><i class="bi bi-list-task me-2"></i>Opportunity pipeline</h2>
-    <p class="text-muted mb-0">Business development workspace &mdash; <%= opportunities.length %> opportunities.</p>
-  </div>
-</div>
-
-<% if (loadError) { %>
-  <div class="alert alert-warning">
-    <i class="bi bi-exclamation-triangle me-2"></i>
-    Could not load opportunities: <%= loadError %>
-  </div>
-<% } %>
-
 <%
   var openCount = opportunities.filter(function(o) { return o.Status === 'Open'; }).length;
   var wonCount = opportunities.filter(function(o) { return String(o.Stage || '').toLowerCase() === 'won'; }).length;
   var totalHours = opportunities.reduce(function(acc, o) { return acc + Number(o.OpportunityHours || 0); }, 0);
   var softCount = opportunities.filter(function(o) { return !isCommitted(o); }).length;
+  var shown = opportunities.length;
+  var matched = typeof total !== 'undefined' && total ? total : shown;
+  var nextSteps = typeof nextStepFor !== 'undefined' ? nextStepFor : {};
+  var isBoard = view === 'board';
 
   // Stage totals, so the summary says how much is actually won and lost rather
   // than only how many opportunities exist. "Other" is everything still in play.
@@ -50,65 +40,204 @@
   var otherTotals = totalsFor(function(r) { return r.key !== 'won' && r.key !== 'lost'; });
   var decided = wonTotals.count + lostTotals.count;
   var winRate = decided > 0 ? Math.round((wonTotals.count / decided) * 1000) / 10 : null;
+
+  // Links that change one filter keep every other one.
+  function hrefWith(overrides, stageList, statusList) {
+    var qs = queryWith(overrides);
+    if (stageList || statusList) {
+      var params = new URLSearchParams(qs);
+      if (stageList) { params.delete('stage'); stageList.forEach(function(s) { params.append('stage', s); }); }
+      if (statusList) { params.delete('status'); statusList.forEach(function(s) { params.append('status', s); }); }
+      qs = params.toString();
+    }
+    return '/?' + qs;
+  }
+  function isOnly(list, value) { return list.length === 1 && list[0] === value; }
+  function sortHref(key) {
+    var dir = filters.sort === key ? (filters.dir === 'asc' ? 'desc' : 'asc') : (key === 'hours' || key === 'updated' || key === 'created' ? 'desc' : 'asc');
+    return hrefWith({ sort: key, dir: dir });
+  }
+  function sortState(key) {
+    if (filters.sort !== key) return 'none';
+    return filters.dir === 'asc' ? 'ascending' : 'descending';
+  }
+  function sortIcon(key) {
+    if (filters.sort !== key) return 'bi-arrow-down-up';
+    return filters.dir === 'asc' ? 'bi-sort-up' : 'bi-sort-down';
+  }
+  function personOptions(selected) {
+    var list = people.slice();
+    if (selected && list.indexOf(selected) === -1) list.push(selected);
+    return list;
+  }
+  var activeFilterCount = filters.stage.length + filters.status.length + (filters.booking ? 1 : 0) + (filters.q ? 1 : 0);
 %>
-<div class="row g-3 mb-4">
-  <div class="col-sm-4 col-lg-2">
-    <div class="card text-center h-100 stat-card">
+
+<div class="page-hero page-hero-overlap">
+  <div>
+    <span class="hero-eyebrow">Business development</span>
+    <h2>Opportunity pipeline</h2>
+    <p class="text-muted mb-0">
+      <%= matched %> <%= matched === 1 ? 'opportunity' : 'opportunities' %><%= activeFilterCount ? ' match the filters' : '' %>.
+    </p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap align-items-center">
+    <div class="btn-group" role="group" aria-label="Pipeline layout">
+      <a class="btn btn-sm <%= isBoard ? 'btn-outline-secondary' : 'btn-secondary' %>" href="<%= hrefWith({ view: 'table' }) %>" data-pipeline-link <%= isBoard ? '' : 'aria-current="page"' %>>
+        <i class="bi bi-table me-1" aria-hidden="true"></i>Table
+      </a>
+      <a class="btn btn-sm <%= isBoard ? 'btn-secondary' : 'btn-outline-secondary' %>" href="<%= hrefWith({ view: 'board' }) %>" data-pipeline-link <%= isBoard ? 'aria-current="page"' : '' %>>
+        <i class="bi bi-kanban me-1" aria-hidden="true"></i>Board
+      </a>
+    </div>
+    <a class="btn btn-sm btn-outline-success" href="/pipeline/export?<%= queryWith({}) %>" title="Download the filtered pipeline as an Excel file">
+      <i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>Export
+    </a>
+  </div>
+</div>
+
+<% if (loadError) { %>
+  <div class="alert alert-warning" role="alert">
+    <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>
+    Could not load opportunities: <%= loadError %>
+  </div>
+<% } %>
+
+<%# The tiles are shortcuts: each one applies the filter it counts. %>
+<div class="row g-3 mb-3 stat-tiles">
+  <div class="col-6 col-sm-4 col-lg-2">
+    <a class="card h-100 stat-card tone-indigo stat-link <%= !activeFilterCount ? 'is-active' : '' %>" href="/?applied=1&view=<%= view %>" data-pipeline-link title="Show every opportunity">
+      <span class="card-body py-3">
+        <span class="stat-value"><%= shown %></span>
+        <span class="stat-label">Opportunities</span>
+      </span>
+    </a>
+  </div>
+  <div class="col-6 col-sm-4 col-lg-2">
+    <a class="card h-100 stat-card tone-green stat-link <%= isOnly(filters.status, 'Open') ? 'is-active' : '' %>" href="<%= hrefWith({}, null, isOnly(filters.status, 'Open') ? [] : ['Open']) %>" data-pipeline-link title="Show open opportunities">
+      <span class="card-body py-3">
+        <span class="stat-value"><%= openCount %></span>
+        <span class="stat-label">Open</span>
+      </span>
+    </a>
+  </div>
+  <div class="col-6 col-sm-4 col-lg-2">
+    <a class="card h-100 stat-card tone-cyan stat-link <%= isOnly(filters.stage, 'Won') ? 'is-active' : '' %>" href="<%= hrefWith({}, isOnly(filters.stage, 'Won') ? [] : ['Won']) %>" data-pipeline-link title="Show won opportunities">
+      <span class="card-body py-3">
+        <span class="stat-value"><%= wonCount %></span>
+        <span class="stat-label">Won</span>
+      </span>
+    </a>
+  </div>
+  <div class="col-6 col-sm-4 col-lg-2">
+    <div class="card h-100 stat-card tone-amber">
       <div class="card-body py-3">
-        <div class="fs-3 fw-bold" style="color: var(--color-primary);"><%= opportunities.length %></div>
-        <div class="text-muted small">Opportunities</div>
+        <span class="stat-value"><%= Math.round(totalHours) %>h</span>
+        <span class="stat-label">Total hours</span>
       </div>
     </div>
   </div>
-  <div class="col-sm-4 col-lg-2">
-    <div class="card text-center h-100 stat-card">
-      <div class="card-body py-3">
-        <div class="fs-3 fw-bold text-success"><%= openCount %></div>
-        <div class="text-muted small">Open</div>
-      </div>
-    </div>
+  <div class="col-6 col-sm-4 col-lg-2">
+    <a class="card h-100 stat-card tone-pink stat-link <%= filters.booking === 'soft' ? 'is-active' : '' %>" href="<%= hrefWith({ booking: filters.booking === 'soft' ? '' : 'soft' }) %>" data-pipeline-link title="Show soft bookings only">
+      <span class="card-body py-3">
+        <span class="stat-value"><%= softCount %></span>
+        <span class="stat-label">Soft booked</span>
+      </span>
+    </a>
   </div>
-  <div class="col-sm-4 col-lg-2">
-    <div class="card text-center h-100 stat-card">
-      <div class="card-body py-3">
-        <div class="fs-3 fw-bold text-info"><%= wonCount %></div>
-        <div class="text-muted small">Won</div>
-      </div>
-    </div>
+  <div class="col-6 col-sm-4 col-lg-2">
+    <a class="card h-100 stat-card tone-violet stat-link" href="#upcomingCard" title="Jump to upcoming actions">
+      <span class="card-body py-3">
+        <span class="stat-value"><%= upcoming.items.length %></span>
+        <span class="stat-label">Upcoming actions</span>
+      </span>
+    </a>
   </div>
-  <div class="col-sm-4 col-lg-2">
-    <div class="card text-center h-100 stat-card">
-      <div class="card-body py-3">
-        <div class="fs-3 fw-bold" style="color: var(--color-accent);"><%= Math.round(totalHours) %>h</div>
-        <div class="text-muted small">Total hours</div>
+</div>
+
+<%# One search and the filters, always visible above the list. %>
+<div class="card mb-3 pipeline-toolbar">
+  <div class="card-body py-3">
+    <form method="get" action="/" class="row g-2 align-items-end" data-pipeline-filter role="search" aria-label="Filter the pipeline">
+      <input type="hidden" name="applied" value="1">
+      <input type="hidden" name="view" value="<%= view %>">
+      <input type="hidden" name="period" value="<%= upcomingPeriod %>">
+      <% if (filters.booking) { %><input type="hidden" name="booking" value="<%= filters.booking %>"><% } %>
+      <div class="col-lg-4 col-md-12">
+        <label class="form-label" for="q">Search</label>
+        <div class="input-group">
+          <span class="input-group-text" aria-hidden="true"><i class="bi bi-search" aria-hidden="true"></i></span>
+          <input class="form-control" id="q" name="q" type="search" value="<%= filters.q %>" placeholder="Name, OPP ID, owner or tag" autocomplete="off" data-primary-search data-live-search>
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="col-sm-4 col-lg-2">
-    <div class="card text-center h-100 stat-card">
-      <div class="card-body py-3">
-        <div class="fs-3 fw-bold" style="color: var(--color-accent);"><%= softCount %></div>
-        <div class="text-muted small">Soft booked</div>
+      <div class="col-lg-2 col-md-3 col-6">
+        <%- include('partials/multiselect', {
+          id: 'filter-stage',
+          name: 'stage',
+          label: 'Stage',
+          allLabel: 'All stages',
+          selected: filters.stage,
+          options: stages.map(function(stage) { return { value: stage, label: stage }; })
+        }) %>
       </div>
-    </div>
-  </div>
-  <div class="col-sm-4 col-lg-2">
-    <div class="card text-center h-100 stat-card">
-      <div class="card-body py-3">
-        <div class="fs-3 fw-bold"><%= upcoming.items.length %></div>
-        <div class="text-muted small">Upcoming actions</div>
+      <div class="col-lg-2 col-md-3 col-6">
+        <%- include('partials/multiselect', {
+          id: 'filter-status',
+          name: 'status',
+          label: 'Status',
+          allLabel: 'All statuses',
+          selected: filters.status,
+          options: statuses.map(function(status) { return { value: status, label: status }; })
+        }) %>
       </div>
+      <div class="col-lg-2 col-md-3 col-6">
+        <label class="form-label" for="sort">Sort</label>
+        <select class="form-select" id="sort" name="sort" data-auto-submit>
+          <option value="updated" <%= filters.sort === 'updated' ? 'selected' : '' %>>Recently updated</option>
+          <option value="created" <%= filters.sort === 'created' ? 'selected' : '' %>>Recently created</option>
+          <option value="name" <%= filters.sort === 'name' ? 'selected' : '' %>>Name</option>
+          <option value="stage" <%= filters.sort === 'stage' ? 'selected' : '' %>>Stage</option>
+          <option value="owner" <%= filters.sort === 'owner' ? 'selected' : '' %>>Lead consultant</option>
+          <option value="hours" <%= filters.sort === 'hours' ? 'selected' : '' %>>Hours</option>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-3 col-6 d-flex gap-2">
+        <button class="btn btn-primary flex-grow-1" type="submit"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
+        <a class="btn btn-outline-secondary" href="/?applied=1&view=<%= view %>" title="Clear all filters" aria-label="Clear all filters" data-pipeline-clear><i class="bi bi-x-lg" aria-hidden="true"></i></a>
+      </div>
+    </form>
+    <div class="d-flex align-items-center gap-2 flex-wrap mt-2 small">
+      <% if (filters.booking) { %>
+        <a class="filter-chip" href="<%= hrefWith({ booking: '' }) %>" data-pipeline-link title="Remove this filter">
+          <%= filters.booking === 'soft' ? 'Soft booked' : 'Committed' %> <i class="bi bi-x" aria-hidden="true"></i><span class="visually-hidden">remove filter</span>
+        </a>
+      <% } %>
+      <form method="post" action="/pipeline/defaults" class="d-inline-flex align-items-center gap-2 flex-wrap" data-pipeline-defaults>
+        <% filters.stage.forEach(function(stage) { %><input type="hidden" name="stage" value="<%= stage %>"><% }) %>
+        <% filters.status.forEach(function(status) { %><input type="hidden" name="status" value="<%= status %>"><% }) %>
+        <button class="btn btn-sm btn-link p-0" type="submit" <%= filtersMatchDefault ? 'disabled' : '' %>>
+          <i class="bi bi-pin-angle me-1" aria-hidden="true"></i>Save stage and status as my default
+        </button>
+      </form>
+      <span class="text-muted">
+        <% if (savedDefaults.stages.length || savedDefaults.statuses.length) { %>
+          <%= personalDefaults ? 'Your default' : 'Default' %>: <%= savedDefaults.stages.length ? savedDefaults.stages.join(', ') : 'all stages' %>
+          &middot; <%= savedDefaults.statuses.length ? savedDefaults.statuses.join(', ') : 'all statuses' %>
+        <% } else { %>
+          No default saved &mdash; showing everything.
+        <% } %>
+      </span>
     </div>
   </div>
 </div>
 
 <%- include('partials/upcoming-card') %>
 
-<div class="card mb-4">
+<div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseStages" aria-expanded="false">
-      <i class="bi bi-chevron-down"></i><span><i class="bi bi-pie-chart me-2"></i>Stage totals</span>
-    </a>
+    <button type="button" class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseStages" aria-expanded="false" aria-controls="collapseStages">
+      <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-pie-chart me-2" aria-hidden="true"></i>Stage totals</span>
+    </button>
     <% if (winRate !== null) { %>
       <span class="text-muted small">
         Win rate <strong><%= winRate %>%</strong> of the <%= decided %> decided
@@ -148,17 +277,17 @@
     <button class="btn btn-sm btn-outline-secondary stage-breakdown-toggle collapsed" type="button"
             data-bs-toggle="collapse" data-bs-target="#stageBreakdown"
             aria-expanded="false" aria-controls="stageBreakdown">
-      <i class="bi bi-chevron-right me-1"></i>Share of hours by stage
+      <i class="bi bi-chevron-right me-1" aria-hidden="true"></i>Share of hours by stage
     </button>
     <div class="collapse mt-3" id="stageBreakdown">
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0 stage-total-table">
           <thead>
             <tr>
-              <th>Stage</th>
-              <th class="text-end">Opportunities</th>
-              <th class="text-end">Hours</th>
-              <th class="text-end">Share of hours</th>
+              <th scope="col">Stage</th>
+              <th scope="col" class="text-end">Opportunities</th>
+              <th scope="col" class="text-end">Hours</th>
+              <th scope="col" class="text-end">Share of hours</th>
             </tr>
           </thead>
           <tbody>
@@ -185,131 +314,185 @@
   </div>
 </div>
 
-<div class="card mb-4">
-  <div class="card-header">
-    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapseFilters" aria-expanded="false">
-      <i class="bi bi-chevron-down"></i><span><i class="bi bi-funnel me-2"></i>Filters</span>
-    </a>
+<% if (matched > shown) { %>
+  <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2" role="status">
+    <span><i class="bi bi-info-circle me-2" aria-hidden="true"></i>Showing the first <strong><%= shown %></strong> of <strong><%= matched %></strong> matching opportunities. Totals above cover the ones shown.</span>
+    <span class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-primary" href="<%= hrefWith({ limit: String(shown + pageSize) }) %>" data-pipeline-link>Load <%= Math.min(pageSize, matched - shown) %> more</a>
+      <a class="btn btn-sm btn-outline-secondary" href="<%= hrefWith({ limit: 'all' }) %>" data-pipeline-link>Show all</a>
+    </span>
   </div>
-  <div class="card-body collapse" id="collapseFilters">
-    <form method="get" action="/" class="row g-3 align-items-end" data-pipeline-filter>
-      <input type="hidden" name="applied" value="1">
-      <div class="col-lg-4 col-md-6">
-        <label class="form-label" for="q">Search</label>
-        <input class="form-control" id="q" name="q" type="search" value="<%= filters.q %>" placeholder="Name, owner, or tag">
-      </div>
-      <div class="col-lg-2 col-md-3 col-6">
-        <%- include('partials/multiselect', {
-          id: 'filter-stage',
-          name: 'stage',
-          label: 'Stage',
-          allLabel: 'All stages',
-          selected: filters.stage,
-          options: stages.map(function(stage) { return { value: stage, label: stage }; })
-        }) %>
-      </div>
-      <div class="col-lg-2 col-md-3 col-6">
-        <%- include('partials/multiselect', {
-          id: 'filter-status',
-          name: 'status',
-          label: 'Status',
-          allLabel: 'All statuses',
-          selected: filters.status,
-          options: statuses.map(function(status) { return { value: status, label: status }; })
-        }) %>
-      </div>
-      <div class="col-lg-2 col-md-3 col-6">
-        <label class="form-label" for="sort">Sort</label>
-        <select class="form-select" id="sort" name="sort">
-          <option value="updated" <%= filters.sort === 'updated' ? 'selected' : '' %>>Recently updated</option>
-          <option value="created" <%= filters.sort === 'created' ? 'selected' : '' %>>Recently created</option>
-          <option value="name" <%= filters.sort === 'name' ? 'selected' : '' %>>Name</option>
-        </select>
-      </div>
-      <div class="col-lg-2 col-md-3 col-6 d-flex gap-2">
-        <button class="btn btn-primary flex-grow-1" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
-        <a class="btn btn-outline-secondary" href="/?applied=1" title="Clear filters" data-pipeline-clear><i class="bi bi-x-lg"></i></a>
-      </div>
-      <input type="hidden" name="period" value="<%= upcomingPeriod %>">
-    </form>
-    <form method="post" action="/pipeline/defaults" class="mt-3 d-flex align-items-center gap-2 flex-wrap" data-pipeline-defaults>
-      <% filters.stage.forEach(function(stage) { %><input type="hidden" name="stage" value="<%= stage %>"><% }) %>
-      <% filters.status.forEach(function(status) { %><input type="hidden" name="status" value="<%= status %>"><% }) %>
-      <button class="btn btn-sm btn-outline-primary" type="submit" <%= filtersMatchDefault ? 'disabled' : '' %>>
-        <i class="bi bi-pin-angle me-1"></i>Save as my default
-      </button>
-      <span class="text-muted small">
-        <% if (savedDefaults.stages.length || savedDefaults.statuses.length) { %>
-          Current default: <%= savedDefaults.stages.length ? savedDefaults.stages.join(', ') : 'all stages' %>
-          &middot; <%= savedDefaults.statuses.length ? savedDefaults.statuses.join(', ') : 'all statuses' %>
-        <% } else { %>
-          No default saved &mdash; showing everything.
-        <% } %>
-      </span>
-    </form>
-  </div>
-</div>
+<% } %>
 
-<div class="card mb-4">
-  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <a class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePipeline" aria-expanded="false">
-      <i class="bi bi-chevron-down"></i><span><i class="bi bi-table me-2"></i>Pipeline (<%= opportunities.length %>)</span>
-    </a>
-    <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Filter rows..." oninput="filterTable(this, 'pipelineTable')">
+<%
+  function nextStepCell(o) {
+    var step = nextSteps[String(o.Id)];
+    return step;
+  }
+%>
+
+<% if (isBoard) { %>
+  <%# Board: one column per stage. Drag a card to move it, or use its stage menu. %>
+  <div class="pipeline-board" data-pipeline-board aria-label="Pipeline board, grouped by stage">
+    <% stages.concat(unspecified.length ? ['Unspecified'] : []).forEach(function(stage) {
+         var column = opportunities.filter(function(o) { return stage === 'Unspecified' ? stages.indexOf(String(o.Stage || '')) === -1 : String(o.Stage || '') === stage; });
+         var columnHours = Math.round(column.reduce(function(acc, o) { return acc + Number(o.OpportunityHours || 0); }, 0));
+    %>
+      <section class="board-column" data-board-stage="<%= stage === 'Unspecified' ? '' : stage %>" aria-labelledby="board-col-<%= stage.toLowerCase() %>">
+        <header class="board-column-head">
+          <span class="stage-badge <%= stageBadgeClass(stage) %>" id="board-col-<%= stage.toLowerCase() %>"><%= stage %></span>
+          <span class="board-column-meta"><%= column.length %> &middot; <%= columnHours %>h</span>
+        </header>
+        <div class="board-column-body" data-board-dropzone>
+          <% column.forEach(function(o) { var step = nextStepCell(o); %>
+            <article class="board-card <%= isCommitted(o) ? 'is-committed' : 'is-soft' %>" draggable="true" data-opportunity-id="<%= o.Id %>" data-opportunity-name="<%= o.Name %>">
+              <a class="board-card-title" href="/opportunities/<%= o.Id %>"><%= o.Name %></a>
+              <div class="board-card-meta">
+                <span><i class="bi bi-person" aria-hidden="true"></i> <%= o.TechOwner || 'Unassigned' %></span>
+                <span><%= o.OpportunityHours == null ? 0 : o.OpportunityHours %>h</span>
+              </div>
+              <% if (step) { %>
+                <div class="board-card-step <%= step.overdue ? 'is-overdue' : '' %>">
+                  <i class="bi bi-arrow-right-circle" aria-hidden="true"></i> <%= step.title %><% if (step.dueText) { %> &middot; <%= step.dueText %><% } %>
+                </div>
+              <% } %>
+              <div class="board-card-actions">
+                <label class="visually-hidden" for="board-stage-<%= o.Id %>">Move <%= o.Name %> to stage</label>
+                <select class="form-select form-select-sm" id="board-stage-<%= o.Id %>" data-quick-field="stage" data-opportunity-id="<%= o.Id %>">
+                  <% stages.forEach(function(option) { %>
+                    <option value="<%= option %>" <%= String(o.Stage || '') === option ? 'selected' : '' %>><%= option %></option>
+                  <% }) %>
+                  <% if (stages.indexOf(String(o.Stage || '')) === -1) { %><option value="" selected disabled>Unspecified</option><% } %>
+                </select>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-quick-step data-opportunity-id="<%= o.Id %>" data-opportunity-name="<%= o.Name %>" title="Add a next step">
+                  <i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add a next step to <%= o.Name %></span>
+                </button>
+              </div>
+            </article>
+          <% }) %>
+          <% if (!column.length) { %><p class="board-empty">Drop here</p><% } %>
+        </div>
+      </section>
+    <% }) %>
   </div>
-  <div class="card-body p-0 collapse" id="collapsePipeline">
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0" id="pipelineTable">
-        <thead>
-          <tr>
-            <th>Opportunity</th>
-            <th>Lead consultant</th>
-            <th>Stage</th>
-            <th>Status</th>
-            <th>Capacity booking</th>
-            <th class="text-end">Hours</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% opportunities.forEach(function(o) { %>
+<% } else { %>
+  <div class="card mb-4 pipeline-table-card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapsePipeline" aria-expanded="true" aria-controls="collapsePipeline">
+        <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-table me-2" aria-hidden="true"></i>Pipeline (<%= shown %>)</span>
+      </button>
+      <span class="text-muted small d-none d-md-inline">Change stage, status or lead right in the row; click a row to open it.</span>
+    </div>
+    <div class="card-body p-0 collapse show" id="collapsePipeline">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 pipeline-table" id="pipelineTable">
+          <thead>
             <tr>
-              <td>
-                <div class="pipeline-title">
-                  <a href="/opportunities/<%= o.Id %>" class="pipeline-link"><%= o.Name %></a>
-                  <%
-                    var tagList = String(o.Tags || '').split(',').map(function(t) { return t.trim(); }).filter(Boolean);
-                  %>
-                  <% tagList.forEach(function(tag) { %><span class="opportunity-tag"><%= tag %></span><% }) %>
-                </div>
-                <div class="pipeline-subtitle"><%= o.TechnologyStack || 'No technology stack' %></div>
-                <div class="pipeline-created small text-muted">
-                  <% if (o.OppId) { %><span class="pipeline-oppid"><%= o.OppId %></span> &middot; <% } %>Created <%= o.CreatedAt ? new Date(o.CreatedAt).toLocaleDateString() : '-' %>
-                </div>
-              </td>
-              <td><%= o.TechOwner || 'Unassigned' %></td>
-              <td><span class="stage-badge <%= stageBadgeClass(o.Stage) %>"><%= o.Stage || 'Unspecified' %></span></td>
-              <td><%= o.Status || 'Unspecified' %></td>
-              <td>
-                <form method="post" action="/opportunities/<%= o.Id %>/booking" class="booking-control">
-                  <select class="form-select form-select-sm" name="bookingMode" data-pipeline-booking
-                          title="<%= bookingLabel(o) %>">
-                    <% bookingModes.forEach(function(option) { %>
-                      <option value="<%= option.key %>" <%= bookingMode(o) === option.key ? 'selected' : '' %>><%= option.label %></option>
+              <th scope="col" aria-sort="<%= sortState('name') %>"><a class="sort-link" href="<%= sortHref('name') %>" data-pipeline-link>Opportunity <i class="bi <%= sortIcon('name') %>" aria-hidden="true"></i></a></th>
+              <th scope="col" aria-sort="<%= sortState('owner') %>"><a class="sort-link" href="<%= sortHref('owner') %>" data-pipeline-link>Lead consultant <i class="bi <%= sortIcon('owner') %>" aria-hidden="true"></i></a></th>
+              <th scope="col" aria-sort="<%= sortState('stage') %>"><a class="sort-link" href="<%= sortHref('stage') %>" data-pipeline-link>Stage <i class="bi <%= sortIcon('stage') %>" aria-hidden="true"></i></a></th>
+              <th scope="col">Status</th>
+              <th scope="col">Next step</th>
+              <th scope="col">Capacity booking</th>
+              <th scope="col" class="text-end" aria-sort="<%= sortState('hours') %>"><a class="sort-link" href="<%= sortHref('hours') %>" data-pipeline-link>Hours <i class="bi <%= sortIcon('hours') %>" aria-hidden="true"></i></a></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% opportunities.forEach(function(o) { var step = nextStepCell(o); %>
+              <tr data-href="/opportunities/<%= o.Id %>" class="pipeline-row">
+                <td data-label="Opportunity">
+                  <div class="pipeline-title">
+                    <a href="/opportunities/<%= o.Id %>" class="pipeline-link"><%= o.Name %></a>
+                    <%
+                      var tagList = String(o.Tags || '').split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+                    %>
+                    <% tagList.forEach(function(tag) { %><span class="opportunity-tag"><%= tag %></span><% }) %>
+                  </div>
+                  <div class="pipeline-created small text-muted" title="Created <%= o.CreatedAt ? new Date(o.CreatedAt).toLocaleDateString() : '-' %>">
+                    <% if (o.OppId) { %><span class="pipeline-oppid"><%= o.OppId %></span> &middot; <% } %><%= o.TechnologyStack || 'No technology stack' %>
+                  </div>
+                </td>
+                <td data-label="Lead consultant">
+                  <label class="visually-hidden" for="lead-<%= o.Id %>">Lead consultant for <%= o.Name %></label>
+                  <select class="form-select form-select-sm inline-edit" id="lead-<%= o.Id %>" data-quick-field="techOwner" data-opportunity-id="<%= o.Id %>">
+                    <option value="" <%= !o.TechOwner ? 'selected' : '' %>>Unassigned</option>
+                    <% personOptions(o.TechOwner).forEach(function(person) { %>
+                      <option value="<%= person %>" <%= o.TechOwner === person ? 'selected' : '' %>><%= person %></option>
                     <% }) %>
                   </select>
-                  <span class="booking-state <%= isCommitted(o) ? 'is-committed' : 'is-soft' %>">
-                    <%= isCommitted(o) ? 'Committed' : 'Soft' %>
-                  </span>
-                </form>
-              </td>
-              <td class="text-end fw-semibold"><%= o.OpportunityHours == null ? 0 : o.OpportunityHours %>h</td>
-            </tr>
-          <% }) %>
-          <% if (!opportunities.length) { %>
-            <tr><td colspan="6" class="text-center text-muted py-4">No opportunities match the current filters.</td></tr>
-          <% } %>
-        </tbody>
-      </table>
+                </td>
+                <td data-label="Stage">
+                  <label class="visually-hidden" for="stage-<%= o.Id %>">Stage for <%= o.Name %></label>
+                  <select class="form-select form-select-sm inline-edit inline-stage <%= stageBadgeClass(o.Stage) %>" id="stage-<%= o.Id %>" data-quick-field="stage" data-opportunity-id="<%= o.Id %>">
+                    <% stages.forEach(function(option) { %>
+                      <option value="<%= option %>" <%= String(o.Stage || '') === option ? 'selected' : '' %>><%= option %></option>
+                    <% }) %>
+                    <% if (stages.indexOf(String(o.Stage || '')) === -1) { %><option value="" selected disabled>Unspecified</option><% } %>
+                  </select>
+                </td>
+                <td data-label="Status">
+                  <label class="visually-hidden" for="status-<%= o.Id %>">Status for <%= o.Name %></label>
+                  <select class="form-select form-select-sm inline-edit" id="status-<%= o.Id %>" data-quick-field="status" data-opportunity-id="<%= o.Id %>">
+                    <% statuses.forEach(function(option) { %>
+                      <option value="<%= option %>" <%= String(o.Status || '') === option ? 'selected' : '' %>><%= option %></option>
+                    <% }) %>
+                    <% if (statuses.indexOf(String(o.Status || '')) === -1) { %><option value="" selected disabled>Unspecified</option><% } %>
+                  </select>
+                </td>
+                <td data-label="Next step" class="next-step-cell">
+                  <div class="d-flex align-items-start gap-2">
+                    <div class="flex-grow-1">
+                      <% if (step) { %>
+                        <div class="next-step-title"><%= step.title %></div>
+                        <% if (step.dueText) { %>
+                          <span class="next-step-due <%= step.overdue ? 'is-overdue' : step.dueToday ? 'is-today' : '' %>">
+                            <%= step.overdue ? 'Overdue' : step.dueToday ? 'Today' : 'Due' %> <%= step.dueText %>
+                          </span>
+                        <% } else { %>
+                          <span class="next-step-due">No due date</span>
+                        <% } %>
+                      <% } else { %>
+                        <span class="text-muted small">None planned</span>
+                      <% } %>
+                    </div>
+                    <div class="next-step-actions">
+                      <% if (step) { %>
+                        <button type="button" class="btn btn-sm btn-outline-success" data-step-done="<%= step.stepId %>" data-opportunity-id="<%= o.Id %>" title="Mark this step as done">
+                          <i class="bi bi-check2" aria-hidden="true"></i><span class="visually-hidden">Mark next step of <%= o.Name %> done</span>
+                        </button>
+                      <% } %>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" data-quick-step data-opportunity-id="<%= o.Id %>" data-opportunity-name="<%= o.Name %>" title="Add a next step">
+                        <i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add a next step to <%= o.Name %></span>
+                      </button>
+                    </div>
+                  </div>
+                </td>
+                <td data-label="Capacity booking">
+                  <form method="post" action="/opportunities/<%= o.Id %>/booking" class="booking-control">
+                    <label class="visually-hidden" for="booking-<%= o.Id %>">Capacity booking for <%= o.Name %></label>
+                    <select class="form-select form-select-sm" name="bookingMode" id="booking-<%= o.Id %>" data-pipeline-booking
+                            title="<%= bookingLabel(o) %>">
+                      <% bookingModes.forEach(function(option) { %>
+                        <option value="<%= option.key %>" <%= bookingMode(o) === option.key ? 'selected' : '' %>><%= option.label %></option>
+                      <% }) %>
+                    </select>
+                    <span class="booking-state <%= isCommitted(o) ? 'is-committed' : 'is-soft' %>">
+                      <%= isCommitted(o) ? 'Committed' : 'Soft' %>
+                    </span>
+                  </form>
+                </td>
+                <td data-label="Hours" class="text-end fw-semibold"><%= o.OpportunityHours == null ? 0 : o.OpportunityHours %>h</td>
+              </tr>
+            <% }) %>
+            <% if (!opportunities.length) { %>
+              <tr><td colspan="7" class="text-center text-muted py-4">
+                No opportunities match the current filters.
+                <a href="/?applied=1&view=<%= view %>" data-pipeline-link>Clear filters</a> or <a href="/opportunities/new">create one</a>.
+              </td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
-</div>
+<% } %>

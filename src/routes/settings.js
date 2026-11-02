@@ -50,12 +50,12 @@ router.get('/', (req, res) => {
 });
 
 /** Chooses which stages consume real capacity; every other stage is a soft booking. */
-router.post('/capacity/stages', (req, res) => {
+router.post('/capacity/stages', async (req, res) => {
   try {
     const raw = req.body.firmStages;
     const selected = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
     const valid = selected.filter((stage) => STAGES.includes(String(stage)));
-    updateFirmStages(valid);
+    await updateFirmStages(valid);
     req.flash('success', valid.length ? `Committed stages: ${valid.join(', ')}.` : 'All stages are now soft bookings.');
   } catch (err) {
     req.flash('error', err.message || String(err));
@@ -63,9 +63,9 @@ router.post('/capacity/stages', (req, res) => {
   res.redirect('/settings');
 });
 
-router.post('/people', (req, res) => {
+router.post('/people', async (req, res) => {
   try {
-    addPerson(req.body.personName, req.body.dailyHours, req.body.role, req.body.internalCost, req.body.manager);
+    await addPerson(req.body.personName, req.body.dailyHours, req.body.role, req.body.internalCost, req.body.manager);
     req.flash('success', `${String(req.body.personName).trim()} added.`);
   } catch (err) {
     req.flash('error', err.message || String(err));
@@ -73,9 +73,9 @@ router.post('/people', (req, res) => {
   res.redirect('/settings');
 });
 
-router.post('/people/profile', (req, res) => {
+router.post('/people/profile', async (req, res) => {
   try {
-    updatePersonProfile(req.body.personName, {
+    await updatePersonProfile(req.body.personName, {
       dailyHours: req.body.dailyHours,
       role: req.body.role,
       cost: req.body.internalCost,
@@ -88,9 +88,9 @@ router.post('/people/profile', (req, res) => {
   res.redirect('/settings');
 });
 
-router.post('/people/remove', (req, res) => {
+router.post('/people/remove', async (req, res) => {
   try {
-    removePerson(req.body.personName);
+    await removePerson(req.body.personName);
     req.flash('success', `${String(req.body.personName).trim()} removed.`);
   } catch (err) {
     req.flash('error', err.message || String(err));
@@ -99,11 +99,11 @@ router.post('/people/remove', (req, res) => {
 });
 
 /** Absence removes working days from a person's capacity for the dates it covers. */
-router.post('/people/absences', (req, res) => {
+router.post('/people/absences', async (req, res) => {
   const person = String(req.body.personName || '').trim();
   const redirectTo = String(req.body.redirect || '');
   try {
-    const absence = addAbsence(person, {
+    const absence = await addAbsence(person, {
       startDate: req.body.startDate,
       endDate: req.body.endDate,
       kind: req.body.kind,
@@ -119,11 +119,11 @@ router.post('/people/absences', (req, res) => {
   res.redirect(redirectTo || `/settings?person=${encodeURIComponent(person)}`);
 });
 
-router.post('/people/absences/remove', (req, res) => {
+router.post('/people/absences/remove', async (req, res) => {
   const person = String(req.body.personName || '').trim();
   const redirectTo = String(req.body.redirect || '');
   try {
-    removeAbsence(person, req.body.absenceId);
+    await removeAbsence(person, req.body.absenceId);
     req.flash('success', `Absence removed. ${person} is available again for those dates.`);
   } catch (err) {
     req.flash('error', err.message || String(err));
@@ -131,11 +131,11 @@ router.post('/people/absences/remove', (req, res) => {
   res.redirect(redirectTo || `/settings?person=${encodeURIComponent(person)}`);
 });
 
-router.post('/people/absences/update', (req, res) => {
+router.post('/people/absences/update', async (req, res) => {
   const person = String(req.body.personName || '').trim();
   const redirectTo = String(req.body.redirect || '');
   try {
-    const updated = updateAbsence(person, req.body.absenceId, {
+    const updated = await updateAbsence(person, req.body.absenceId, {
       startDate: req.body.startDate,
       endDate: req.body.endDate,
       kind: req.body.kind,

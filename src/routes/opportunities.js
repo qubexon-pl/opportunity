@@ -6,6 +6,7 @@ const {
   createOpportunity,
   updateOpportunity,
   setBookingFlag,
+  quickUpdateOpportunity,
   deleteOpportunity,
   addNote,
   deleteNote,
@@ -158,13 +159,39 @@ router.get('/', (req, res) => {
   res.redirect('/');
 });
 
+const LAST_LEAD_COOKIE = 'opp-last-lead';
+
+/** The Monday after today: most engagements are planned to start on a week boundary. */
+function nextMonday(from = new Date()) {
+  const date = new Date(Date.UTC(from.getFullYear(), from.getMonth(), from.getDate()));
+  const offset = ((8 - date.getUTCDay()) % 7) || 7;
+  date.setUTCDate(date.getUTCDate() + offset);
+  return toDateText(date);
+}
+
+/** A new opportunity starts from the common case, so fewer fields need touching. */
+function newFormDefaults(req) {
+  const people = listPeople();
+  const lastLead = String((req.cookies && req.cookies[LAST_LEAD_COOKIE]) || '');
+  return {
+    ...emptyForm(),
+    TechOwner: people.includes(lastLead) ? lastLead : '',
+    PlannedStartDate: nextMonday(),
+    FirstContactDate: toDateText(new Date()),
+  };
+}
+
+function isAjaxRequest(req) {
+  return req.get('X-Requested-With') === 'XMLHttpRequest';
+}
+
 router.get('/new', (req, res) => {
   res.render(
     'opportunities/form',
     baseViewModel({
       title: 'Create opportunity',
       mode: 'new',
-      opportunity: emptyForm(),
+      opportunity: newFormDefaults(req),
       plannedEndPreview: null,
       plannedDurationPreview: null,
       partial: false,
@@ -180,6 +207,9 @@ router.post('/', async (req, res, next) => {
       return res.redirect('/opportunities/new');
     }
     const id = await createOpportunity(payload);
+    if (payload.techOwner) {
+      res.cookie(LAST_LEAD_COOKIE, payload.techOwner, { maxAge: 365 * 24 * 60 * 60 * 1000, sameSite: 'lax', httpOnly: true });
+    }
     req.flash('success', 'Opportunity created.');
     res.redirect(`/opportunities/${id}`);
   } catch (err) {
@@ -205,6 +235,11 @@ router.get('/:id', async (req, res, next) => {
     }
 
     const opportunity = detail.opportunity;
+    // Name the record in the breadcrumb instead of showing its id.
+    res.locals.breadcrumb = [
+      { label: 'Pipeline', href: '/' },
+      { label: opportunity.Name || 'Opportunity', href: req.originalUrl },
+    ];
     res.render(
       'opportunities/form',
       baseViewModel({
@@ -268,6 +303,27 @@ router.post('/:id/booking', async (req, res) => {
   res.redirect(req.get('referer') || '/');
 });
 
+/**
+ * One-field change from the pipeline: a table cell (stage, status, lead
+ * consultant) or a card dragged to another column on the board.
+ */
+router.post('/:id/quick', async (req, res) => {
+  const patch = {};
+  ['stage', 'status', 'techOwner'].forEach((field) => {
+    if (req.body[field] !== undefined) patch[field] = field === 'techOwner' ? text(req.body[field]) : String(req.body[field]);
+  });
+  try {
+    const updated = await quickUpdateOpportunity(req.params.id, patch);
+    if (!updated) throw new Error('Opportunity not found.');
+    if (isAjaxRequest(req)) return res.json({ ok: true });
+    req.flash('success', 'Opportunity updated.');
+  } catch (err) {
+    if (isAjaxRequest(req)) return res.status(400).json({ ok: false, error: friendlyError(err) });
+    req.flash('error', friendlyError(err));
+  }
+  res.redirect(req.get('referer') || '/');
+});
+
 router.post('/:id/delete', async (req, res, next) => {
   try {
     const deleted = await deleteOpportunity(req.params.id);
@@ -304,15 +360,18 @@ router.post('/:id/notes/:noteId/delete', async (req, res, next) => {
 });
 
 // ──── Next steps ────
+/* Quick-add and "done" also run from the pipeline, which asks for JSON and stays put. */
 router.post('/:id/steps', async (req, res, next) => {
   try {
     await addStep(req.params.id, {
       title: String(req.body.title || '').trim(),
       dueDate: text(req.body.dueDate),
     });
+    if (isAjaxRequest(req) && req.get('Accept') === 'application/json') return res.json({ ok: true });
     req.flash('success', 'Next step added.');
   } catch (err) {
     if (!err || !(err.issues || err.name === 'ZodError')) return next(err);
+    if (isAjaxRequest(req) && req.get('Accept') === 'application/json') return res.status(400).json({ ok: false, error: friendlyError(err) });
     req.flash('error', friendlyError(err));
   }
   res.redirect(`/opportunities/${req.params.id}#steps`);
@@ -321,6 +380,7 @@ router.post('/:id/steps', async (req, res, next) => {
 router.post('/:id/steps/:stepId/toggle', async (req, res, next) => {
   try {
     await setStepDone(req.params.stepId, bool(req.body.isDone));
+    if (isAjaxRequest(req) && req.get('Accept') === 'application/json') return res.json({ ok: true });
     res.redirect(`/opportunities/${req.params.id}#steps`);
   } catch (err) {
     next(err);
@@ -410,3 +470,4 @@ router.post('/:id/assignments/:assignmentId/delete', async (req, res, next) => {
 
 module.exports = router;
 module.exports.opportunityPayload = opportunityPayload;
+module.exports.nextMonday = nextMonday;
