@@ -61,24 +61,6 @@
         <i class="bi bi-layout-sidebar-inset" id="collapseIcon" aria-hidden="true"></i> <span>Collapse</span>
       </button>
     </nav>
-
-    <!-- Sidebar footer: user info -->
-    <div class="sidebar-footer">
-      <div class="sidebar-user">
-        <div class="sidebar-user-avatar" aria-hidden="true"><%= user ? (user.name || 'U').charAt(0).toUpperCase() : 'O' %></div>
-        <div class="sidebar-user-info">
-          <div class="sidebar-user-name"><%= user ? user.name : 'Local workspace' %></div>
-          <div class="sidebar-user-email">
-            <% if (user) { %>
-              <%= user.email || '' %>
-              <% if (logoutUrl) { %><a href="<%= logoutUrl %>" class="sidebar-signout">Sign out</a><% } %>
-            <% } else { %>
-              Not signed in
-            <% } %>
-          </div>
-        </div>
-      </div>
-    </div>
   </aside>
 
   <!-- Main content -->
@@ -140,7 +122,6 @@
               <% if (user && user.email) { %><div class="small text-muted"><%= user.email %></div><% } %>
             </li>
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="/settings"><i class="bi bi-gear me-2" aria-hidden="true"></i>Configuration</a></li>
             <% if (logoutUrl) { %>
               <li><a class="dropdown-item text-danger" href="<%= logoutUrl %>"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Sign out</a></li>
             <% } else { %>
