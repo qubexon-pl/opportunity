@@ -1,0 +1,15 @@
+<%#
+  Staffing flag: the one-glance answer to "does this opportunity have people
+  on it". Green tick when somebody is assigned, red mark when nobody is.
+%>
+<%
+  var afPeople = Array.isArray(afPeople) ? afPeople : [];
+  var afStaffed = afPeople.length > 0;
+  var afTitle = afStaffed
+    ? afPeople.length + (afPeople.length === 1 ? ' person assigned' : ' people assigned')
+    : 'Nobody assigned yet';
+%>
+<span class="assign-flag <%= afStaffed ? 'is-staffed' : 'is-unstaffed' %>" title="<%= afTitle %>">
+  <i class="bi <%= afStaffed ? 'bi-check-circle-fill' : 'bi-exclamation-circle-fill' %>" aria-hidden="true"></i>
+  <span class="visually-hidden"><%= afTitle %></span>
+</span>

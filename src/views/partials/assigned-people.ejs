@@ -1,0 +1,29 @@
+<%#
+  Who is already booked on an opportunity.
+
+  The pipeline is read top to bottom, so the names sit quietly under the lead
+  consultant in a smaller type, and only the first few are spelled out: the
+  question being answered here is "is this staffed", not "by exactly whom".
+  The full list, with hours, stays available in the tooltip.
+%>
+<%
+  var apPeople = Array.isArray(apPeople) ? apPeople : [];
+  var apLimit = typeof apLimit === 'undefined' ? 3 : apLimit;
+  var apShown = apPeople.slice(0, apLimit);
+  var apRest = apPeople.length - apShown.length;
+  var apNames = apShown.map(function(entry) { return entry.person; }).join(', ');
+  var apTitle = apPeople.length
+    ? apPeople.length + ' assigned: ' + apPeople.map(function(entry) {
+        return entry.person + ' (' + entry.hours + 'h)';
+      }).join(', ')
+    : 'Nobody is assigned to this opportunity yet';
+%>
+<div class="assigned-people<%= apPeople.length ? '' : ' is-empty' %>" title="<%= apTitle %>">
+  <i class="bi <%= apPeople.length ? 'bi-people' : 'bi-person-dash' %>" aria-hidden="true"></i>
+  <% if (apPeople.length) { %>
+    <span class="assigned-people-names"><%= apNames %></span>
+    <% if (apRest > 0) { %><span class="assigned-people-more">+<%= apRest %></span><% } %>
+  <% } else { %>
+    <span class="assigned-people-names">Nobody assigned</span>
+  <% } %>
+</div>
