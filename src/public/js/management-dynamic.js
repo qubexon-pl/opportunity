@@ -20,6 +20,7 @@
     interceptVisibility();
     interceptDefaults();
     interceptQuickAssign();
+    interceptTimelineAssign();
 
     window.addEventListener('popstate', function () {
       swapContent(window.location.href, false);
@@ -285,6 +286,76 @@
           });
       });
     });
+  }
+
+  /* ── Assign from the timeline ─────────────────────────────────── */
+
+  /* The timeline already answers "who is free, and when", so a free bar (or
+     the person's Assign button) hands that answer straight to the Quick
+     assign form instead of making the user retype it.  Delegated from the
+     content root so it keeps working after a background swap. */
+
+  function interceptTimelineAssign() {
+    contentEl.addEventListener('click', function (e) {
+      var trigger = e.target.closest('[data-timeline-assign]');
+      if (!trigger || !contentEl.contains(trigger)) return;
+      e.preventDefault();
+      openAssignFor(trigger);
+    });
+
+    contentEl.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var trigger = e.target.closest && e.target.closest('[data-timeline-assign]');
+      if (!trigger || !contentEl.contains(trigger)) return;
+      e.preventDefault();
+      openAssignFor(trigger);
+    });
+  }
+
+  function openAssignFor(trigger) {
+    var form = contentEl.querySelector('[data-quick-assign="Timeline"]');
+    var card = document.getElementById('quickAssignCardTimeline');
+    if (!form || !card) return;
+
+    var person = trigger.getAttribute('data-person') || '';
+    var start = trigger.getAttribute('data-start') || '';
+    var end = trigger.getAttribute('data-end') || '';
+
+    /* The full-page board covers the whole viewport, so the form underneath
+       it could never be reached: step out of it first. */
+    var timelineCard = document.getElementById('timelineCard');
+    if (timelineCard && timelineCard.classList.contains('timeline-card-fullpage')) {
+      var toggle = timelineCard.querySelector('[data-timeline-fullpage]');
+      if (toggle) toggle.click();
+    }
+
+    /* Open the panel first: a collapsed card has no height to scroll to. */
+    var body = card.querySelector('.collapse');
+    if (body && !body.classList.contains('show')) {
+      var collapse = bootstrap.Collapse.getInstance(body) || new bootstrap.Collapse(body, { toggle: false });
+      collapse.show();
+    }
+
+    setField(form, '[data-role="person"]', person);
+    setField(form, '[data-role="start"]', start);
+    setField(form, '[data-role="end"]', end);
+
+    card.classList.add('is-flash');
+    setTimeout(function () { card.classList.remove('is-flash'); }, 1200);
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    var opportunity = form.querySelector('[data-role="opportunity"]');
+    if (opportunity) setTimeout(function () { opportunity.focus(); }, 250);
+  }
+
+  /* Allocation maths listens for change/input, so the preview has to be told
+     the values moved - setting .value on its own fires nothing. */
+  function setField(form, selector, value) {
+    var field = form.querySelector(selector);
+    if (!field || !value) return;
+    field.value = value;
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+    field.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
   if (document.readyState === 'loading') {
