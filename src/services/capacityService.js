@@ -481,6 +481,10 @@ function freeSegments(assignmentsForPerson, personName, window, perspective) {
         groupLabel: unitGroup(cursor, perspective).label,
         start,
         endExclusive,
+        /* The dates the bar covers, ready to drop into a date input: assigning
+           straight from the timeline should offer exactly the span clicked. */
+        startText: toDateText(start),
+        endText: toDateText(new Date(endExclusive.getTime() - DAY_MS)),
         capacityHours: round2(capacityHours),
         freeHours: round2(freeHours),
         softHours: round2(softHours),
@@ -847,6 +851,8 @@ function buildManagementView({
       endExclusiveText: toDateText(range.endExclusive),
       windowStartText: toDateText(window.start),
       windowEndExclusiveText: toDateText(window.endExclusive),
+      // Last day of the window, for date inputs that want an inclusive end.
+      windowEndText: toDateText(new Date(window.endExclusive.getTime() - DAY_MS)),
     },
     window: {
       ...window,

@@ -496,6 +496,17 @@ Away <%= row.absentDays %>d, which removes <%= row.absenceHours %>h of capacity:
   <%= band.kind %> <%= band.startDate %> &rarr; <%= band.endDate %> (<%= band.daysInWindow %>d in view)<% }) %><% } %>">
                   <a class="person-link" href="/management/people/<%= encodeURIComponent(row.person) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>&period=<%= periodDirection %>"><%= row.person %></a>
                   <span class="timeline-person-load"><%= row.committedHours %>h / <%= row.capacityHours %>h (<%= row.utilizationPercent %>%)</span>
+                  <%/* Assigning from the timeline saves a trip to the opportunity
+                       page: the row already says who is free and when. */ %>
+                  <button type="button" class="timeline-assign-btn"
+                          data-timeline-assign
+                          data-person="<%= row.person %>"
+                          data-start="<%= view.timeline.windowStartText %>"
+                          data-end="<%= view.timeline.windowEndText %>"
+                          title="Assign <%= row.person %> to an opportunity for <%= view.window.label %>"
+                          aria-label="Assign <%= row.person %> to an opportunity">
+                    <i class="bi bi-plus-lg" aria-hidden="true"></i><span>Assign</span>
+                  </button>
                 </div>
                 <div class="timeline-lane" style="--timeline-units: <%= view.timeline.units.length %>;">
                   <div class="timeline-gridlines">
@@ -554,9 +565,16 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                           }).join('\n')
                         : '';
                     %>
-                    <div class="timeline-free<%= fullyAbsent ? ' is-absent' : '' %><%= segment.isOver ? ' is-over' : '' %>"
+                    <div class="timeline-free<%= fullyAbsent ? ' is-absent' : '' %><%= segment.isOver ? ' is-over' : '' %><%= fullyAbsent ? '' : ' is-assignable' %>"
+                         <% if (!fullyAbsent) { %>
+                         data-timeline-assign
+                         data-person="<%= row.person %>"
+                         data-start="<%= segment.startText %>"
+                         data-end="<%= segment.endText %>"
+                         role="button" tabindex="0"
+                         <% } %>
                          style="left: <%= segment.geometry.left.toFixed(3) %>%; width: <%= segment.geometry.width.toFixed(3) %>%; top: <%= segment.geometry.top %>px;"
-                         title="<%= segment.groupLabel %> <%= segment.unitLabel %> &middot; <%= segment.capacityHours %>h capacity<%= segment.absentDays ? ' (' + segment.grossCapacityHours + 'h \u2212 ' + segment.absenceHours + 'h absence)' : '' %><%= fullyAbsent ? '\nAway for the whole period, so there is no capacity to share out.' : '\n' + breakdown + '\nTotal: ' + (segment.usedPercent + segment.freePercent).toFixed(2) + '%' %><%= segment.isOver ? '\nOver capacity by ' + segment.overHours + 'h: more is committed here than there are hours to give.' : '' %><%= segment.softHours ? '\nSoft booked on top: ' + segment.softHours + 'h = ' + segment.softPercent + '%' : '' %><%= absenceDetail %>">
+                         title="<%= segment.groupLabel %> <%= segment.unitLabel %> &middot; <%= segment.capacityHours %>h capacity<%= segment.absentDays ? ' (' + segment.grossCapacityHours + 'h \u2212 ' + segment.absenceHours + 'h absence)' : '' %><%= fullyAbsent ? '\nAway for the whole period, so there is no capacity to share out.' : '\n' + breakdown + '\nTotal: ' + (segment.usedPercent + segment.freePercent).toFixed(2) + '%' %><%= segment.isOver ? '\nOver capacity by ' + segment.overHours + 'h: more is committed here than there are hours to give.' : '' %><%= segment.softHours ? '\nSoft booked on top: ' + segment.softHours + 'h = ' + segment.softPercent + '%' : '' %><%= absenceDetail %><%= fullyAbsent ? '' : '\nClick to assign ' + row.person + ' to an opportunity for this period.' %>">
                       <span class="timeline-free-label">
                         <% if (fullyAbsent) { %>
                           <span class="timeline-free-primary">Away <%= segment.absentDays %>d</span>
