@@ -346,11 +346,14 @@
         <div class="board-column-body" data-board-dropzone>
           <% column.forEach(function(o) { var step = nextStepCell(o); %>
             <article class="board-card <%= isCommitted(o) ? 'is-committed' : 'is-soft' %>" draggable="true" data-opportunity-id="<%= o.Id %>" data-opportunity-name="<%= o.Name %>">
+              <% var assigned = assignedTo(o); %>
+              <%- include('partials/assign-flag', { afPeople: assigned }) %>
               <a class="board-card-title" href="/opportunities/<%= o.Id %>"><%= o.Name %></a>
               <div class="board-card-meta">
                 <span><i class="bi bi-person" aria-hidden="true"></i> <%= o.TechOwner || 'Unassigned' %></span>
                 <span><%= o.OpportunityHours == null ? 0 : o.OpportunityHours %>h</span>
               </div>
+              <%- include('partials/assigned-people', { apPeople: assigned }) %>
               <% if (step) { %>
                 <div class="board-card-step <%= step.overdue ? 'is-overdue' : '' %>">
                   <i class="bi bi-arrow-right-circle" aria-hidden="true"></i> <%= step.title %><% if (step.dueText) { %> &middot; <%= step.dueText %><% } %>
@@ -420,6 +423,12 @@
                       <option value="<%= person %>" <%= o.TechOwner === person ? 'selected' : '' %>><%= person %></option>
                     <% }) %>
                   </select>
+                  <%# Who is actually booked, as opposed to who owns the deal. %>
+                  <% var rowAssigned = assignedTo(o); %>
+                  <div class="pipeline-assigned">
+                    <%- include('partials/assign-flag', { afPeople: rowAssigned }) %>
+                    <%- include('partials/assigned-people', { apPeople: rowAssigned, apLimit: 2 }) %>
+                  </div>
                 </td>
                 <td data-label="Stage">
                   <label class="visually-hidden" for="stage-<%= o.Id %>">Stage for <%= o.Name %></label>

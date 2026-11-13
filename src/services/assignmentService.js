@@ -136,8 +136,63 @@ async function listAssignments({ includeHidden = true } = {}) {
   }
 }
 
-async function addAssignment(rawOpportunityId, payload) {
-  const opportunityId = toGuid(rawOpportunityId);
+/**
+ * Who is on each opportunity, one row per person.
+ *
+ * The pipeline needs to say "this is staffed" at a glance, which is a
+ * different question from the timeline's: it does not care when or how much,
+ * only who. Grouping in SQL keeps that to one small result set no matter how
+ * many separate assignment rows a person has on the same opportunity.
+ */
+async function listAssignedPeople() {
+  const pool = await getPool();
+  try {
+    const result = await pool.request().query(
+      `SELECT OpportunityId,
+              PersonName,
+              SUM(AllocatedHours) AS AllocatedHours,
+              MIN(PlannedStartDate) AS StartDate,
+              MAX(PlannedEndDate) AS EndDate,
+              MAX(CAST(IsTimelineVisible AS INT)) AS IsTimelineVisible
+       FROM dbo.OpportunityAssignments
+       GROUP BY OpportunityId, PersonName
+       ORDER BY OpportunityId, PersonName;`
+    );
+    return result.recordset;
+  } catch (err) {
+    // Staffing is a nice-to-know on the pipeline, never a reason to fail it.
+    if (isMissingAssignmentsTable(err)) return [];
+    throw err;
+  }
+}
+
+/**
+ * Turns the rows above into a lookup keyed by opportunity id.
+ *
+ * Ids are lower-cased because SQL Server hands GUIDs back upper-cased while
+ * the URLs and in-memory fixtures use lower case, and a case mismatch would
+ * quietly report every opportunity as unstaffed.
+ */
+function assignedPeopleByOpportunity(rows) {
+  const byOpportunity = {};
+
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const key = String(row.OpportunityId || '').toLowerCase();
+    if (!key || !row.PersonName) return;
+    if (!byOpportunity[key]) byOpportunity[key] = [];
+    byOpportunity[key].push({
+      person: row.PersonName,
+      hours: round2(Number(row.AllocatedHours || 0)),
+      startDate: row.StartDate ? toDateText(new Date(row.StartDate)) : '',
+      endDate: row.EndDate ? toDateText(new Date(row.EndDate)) : '',
+      isVisible: Number(row.IsTimelineVisible || 0) > 0,
+    });
+  });
+
+  return byOpportunity;
+}
+
+async function addAssignment(rawOpportunityId, payload) {  const opportunityId = toGuid(rawOpportunityId);
   const body = AssignmentCreateSchema.parse(payload);
 
   if (new Date(body.plannedEndDate) < new Date(body.plannedStartDate)) {
@@ -339,6 +394,8 @@ module.exports = {
   normalizeHolds,
   holdsToJson,
   listAssignments,
+  listAssignedPeople,
+  assignedPeopleByOpportunity,
   addAssignment,
   updateAssignment,
   deleteAssignment,

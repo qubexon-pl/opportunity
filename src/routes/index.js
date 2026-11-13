@@ -4,6 +4,7 @@ const { listOpportunities, listOpenNextSteps, STAGES, STATUSES, PAGE_SIZE } = re
 const { buildUpcoming, nextStepByOpportunity, stageBadgeClass, UPCOMING_PERIODS } = require('../services/capacityService');
 const { BOOKING_MODES, bookingMode, bookingLabel, countsTowardsCapacity, listFirmStages } = require('../services/bookingService');
 const { listPeople } = require('../services/peopleService');
+const { listAssignedPeople, assignedPeopleByOpportunity } = require('../services/assignmentService');
 const { getViewDefaults, updateViewDefaults } = require('../config/settings');
 const { queryList, filterAgainst } = require('../services/filterService');
 const { isDatabaseUnavailable } = require('../db/pool');
@@ -106,6 +107,9 @@ router.get('/', async (req, res, next) => {
     upcomingPeriod,
     upcomingPeriods: UPCOMING_PERIODS,
     stageBadgeClass,
+    // Replaced below once the staffing read lands; the empty default keeps the
+    // template working on the error path, where nothing was read at all.
+    assignedTo: () => [],
     savedDefaults: defaults,
     personalDefaults: !!userKey(req),
     filtersMatchDefault: sameAsDefault(filters.stage, defaults.stages) && sameAsDefault(filters.status, defaults.statuses),
@@ -115,21 +119,26 @@ router.get('/', async (req, res, next) => {
   try {
     // Booking is worked out in code, not stored, so that filter is applied
     // after the read and paging happens afterwards.
-    const [allRows, nextSteps] = await Promise.all([
+    const [allRows, nextSteps, assignedRows] = await Promise.all([
       listOpportunities({ ...filters, limit: filters.booking || limit === null ? undefined : limit }),
       // A missing next-step read should never take the whole pipeline down.
       listOpenNextSteps().catch(() => []),
+      // Nor should a missing assignments table: the pipeline simply reports
+      // nobody as staffed rather than refusing to load.
+      listAssignedPeople().catch(() => []),
     ]);
     const matching = filters.booking ? applyBookingFilter(allRows, filters.booking, firmStages) : allRows;
     const opportunities = filters.booking && limit !== null ? matching.slice(0, limit) : matching;
     opportunities.total = filters.booking ? matching.length : allRows.total;
 
     const upcoming = buildUpcoming(opportunities, upcomingPeriod, nextSteps);
+    const assignedPeople = assignedPeopleByOpportunity(assignedRows);
     const model = {
       ...baseModel,
       opportunities,
       total: opportunities.total || opportunities.length,
       nextStepFor: nextStepByOpportunity(nextSteps),
+      assignedTo: (opportunity) => assignedPeople[String(opportunity.Id || '').toLowerCase()] || [],
       upcoming,
       loadError: null,
     };
