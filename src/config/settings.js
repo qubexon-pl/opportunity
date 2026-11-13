@@ -12,7 +12,7 @@ const DEFAULT_FIRM_STAGES = ['Won'];
 
 const DEFAULT_VIEW_DEFAULTS = {
   pipeline: { stages: [], statuses: [] },
-  management: { stages: [], statuses: [], people: [], managers: [], perspective: 'months', units: 6, offset: 0 },
+  management: { stages: [], statuses: [], people: [], managers: [], perspective: 'months', units: 6, period: 'next' },
 };
 
 /* Settings are held in memory by the store and persisted to Azure SQL (or the
@@ -117,12 +117,25 @@ function viewDefaultsKey(userId) {
   return userId ? `${SHARED_VIEW_DEFAULTS_KEY}:user:${String(userId).toLowerCase()}` : SHARED_VIEW_DEFAULTS_KEY;
 }
 
+/**
+ * Saved defaults predate the back/current/next control: they stored a numeric
+ * offset in units. A negative one meant the reader was looking at a period that
+ * had already happened, so it maps to "back"; anything else looked forward.
+ */
+function managementPeriod(management) {
+  const stored = String(management.period || '').trim();
+  if (['back', 'current', 'next'].includes(stored)) return stored;
+  const offset = Number(management.offset);
+  if (Number.isFinite(offset) && offset < 0) return 'back';
+  return DEFAULT_VIEW_DEFAULTS.management.period;
+}
+
 function normalizeViewDefaults(saved) {
   const pipeline = (saved && saved.pipeline) || {};
   const management = (saved && saved.management) || {};
 
   const units = Number(management.units);
-  const offset = Number(management.offset);
+  const period = managementPeriod(management);
 
   return {
     pipeline: {
@@ -136,8 +149,8 @@ function normalizeViewDefaults(saved) {
       managers: toStringArray(management.managers),
       perspective: management.perspective ? String(management.perspective) : DEFAULT_VIEW_DEFAULTS.management.perspective,
       units: Number.isFinite(units) && units > 0 ? units : DEFAULT_VIEW_DEFAULTS.management.units,
-      // Negative values look back at a period that has already happened.
-      offset: Number.isFinite(offset) ? Math.trunc(offset) : DEFAULT_VIEW_DEFAULTS.management.offset,
+      // back / current / next - which way the window looks from today.
+      period,
     },
   };
 }
