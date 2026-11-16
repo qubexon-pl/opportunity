@@ -240,7 +240,13 @@
             </tr>
           <% }) %>
           <% if (!detail.inWindow.length) { %>
-            <tr><td colspan="7" class="text-center text-muted py-4">Nothing allocated in this period.</td></tr>
+            <tr><td colspan="7" class="p-0">
+              <%- include('partials/empty-state', {
+                esArt: 'opportunities',
+                esTitle: 'Nothing allocated in this period',
+                esHint: 'This person is free for the whole window.'
+              }) %>
+            </td></tr>
           <% } %>
         </tbody>
         <% if (detail.inWindow.length) { %>
@@ -414,7 +420,11 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
       </div>
     </div>
     <% } else { %>
-      <div class="p-4 text-center text-muted">Nothing to display for this person in the selected window.</div>
+      <%- include('partials/empty-state', {
+        esArt: 'timeline',
+        esTitle: 'Nothing to display for this person',
+        esHint: 'There is no scheduled work in the selected window.'
+      }) %>
     <% } %>
   </div>
 </div>

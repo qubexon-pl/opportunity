@@ -2314,6 +2314,50 @@ th[aria-sort="ascending"] .sort-link .bi, th[aria-sort="descending"] .sort-link 
 .pipeline-assigned .assign-flag { position: static; }
 .pipeline-assigned .assigned-people { margin-top: 0; min-width: 0; }
 
+/* ──── Illustrated empty states ──── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 30px 16px 34px;
+  text-align: center;
+}
+
+.empty-state-art {
+  width: 240px;
+  max-width: 100%;
+  height: auto;
+  margin-bottom: 14px;
+  user-select: none;
+}
+
+.empty-state-title {
+  margin: 0;
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--color-text, #212529);
+}
+
+.empty-state-hint {
+  margin: 0;
+  max-width: 42ch;
+  font-size: .82rem;
+  color: var(--color-text-muted, #6c757d);
+}
+
+.empty-state-hint a { color: inherit; text-decoration: underline; }
+
+.empty-state-sm { padding: 14px 8px 16px; }
+.empty-state-sm .empty-state-art { width: 168px; margin-bottom: 10px; }
+.empty-state-sm .empty-state-title { font-size: .88rem; }
+.empty-state-sm .empty-state-hint { font-size: .78rem; }
+
+/* The drawings are built on paper-white grounds, so take the glare off them
+   when the rest of the page is dark. */
+[data-theme="dark"] .empty-state-art { opacity: .82; }
+
 /* ──── Opportunity page ──── */
 .opportunity-tabs .badge { font-weight: 500; margin-left: 4px; }
 

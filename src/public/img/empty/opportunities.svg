@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" role="img" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="oppRough" x="-12%" y="-12%" width="124%" height="124%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" seed="11" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.2" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <clipPath id="oppClip"><rect x="0" y="0" width="240" height="160" rx="18"/></clipPath>
+  </defs>
+  <g clip-path="url(#oppClip)">
+    <rect width="240" height="160" fill="#EDF3EC"/>
+    <g filter="url(#oppRough)">
+      <path d="M138 -6H246V166H138Z" fill="#E8C98A"/>
+      <path d="M-6 108c36-20 72-10 106 8 28 15 58 8 146-16v72H-6Z" fill="#CFE4D3"/>
+      <rect x="-6" y="124" width="252" height="42" fill="#BE9552"/>
+
+      <g transform="rotate(-5 94 86)">
+        <rect x="50" y="56" width="88" height="62" rx="7" fill="#FDF8F0"/>
+        <rect x="60" y="68" width="58" height="6" rx="3" fill="#22395C"/>
+        <rect x="60" y="82" width="46" height="5" rx="2.5" fill="#B9C6D6"/>
+        <rect x="60" y="93" width="54" height="5" rx="2.5" fill="#B9C6D6"/>
+        <rect x="60" y="104" width="30" height="8" rx="4" fill="#6FC7AE"/>
+      </g>
+
+      <g transform="rotate(4 168 72)">
+        <rect x="124" y="34" width="92" height="68" rx="7" fill="#FDF8F0"/>
+        <rect x="134" y="48" width="30" height="6" rx="3" fill="#22395C"/>
+        <rect x="176" y="48" width="30" height="6" rx="3" fill="#22395C"/>
+        <path d="M170 38l14 12v14h-28V50Z" fill="#EE8E6E"/>
+        <rect x="164" y="56" width="12" height="10" fill="#FDF8F0"/>
+        <rect x="150" y="80" width="42" height="9" rx="4.5" fill="#E8C98A"/>
+      </g>
+
+      <g>
+        <path d="M30 96h30v26a8 8 0 0 1-8 8H38a8 8 0 0 1-8-8Z" fill="#22395C"/>
+        <path d="M60 102h7a8 8 0 0 1 0 16h-7" fill="none" stroke="#22395C" stroke-width="5"/>
+        <path d="M38 88c4-5-3-8 1-13M48 88c4-5-3-8 1-13" fill="none" stroke="#9FB4C7" stroke-width="3" stroke-linecap="round"/>
+      </g>
+
+      <g>
+        <rect x="184" y="104" width="52" height="34" rx="5" fill="#EE8E6E"/>
+        <path d="M184 106l26 18 26-18" fill="none" stroke="#F6C0A8" stroke-width="4" stroke-linecap="round"/>
+      </g>
+
+      <circle cx="120" cy="24" r="4" fill="#EE8E6E"/>
+      <circle cx="196" cy="20" r="5" fill="#6FC7AE"/>
+      <path d="M212 70l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#FDF8F0"/>
+      <path d="M38 44l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6Z" fill="#FDF8F0"/>
+    </g>
+  </g>
+</svg>

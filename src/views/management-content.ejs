@@ -401,7 +401,13 @@
                 <% }) %>
               <% }) %>
               <% if (!view.assignmentRows.length) { %>
-                <tr><td colspan="8" class="text-center text-muted py-4">No assignments yet.</td></tr>
+                <tr><td colspan="8" class="p-0">
+                  <%- include('partials/empty-state', {
+                    esArt: 'assignments',
+                    esTitle: 'Nobody is booked in this window',
+                    esHint: 'Assign someone from the timeline below, or widen the period and filters.'
+                  }) %>
+                </td></tr>
               <% } %>
             </tbody>
           </table>
@@ -613,7 +619,11 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
             <% }) %>
 
             <% if (!view.timeline.rows.length) { %>
-              <div class="p-4 text-center text-muted">Nothing to display for the selected filters.</div>
+              <%- include('partials/empty-state', {
+                esArt: 'timeline',
+                esTitle: 'Nothing to display for the selected filters',
+                esHint: 'Try a wider period, or clear a filter or two.'
+              }) %>
             <% } %>
           </div>
         </div>

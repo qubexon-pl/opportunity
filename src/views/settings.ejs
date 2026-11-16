@@ -77,7 +77,13 @@
                 </tr>
               <% }) %>
               <% if (!people.length) { %>
-                <tr><td colspan="7" class="text-center text-muted py-4">No people configured yet.</td></tr>
+                <tr><td colspan="7" class="p-0">
+                  <%- include('partials/empty-state', {
+                    esArt: 'people',
+                    esTitle: 'No people configured yet',
+                    esHint: 'Add your team above to start planning capacity.'
+                  }) %>
+                </td></tr>
               <% } %>
             </tbody>
           </table>

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" role="img" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="pplRough" x="-12%" y="-12%" width="124%" height="124%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" seed="31" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <clipPath id="pplClip"><rect x="0" y="0" width="240" height="160" rx="18"/></clipPath>
+  </defs>
+  <g clip-path="url(#pplClip)">
+    <rect width="240" height="160" fill="#F6EFDF"/>
+    <g filter="url(#pplRough)">
+      <path d="M150 -6H246V166H150Z" fill="#E8C98A"/>
+      <rect x="-6" y="120" width="252" height="46" fill="#DCEBE0"/>
+
+      <g>
+        <rect x="96" y="22" width="86" height="74" rx="6" fill="#9FC7D9"/>
+        <rect x="96" y="22" width="86" height="74" rx="6" fill="none" stroke="#22395C" stroke-width="7"/>
+        <path d="M139 22v74M96 59h86" stroke="#22395C" stroke-width="7"/>
+        <circle cx="162" cy="44" r="11" fill="#E8C98A"/>
+      </g>
+
+      <g>
+        <rect x="18" y="74" width="62" height="40" rx="10" fill="#3E5C86"/>
+        <rect x="10" y="86" width="16" height="30" rx="8" fill="#22395C"/>
+        <rect x="72" y="86" width="16" height="30" rx="8" fill="#22395C"/>
+      </g>
+
+      <g>
+        <path d="M96 120l6-26h26l6 26Z" fill="#EE8E6E"/>
+        <path d="M109 94c-8-12-4-24 6-28 2 12 8 16 8 28Z" fill="#4FB096"/>
+        <path d="M122 94c10-6 16-2 18 4-8 4-12 4-18-4Z" fill="#6FC7AE"/>
+      </g>
+
+      <rect x="190" y="88" width="14" height="32" rx="7" fill="#6FC7AE"/>
+
+      <rect x="26" y="26" width="42" height="34" rx="6" fill="#FDF8F0"/>
+      <path d="M47 34v18M38 43h18" stroke="#EE8E6E" stroke-width="6" stroke-linecap="round"/>
+
+      <path d="M78 38l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#FDF8F0"/>
+      <circle cx="212" cy="30" r="5" fill="#FDF8F0"/>
+    </g>
+  </g>
+</svg>
