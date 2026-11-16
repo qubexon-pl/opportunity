@@ -1,0 +1,23 @@
+<%#
+  An empty state with an illustration.
+
+  Blank tables and blank cards read as breakage rather than as "there is
+  genuinely nothing here", so each one gets a drawing, a short headline and an
+  optional line explaining what to do next.
+
+  esArt   - file name in /img/empty, without the extension
+  esTitle - headline
+  esHint  - optional supporting line; may contain markup
+  esSize  - 'sm' for inline panels, omitted for full-width tables
+%>
+<%
+  var esArt = typeof esArt === 'undefined' ? 'opportunities' : esArt;
+  var esTitle = typeof esTitle === 'undefined' ? 'Nothing here yet' : esTitle;
+  var esHint = typeof esHint === 'undefined' ? '' : esHint;
+  var esSize = typeof esSize === 'undefined' ? '' : esSize;
+%>
+<div class="empty-state<%= esSize === 'sm' ? ' empty-state-sm' : '' %>">
+  <img class="empty-state-art" src="/img/empty/<%= esArt %>.svg" alt="" aria-hidden="true" width="240" height="160" loading="lazy">
+  <p class="empty-state-title"><%= esTitle %></p>
+  <% if (esHint) { %><p class="empty-state-hint"><%- esHint %></p><% } %>
+</div>

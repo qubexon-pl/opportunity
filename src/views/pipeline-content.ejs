@@ -494,9 +494,12 @@
               </tr>
             <% }) %>
             <% if (!opportunities.length) { %>
-              <tr><td colspan="7" class="text-center text-muted py-4">
-                No opportunities match the current filters.
-                <a href="/?applied=1&view=<%= view %>" data-pipeline-link>Clear filters</a> or <a href="/opportunities/new">create one</a>.
+              <tr><td colspan="7" class="p-0">
+                <%- include('partials/empty-state', {
+                  esArt: 'filters',
+                  esTitle: 'No opportunities match the current filters',
+                  esHint: '<a href="/?applied=1&amp;view=' + view + '" data-pipeline-link>Clear the filters</a> to see everything, or <a href="/opportunities/new">create a new opportunity</a>.'
+                }) %>
               </td></tr>
             <% } %>
           </tbody>

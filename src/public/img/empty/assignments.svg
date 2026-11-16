@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" role="img" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="asgRough" x="-12%" y="-12%" width="124%" height="124%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" seed="23" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.2" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <clipPath id="asgClip"><rect x="0" y="0" width="240" height="160" rx="18"/></clipPath>
+  </defs>
+  <g clip-path="url(#asgClip)">
+    <rect width="240" height="160" fill="#F3EFE5"/>
+    <g filter="url(#asgRough)">
+      <path d="M-6 -6H104V166H-6Z" fill="#DCEBE0"/>
+      <path d="M-6 112c48-26 92-18 130 2 24 13 70 8 122-14v66H-6Z" fill="#E8C98A"/>
+
+      <g>
+        <circle cx="62" cy="62" r="17" fill="#22395C"/>
+        <path d="M38 118c0-15 11-26 24-26s24 11 24 26Z" fill="#3E5C86"/>
+      </g>
+
+      <g>
+        <circle cx="120" cy="52" r="19" fill="#EE8E6E"/>
+        <path d="M93 118c0-16 12-28 27-28s27 12 27 28Z" fill="#D9714F"/>
+      </g>
+
+      <g>
+        <circle cx="178" cy="64" r="16" fill="#6FC7AE"/>
+        <path d="M156 118c0-14 10-24 22-24s22 10 22 24Z" fill="#4FB096"/>
+      </g>
+
+      <rect x="-6" y="116" width="252" height="50" fill="#BE9552"/>
+      <rect x="18" y="124" width="204" height="10" rx="5" fill="#A87F42"/>
+
+      <path d="M148 24a10 10 0 0 1 10-10h30a10 10 0 0 1 10 10v12a10 10 0 0 1-10 10h-18l-10 9v-9h-2a10 10 0 0 1-10-10Z" fill="#FDF8F0"/>
+      <rect x="158" y="24" width="20" height="4" rx="2" fill="#B9C6D6"/>
+      <rect x="158" y="32" width="12" height="4" rx="2" fill="#B9C6D6"/>
+
+      <path d="M34 34l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#FDF8F0"/>
+      <circle cx="214" cy="100" r="4" fill="#FDF8F0"/>
+    </g>
+  </g>
+</svg>

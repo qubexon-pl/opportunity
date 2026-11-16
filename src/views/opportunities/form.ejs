@@ -543,7 +543,12 @@
         </div>
       <% }) %>
       <% if (!assignmentList.length) { %>
-        <p class="text-muted small mb-0">No assignments yet. Add at least one person for timeline planning.</p>
+        <%- include('../partials/empty-state', {
+          esSize: 'sm',
+          esArt: 'assignments',
+          esTitle: 'No assignments yet',
+          esHint: 'Add at least one person so this opportunity shows up on the timeline.'
+        }) %>
       <% } %>
     </div>
   </div>
@@ -584,7 +589,12 @@
             </div>
           <% }) %>
           <% if (!notesList.length) { %>
-            <p class="text-muted small mb-0">No notes yet.</p>
+            <%- include('../partials/empty-state', {
+              esSize: 'sm',
+              esArt: 'notes',
+              esTitle: 'No notes yet',
+              esHint: 'Jot down what was said, so the next conversation starts where this one left off.'
+            }) %>
           <% } %>
         </div>
       </div>
@@ -630,7 +640,12 @@
             </div>
           <% }) %>
           <% if (!stepsList.length) { %>
-            <p class="text-muted small mb-0">No next steps yet.</p>
+            <%- include('../partials/empty-state', {
+              esSize: 'sm',
+              esArt: 'timeline',
+              esTitle: 'No next steps yet',
+              esHint: 'Plan the next move and it will surface on the pipeline.'
+            }) %>
           <% } %>
         </div>
       </div>
