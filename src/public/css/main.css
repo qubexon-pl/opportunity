@@ -2439,37 +2439,82 @@ body { background:
   --bs-btn-active-bg: var(--color-primary-strong); --bs-btn-active-border-color: var(--color-primary-strong); }
 [data-theme="dark"] .btn-primary { --bs-btn-color: #1e1b4b; --bs-btn-hover-color: #1e1b4b; --bs-btn-active-color: #1e1b4b; }
 
-/* Page header: a gradient band carrying the title and the page's main actions. */
+/* Page header: an illustrated pastel band carrying the title and the page's
+   main actions. The palette is the one the hand-drawn scenes are painted in,
+   so the artwork sits on the band rather than on top of it. */
 .page-hero {
+  --hero-ink: #22395c;
   position: relative;
   display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;
   margin: -8px 0 20px;
   padding: 22px 26px;
   border-radius: var(--radius-lg);
-  background: var(--hero-gradient);
-  color: #fff;
-  box-shadow: 0 10px 30px rgba(67,56,202,.18);
+  background: linear-gradient(104deg, #e9f2ea 0%, #f3ecdc 52%, #ecd4a4 100%);
+  color: var(--hero-ink);
+  border: 1px solid rgba(34,57,92,.10);
+  box-shadow: 0 8px 24px rgba(34,57,92,.10);
   overflow: hidden;
 }
-.page-hero h2 { color: #fff !important; font-weight: 750; letter-spacing: -.02em; margin-bottom: 4px; }
-.page-hero h2 .bi { opacity: .85; }
-.page-hero p, .page-hero .text-muted { color: rgba(255,255,255,.85) !important; }
+.page-hero h2 { color: var(--hero-ink) !important; font-weight: 750; letter-spacing: -.02em; margin-bottom: 4px; }
+.page-hero h2 .bi { opacity: .7; }
+.page-hero p, .page-hero .text-muted { color: rgba(34,57,92,.72) !important; }
 .page-hero .hero-eyebrow {
   display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px;
   padding: 3px 10px; border-radius: var(--radius-pill);
-  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28);
+  background: rgba(255,255,255,.72); border: 1px solid rgba(34,57,92,.14);
+  color: var(--hero-ink);
   font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
 }
-.page-hero .hero-eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #67e8f9; }
+.page-hero .hero-eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #ee8e6e; }
 .page-hero .btn {
-  color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.32);
+  color: var(--hero-ink); background: rgba(255,255,255,.74); border: 1px solid rgba(34,57,92,.16);
   backdrop-filter: blur(4px);
 }
-.page-hero .btn:hover, .page-hero .btn:focus-visible { color: #fff; background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.6); }
-.page-hero .btn.btn-secondary, .page-hero .btn[aria-current="page"] { background: #fff; color: #3730a3; border-color: #fff; }
-.page-hero .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; }
-.page-hero .badge { background: rgba(255,255,255,.16) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.3); }
+.page-hero .btn:hover, .page-hero .btn:focus-visible { color: var(--hero-ink); background: #fff; border-color: rgba(34,57,92,.4); }
+.page-hero .btn.btn-secondary, .page-hero .btn[aria-current="page"] { background: var(--hero-ink); color: #fff; border-color: var(--hero-ink); }
+.page-hero .btn-outline-danger { color: #a3392b; border-color: rgba(163,57,43,.35); }
+.page-hero .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; color: #fff; }
+.page-hero .badge { background: rgba(255,255,255,.76) !important; color: var(--hero-ink) !important; border: 1px solid rgba(34,57,92,.14); }
 .page-hero form { margin: 0; }
+
+[data-theme="dark"] .page-hero {
+  --hero-ink: #f1ece2;
+  background: linear-gradient(104deg, #2b3b36 0%, #3a3730 52%, #4b4030 100%);
+  border-color: rgba(255,255,255,.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+[data-theme="dark"] .page-hero p, [data-theme="dark"] .page-hero .text-muted { color: rgba(241,236,226,.74) !important; }
+[data-theme="dark"] .page-hero .hero-eyebrow,
+[data-theme="dark"] .page-hero .btn,
+[data-theme="dark"] .page-hero .badge { background: rgba(255,255,255,.1) !important; border-color: rgba(255,255,255,.18); }
+[data-theme="dark"] .page-hero .btn.btn-secondary, [data-theme="dark"] .page-hero .btn[aria-current="page"] { background: #f1ece2 !important; color: #22395c; }
+
+/* The hand-drawn scene sits along the right edge of the band and fades into
+   the gradient, so the hero reads as an illustrated banner rather than a
+   plain colour block. It is decoration only: it never takes layout space, and
+   it steps aside once the band is too narrow to hold it clear of the text. */
+.page-hero-art {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 340px;
+  object-fit: cover;
+  object-position: center right;
+  pointer-events: none;
+  opacity: 1;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 34%);
+  mask-image: linear-gradient(to right, transparent, #000 34%);
+}
+[data-theme="dark"] .page-hero-art { opacity: .55; }
+
+.page-hero:has(.page-hero-art) { padding-right: 300px; }
+
+@media (max-width: 991.98px) {
+  .page-hero-art { display: none; }
+  .page-hero:has(.page-hero-art) { padding-right: 26px; }
+}
+
 /* On the pipeline the tiles ride up onto the band, as one header block. */
 .page-hero-overlap { padding-bottom: 58px; margin-bottom: 0; }
 .page-hero-overlap + .stat-tiles, .page-hero-overlap ~ .stat-tiles { margin-top: -42px; position: relative; padding: 0 14px; }
