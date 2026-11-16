@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <filter id="bgRough" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="12" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <linearGradient id="bgWash" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EDF4EE"/>
+      <stop offset="0.52" stop-color="#F6F1E6"/>
+      <stop offset="1" stop-color="#F2E6D2"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="900" fill="url(#bgWash)"/>
+
+  <g filter="url(#bgRough)">
+    <ellipse cx="170" cy="150" rx="260" ry="180" fill="#DCEBE0" opacity="0.75"/>
+    <ellipse cx="1040" cy="210" rx="240" ry="170" fill="#F3DFC0" opacity="0.8"/>
+    <ellipse cx="620" cy="760" rx="380" ry="200" fill="#DFEDE4" opacity="0.6"/>
+    <ellipse cx="120" cy="690" rx="200" ry="150" fill="#F6E3CE" opacity="0.65"/>
+
+    <circle cx="930" cy="640" r="70" fill="#CFE4D3" opacity="0.8"/>
+    <circle cx="930" cy="640" r="34" fill="#6FC7AE" opacity="0.35"/>
+
+    <rect x="250" y="320" width="150" height="104" rx="16" fill="#FDF8F0" opacity="0.85"/>
+    <rect x="272" y="346" width="100" height="9" rx="4" fill="#BE9552" opacity="0.4"/>
+    <rect x="272" y="368" width="74" height="9" rx="4" fill="#EE8E6E" opacity="0.4"/>
+    <rect x="272" y="390" width="86" height="9" rx="4" fill="#3E5C86" opacity="0.25"/>
+
+    <rect x="760" y="380" width="126" height="90" rx="14" fill="#FDF8F0" opacity="0.8"/>
+    <rect x="782" y="404" width="82" height="8" rx="4" fill="#4FB096" opacity="0.4"/>
+    <rect x="782" y="424" width="56" height="8" rx="4" fill="#E8C98A" opacity="0.6"/>
+
+    <path d="M60 470 q70 -46 142 0 q72 46 144 0" stroke="#6FC7AE" stroke-width="7" fill="none" opacity="0.3" stroke-linecap="round"/>
+    <path d="M900 820 q74 -48 150 0" stroke="#EE8E6E" stroke-width="7" fill="none" opacity="0.26" stroke-linecap="round"/>
+
+    <circle cx="500" cy="120" r="16" fill="#EE8E6E" opacity="0.3"/>
+    <circle cx="700" cy="690" r="12" fill="#22395C" opacity="0.16"/>
+    <circle cx="1120" cy="470" r="20" fill="#E8C98A" opacity="0.55"/>
+    <circle cx="380" cy="600" r="10" fill="#4FB096" opacity="0.3"/>
+  </g>
+</svg>

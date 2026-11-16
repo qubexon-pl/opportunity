@@ -2428,10 +2428,18 @@ th[aria-sort="ascending"] .sort-link .bi, th[aria-sort="descending"] .sort-link 
 /* ══════════════════════════════════════════════════════════════
    Part 4: colour — gradient page headers, toned tiles, pills
    ══════════════════════════════════════════════════════════════ */
+/* A soft hand-drawn canvas sits behind the whole app, veiled in the page
+   colour so it never competes with content. The panels on top are themselves
+   slightly transparent, so the drawing reads faintly through them rather than
+   being hidden by them. */
 body { background:
-  radial-gradient(900px 500px at 0% 0%, rgba(99,102,241,.07), transparent 60%),
-  radial-gradient(900px 500px at 100% 30%, rgba(14,165,233,.06), transparent 60%),
-  var(--color-bg); background-attachment: fixed; }
+  linear-gradient(rgba(244,245,251,.45), rgba(244,245,251,.45)),
+  url('/img/bg/canvas.svg') center / cover no-repeat,
+  var(--color-bg); background-attachment: fixed, fixed, fixed; }
+[data-theme="dark"] body { background:
+  linear-gradient(rgba(18,18,18,.86), rgba(18,18,18,.86)),
+  url('/img/bg/canvas.svg') center / cover no-repeat,
+  var(--color-bg); background-attachment: fixed, fixed, fixed; }
 .main-content { background: transparent; }
 
 .btn-primary { --bs-btn-bg: var(--color-primary); --bs-btn-border-color: var(--color-primary);
@@ -2582,3 +2590,28 @@ body { background:
   .page-hero-overlap ~ .stat-tiles { padding: 0 6px; }
   .pipeline-table tbody tr.pipeline-row { box-shadow: inset 4px 0 0 var(--row-tone, transparent); }
 }
+
+/* ──── Translucent surfaces ──── */
+/* Panels sit on the illustrated page canvas rather than covering it. They keep
+   a frosted blur so text stays crisp while the drawing stays faintly visible
+   underneath, and the chrome (sidebar, top bar) is treated the same way so the
+   whole window reads as one surface. */
+.card { background: rgba(255,255,255,.74); backdrop-filter: blur(10px); }
+.card:hover { background: rgba(255,255,255,.82); }
+.sidebar, .topbar { background: rgba(255,255,255,.78); backdrop-filter: blur(14px); }
+.page-hero {
+  background: linear-gradient(104deg, rgba(233,242,234,.88) 0%, rgba(243,236,220,.88) 52%, rgba(236,212,164,.88) 100%);
+  backdrop-filter: blur(6px);
+}
+.table-responsive, .table { background: transparent; }
+
+[data-theme="dark"] .card { background: rgba(30,30,30,.72); }
+[data-theme="dark"] .card:hover { background: rgba(34,34,34,.82); }
+[data-theme="dark"] .sidebar, [data-theme="dark"] .topbar { background: rgba(26,26,26,.8); }
+[data-theme="dark"] .page-hero {
+  background: linear-gradient(104deg, rgba(43,59,54,.88) 0%, rgba(58,55,48,.88) 52%, rgba(75,64,48,.88) 100%);
+}
+
+/* Overlay chrome must stay opaque: a translucent menu over a busy canvas is
+   unreadable. */
+.dropdown-menu, .modal-content, .offcanvas { backdrop-filter: none; }
