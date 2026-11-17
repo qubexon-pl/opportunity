@@ -1,42 +1,52 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900" preserveAspectRatio="xMidYMid slice">
   <defs>
-    <filter id="bgRough" x="-8%" y="-8%" width="116%" height="116%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="12" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G"/>
+    <filter id="bgBrush" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.06" numOctaves="4" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="38" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
-    <linearGradient id="bgWash" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#EDF4EE"/>
-      <stop offset="0.52" stop-color="#F6F1E6"/>
-      <stop offset="1" stop-color="#F2E6D2"/>
+    <filter id="bgGrain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3"/>
+      <feColorMatrix values="0 0 0 0 0.9  0 0 0 0 0.85  0 0 0 0 0.75  0 0 0 0.05 0"/>
+    </filter>
+    <filter id="bgSoft"><feGaussianBlur stdDeviation="28"/></filter>
+    <linearGradient id="bgSky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1824"/>
+      <stop offset="0.55" stop-color="#132232"/>
+      <stop offset="1" stop-color="#0f1c29"/>
     </linearGradient>
+    <radialGradient id="bgGlow" cx="0.86" cy="0.2" r="0.32">
+      <stop offset="0" stop-color="#e08a3c" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#e08a3c" stop-opacity="0"/>
+    </radialGradient>
   </defs>
 
-  <rect width="1200" height="900" fill="url(#bgWash)"/>
+  <rect width="1200" height="900" fill="url(#bgSky)"/>
+  <rect width="1200" height="900" fill="url(#bgGlow)"/>
 
-  <g filter="url(#bgRough)">
-    <ellipse cx="170" cy="150" rx="260" ry="180" fill="#DCEBE0" opacity="0.75"/>
-    <ellipse cx="1040" cy="210" rx="240" ry="170" fill="#F3DFC0" opacity="0.8"/>
-    <ellipse cx="620" cy="760" rx="380" ry="200" fill="#DFEDE4" opacity="0.6"/>
-    <ellipse cx="120" cy="690" rx="200" ry="150" fill="#F6E3CE" opacity="0.65"/>
-
-    <circle cx="930" cy="640" r="70" fill="#CFE4D3" opacity="0.8"/>
-    <circle cx="930" cy="640" r="34" fill="#6FC7AE" opacity="0.35"/>
-
-    <rect x="250" y="320" width="150" height="104" rx="16" fill="#FDF8F0" opacity="0.85"/>
-    <rect x="272" y="346" width="100" height="9" rx="4" fill="#BE9552" opacity="0.4"/>
-    <rect x="272" y="368" width="74" height="9" rx="4" fill="#EE8E6E" opacity="0.4"/>
-    <rect x="272" y="390" width="86" height="9" rx="4" fill="#3E5C86" opacity="0.25"/>
-
-    <rect x="760" y="380" width="126" height="90" rx="14" fill="#FDF8F0" opacity="0.8"/>
-    <rect x="782" y="404" width="82" height="8" rx="4" fill="#4FB096" opacity="0.4"/>
-    <rect x="782" y="424" width="56" height="8" rx="4" fill="#E8C98A" opacity="0.6"/>
-
-    <path d="M60 470 q70 -46 142 0 q72 46 144 0" stroke="#6FC7AE" stroke-width="7" fill="none" opacity="0.3" stroke-linecap="round"/>
-    <path d="M900 820 q74 -48 150 0" stroke="#EE8E6E" stroke-width="7" fill="none" opacity="0.26" stroke-linecap="round"/>
-
-    <circle cx="500" cy="120" r="16" fill="#EE8E6E" opacity="0.3"/>
-    <circle cx="700" cy="690" r="12" fill="#22395C" opacity="0.16"/>
-    <circle cx="1120" cy="470" r="20" fill="#E8C98A" opacity="0.55"/>
-    <circle cx="380" cy="600" r="10" fill="#4FB096" opacity="0.3"/>
+  <g filter="url(#bgSoft)" opacity="0.9">
+    <ellipse cx="200" cy="180" rx="320" ry="150" fill="#1b3446"/>
+    <ellipse cx="980" cy="760" rx="360" ry="170" fill="#173a46"/>
   </g>
+
+  <g filter="url(#bgBrush)" fill="none" stroke-linecap="round">
+    <path d="M-60 300 C 240 200, 520 330, 820 230 S 1180 160, 1300 220" stroke="#1d3a4f" stroke-width="90" opacity="0.55"/>
+    <path d="M-60 640 C 260 560, 560 700, 860 600 S 1160 520, 1300 560" stroke="#1a3442" stroke-width="120" opacity="0.6"/>
+    <path d="M-40 820 C 300 760, 640 860, 1260 780" stroke="#203f4f" stroke-width="70" opacity="0.5"/>
+    <path d="M620 120 C 760 90, 900 140, 1040 110" stroke="#2c6d73" stroke-width="16" opacity="0.45"/>
+    <path d="M80 520 C 200 480, 320 540, 440 500" stroke="#3b8f8a" stroke-width="12" opacity="0.35"/>
+    <path d="M760 470 C 880 430, 1000 490, 1130 450" stroke="#d9822b" stroke-width="10" opacity="0.32"/>
+    <path d="M300 760 C 420 730, 540 780, 660 750" stroke="#c87a35" stroke-width="8" opacity="0.28"/>
+  </g>
+
+  <g opacity="0.5">
+    <circle cx="1030" cy="190" r="70" fill="none" stroke="#e08a3c" stroke-width="3" opacity="0.4"/>
+    <circle cx="1030" cy="190" r="110" fill="none" stroke="#3b8f8a" stroke-width="2.5" opacity="0.35"/>
+    <circle cx="1030" cy="190" r="24" fill="#e08a3c" opacity="0.5"/>
+    <circle cx="160" cy="420" r="5" fill="#6fc7be"/>
+    <circle cx="560" cy="160" r="4" fill="#e7b37a"/>
+    <circle cx="880" cy="640" r="6" fill="#6fc7be"/>
+    <circle cx="420" cy="860" r="4" fill="#e7b37a"/>
+  </g>
+
+  <rect width="1200" height="900" filter="url(#bgGrain)"/>
 </svg>

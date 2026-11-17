@@ -1,8 +1,7 @@
 const crypto = require('crypto');
 
 /*
- * Scripts run only from this origin, plus the one small inline script in the
- * page head (theme before first paint) which carries a per-request nonce.
+ * Scripts run only from this origin, plus any inline script carrying the per-request nonce.
  * Styles still allow inline attributes: the timeline and capacity bars size
  * themselves with computed style="left/width" values.
  */

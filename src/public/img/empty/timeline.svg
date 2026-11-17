@@ -7,28 +7,28 @@
     <clipPath id="tlClip"><rect x="0" y="0" width="240" height="160" rx="18"/></clipPath>
   </defs>
   <g clip-path="url(#tlClip)">
-    <rect width="240" height="160" fill="#EDF3EC"/>
+    <rect width="240" height="160" fill="#1A2B3C"/>
     <g filter="url(#tlRough)">
-      <path d="M-6 -6H84V166H-6Z" fill="#E8C98A"/>
-      <circle cx="198" cy="128" r="54" fill="#DCEBE0"/>
+      <path d="M-6 -6H84V166H-6Z" fill="#C7792F"/>
+      <circle cx="198" cy="128" r="54" fill="#21404D"/>
 
       <g>
-        <rect x="40" y="26" width="160" height="110" rx="10" fill="#FDF8F0"/>
+        <rect x="40" y="26" width="160" height="110" rx="10" fill="#ECE6DA"/>
         <rect x="40" y="26" width="160" height="22" rx="10" fill="#22395C"/>
         <rect x="40" y="40" width="160" height="8" fill="#22395C"/>
-        <rect x="62" y="16" width="8" height="18" rx="4" fill="#3E5C86"/>
-        <rect x="170" y="16" width="8" height="18" rx="4" fill="#3E5C86"/>
+        <rect x="62" y="16" width="8" height="18" rx="4" fill="#3E6E9E"/>
+        <rect x="170" y="16" width="8" height="18" rx="4" fill="#3E6E9E"/>
 
-        <rect x="54" y="60" width="78" height="10" rx="5" fill="#6FC7AE"/>
-        <rect x="88" y="78" width="96" height="10" rx="5" fill="#E8C98A"/>
-        <rect x="54" y="96" width="52" height="10" rx="5" fill="#EE8E6E"/>
-        <rect x="120" y="96" width="36" height="10" rx="5" fill="#C9D7E4"/>
-        <rect x="54" y="114" width="110" height="6" rx="3" fill="#E6E2D8"/>
+        <rect x="54" y="60" width="78" height="10" rx="5" fill="#4FB0A5"/>
+        <rect x="88" y="78" width="96" height="10" rx="5" fill="#C7792F"/>
+        <rect x="54" y="96" width="52" height="10" rx="5" fill="#E08A3C"/>
+        <rect x="120" y="96" width="36" height="10" rx="5" fill="#9DB0C3"/>
+        <rect x="54" y="114" width="110" height="6" rx="3" fill="#1C2E40"/>
       </g>
 
-      <circle cx="26" cy="112" r="6" fill="#EE8E6E"/>
-      <path d="M216 36l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#FDF8F0"/>
-      <path d="M22 44l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6Z" fill="#FDF8F0"/>
+      <circle cx="26" cy="112" r="6" fill="#E08A3C"/>
+      <path d="M216 36l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#ECE6DA"/>
+      <path d="M22 44l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6Z" fill="#ECE6DA"/>
     </g>
   </g>
 </svg>

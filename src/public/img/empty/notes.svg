@@ -7,31 +7,31 @@
     <clipPath id="noteClip"><rect x="0" y="0" width="240" height="160" rx="18"/></clipPath>
   </defs>
   <g clip-path="url(#noteClip)">
-    <rect width="240" height="160" fill="#F5F1E6"/>
+    <rect width="240" height="160" fill="#1A2B3C"/>
     <g filter="url(#noteRough)">
-      <circle cx="176" cy="44" r="58" fill="#DCEBE0"/>
-      <path d="M-6 118c54-22 108-14 150 4 20 9 60 6 102-10v54H-6Z" fill="#E8C98A"/>
+      <circle cx="176" cy="44" r="58" fill="#21404D"/>
+      <path d="M-6 118c54-22 108-14 150 4 20 9 60 6 102-10v54H-6Z" fill="#C7792F"/>
 
       <g transform="rotate(-6 100 80)">
-        <rect x="52" y="30" width="96" height="104" rx="8" fill="#FDF8F0"/>
-        <rect x="52" y="30" width="96" height="16" rx="8" fill="#6FC7AE"/>
+        <rect x="52" y="30" width="96" height="104" rx="8" fill="#ECE6DA"/>
+        <rect x="52" y="30" width="96" height="16" rx="8" fill="#4FB0A5"/>
         <rect x="64" y="60" width="66" height="6" rx="3" fill="#22395C"/>
-        <rect x="64" y="76" width="54" height="5" rx="2.5" fill="#B9C6D6"/>
-        <rect x="64" y="90" width="62" height="5" rx="2.5" fill="#B9C6D6"/>
-        <rect x="64" y="104" width="40" height="5" rx="2.5" fill="#B9C6D6"/>
-        <circle cx="76" cy="38" r="4" fill="#FDF8F0"/>
-        <circle cx="124" cy="38" r="4" fill="#FDF8F0"/>
+        <rect x="64" y="76" width="54" height="5" rx="2.5" fill="#8FA3B8"/>
+        <rect x="64" y="90" width="62" height="5" rx="2.5" fill="#8FA3B8"/>
+        <rect x="64" y="104" width="40" height="5" rx="2.5" fill="#8FA3B8"/>
+        <circle cx="76" cy="38" r="4" fill="#ECE6DA"/>
+        <circle cx="124" cy="38" r="4" fill="#ECE6DA"/>
       </g>
 
       <g transform="rotate(32 170 96)">
-        <rect x="162" y="48" width="16" height="78" rx="4" fill="#E8C98A"/>
-        <rect x="162" y="48" width="16" height="16" fill="#D9714F"/>
+        <rect x="162" y="48" width="16" height="78" rx="4" fill="#C7792F"/>
+        <rect x="162" y="48" width="16" height="16" fill="#C46A24"/>
         <path d="M162 126l8 16 8-16Z" fill="#22395C"/>
       </g>
 
-      <circle cx="40" cy="36" r="5" fill="#EE8E6E"/>
-      <path d="M208 108l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#FDF8F0"/>
-      <path d="M30 100l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6Z" fill="#FDF8F0"/>
+      <circle cx="40" cy="36" r="5" fill="#E08A3C"/>
+      <path d="M208 108l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#ECE6DA"/>
+      <path d="M30 100l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6Z" fill="#ECE6DA"/>
     </g>
   </g>
 </svg>

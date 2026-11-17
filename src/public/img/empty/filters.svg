@@ -7,28 +7,28 @@
     <clipPath id="fltClip"><rect x="0" y="0" width="240" height="160" rx="18"/></clipPath>
   </defs>
   <g clip-path="url(#fltClip)">
-    <rect width="240" height="160" fill="#EFF2F6"/>
+    <rect width="240" height="160" fill="#1A2B3C"/>
     <g filter="url(#fltRough)">
-      <circle cx="62" cy="48" r="52" fill="#DCEBE0"/>
-      <path d="M-6 116c56-20 110-12 150 6 20 9 58 4 102-12v56H-6Z" fill="#E8C98A"/>
+      <circle cx="62" cy="48" r="52" fill="#21404D"/>
+      <path d="M-6 116c56-20 110-12 150 6 20 9 58 4 102-12v56H-6Z" fill="#C7792F"/>
 
       <g transform="rotate(-4 108 80)">
-        <rect x="64" y="38" width="90" height="84" rx="8" fill="#FDF8F0"/>
+        <rect x="64" y="38" width="90" height="84" rx="8" fill="#ECE6DA"/>
         <rect x="78" y="56" width="62" height="7" rx="3.5" fill="#22395C"/>
-        <rect x="78" y="74" width="46" height="6" rx="3" fill="#C9D7E4"/>
-        <rect x="78" y="90" width="54" height="6" rx="3" fill="#C9D7E4"/>
+        <rect x="78" y="74" width="46" height="6" rx="3" fill="#9DB0C3"/>
+        <rect x="78" y="90" width="54" height="6" rx="3" fill="#9DB0C3"/>
       </g>
 
       <g>
         <circle cx="158" cy="76" r="30" fill="none" stroke="#22395C" stroke-width="9"/>
-        <circle cx="158" cy="76" r="25" fill="#9FC7D9" opacity=".45"/>
+        <circle cx="158" cy="76" r="25" fill="#6FA9C4" opacity=".45"/>
         <path d="M180 99l22 24" stroke="#22395C" stroke-width="12" stroke-linecap="round"/>
-        <path d="M180 99l22 24" stroke="#EE8E6E" stroke-width="5" stroke-linecap="round"/>
+        <path d="M180 99l22 24" stroke="#E08A3C" stroke-width="5" stroke-linecap="round"/>
       </g>
 
-      <circle cx="36" cy="118" r="6" fill="#EE8E6E"/>
-      <circle cx="206" cy="36" r="5" fill="#6FC7AE"/>
-      <path d="M32 30l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#FDF8F0"/>
+      <circle cx="36" cy="118" r="6" fill="#E08A3C"/>
+      <circle cx="206" cy="36" r="5" fill="#4FB0A5"/>
+      <path d="M32 30l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#ECE6DA"/>
     </g>
   </g>
 </svg>

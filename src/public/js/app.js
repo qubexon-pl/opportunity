@@ -412,12 +412,6 @@
         return;
       }
 
-      if (e.key === 'D' && e.ctrlKey && e.shiftKey) {
-        e.preventDefault();
-        if (window.OPP_shell) window.OPP_shell.toggleTheme();
-        return;
-      }
-
       if (e.key === 'd' && e.ctrlKey && !e.shiftKey) {
         e.preventDefault();
         if (window.OPP_shell) window.OPP_shell.toggleDensity();
