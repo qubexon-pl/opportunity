@@ -79,7 +79,8 @@
       options: personOptions.map(function(name) { return { value: name, label: name }; })
     }) %>
   </div>
-  <div class="col-auto">
-    <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Apply</button>
+  <div class="col-auto d-flex align-items-center gap-3">
+    <button class="btn btn-sm btn-primary btn-pill" type="submit"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Apply</button>
+    <a class="filter-clear" href="/management?applied=1" data-mgmt-link>Clear all</a>
   </div>
 </form>
