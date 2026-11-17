@@ -1,8 +1,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { nextStepByOpportunity } = require('../src/services/capacityService');
+const { nextStepByOpportunity, summariseChargeability } = require('../src/services/capacityService');
 const { nextMonday } = require('../src/routes/opportunities');
 const { contentSecurityPolicy } = require('../src/middleware/security');
+
+test('team chargeability leaves out people in Lead positions', () => {
+  const member = (role, activeHours) => ({
+    role, capacityHours: 100, grossCapacityHours: 100, activeHours, softHours: 0, absenceHours: 0, absentDays: 0,
+  });
+  const summary = summariseChargeability([
+    member('Expert Data Intelligence', 80),
+    member('Lead Expert Data Intelligence', 0),
+    member('Team lead', 10),
+    member('Leadership coach', 60),
+  ]);
+  assert.equal(summary.excludedLeads, 2);
+  assert.equal(summary.real, 70);
+});
 
 test('nextMonday always moves forward to the following Monday', () => {
   assert.equal(nextMonday(new Date(2026, 9, 30)), '2026-11-02'); // Friday
