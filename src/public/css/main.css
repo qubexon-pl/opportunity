@@ -183,17 +183,10 @@ code { font-size: 0.8rem; }
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  font-size: 0.9rem;
-  box-shadow: 0 4px 12px rgba(1,105,111,.2);
+  display: block;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(16,27,40,.25);
   flex-shrink: 0;
-}
-[data-theme="dark"] .brand-logo {
-  background: linear-gradient(135deg, #0d9488, #14b8a6);
 }
 
 .brand-text {
@@ -2447,81 +2440,55 @@ body { background:
   --bs-btn-active-bg: var(--color-primary-strong); --bs-btn-active-border-color: var(--color-primary-strong); }
 [data-theme="dark"] .btn-primary { --bs-btn-color: #1e1b4b; --bs-btn-hover-color: #1e1b4b; --bs-btn-active-color: #1e1b4b; }
 
-/* Page header: an illustrated band. The drawing is the band's background
-   rather than something laid on top of it, and every scene keeps its left
-   third as a quiet wash so the title stays readable over it at any width.
-   Pages opt into a scene with a modifier class; a hero without one still
-   gets the wash. */
+/* Page header: a painted band. Each page opts into its own painting with a
+   modifier class; the artwork keeps its left side as dark, quiet brushwork,
+   and a soft left-to-right shade keeps the title readable over it at any
+   width. The paintings are dark, so the ink is light in both themes. */
 .page-hero {
-  --hero-ink: #22395c;
+  --hero-ink: #f1ece2;
   --hero-scene: none;
   position: relative;
   display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;
   margin: -8px 0 20px;
   padding: 22px 26px;
-  min-height: 108px;
+  min-height: 120px;
   border-radius: var(--radius-lg);
-  background-color: #f3efe4;
-  background-image: linear-gradient(rgba(255,255,255,.42), rgba(255,255,255,.42)), var(--hero-scene);
-  background-size: auto, auto 100%;
+  background-color: #101b28;
+  background-image: linear-gradient(90deg, rgba(16,27,40,.78) 0%, rgba(16,27,40,.35) 45%, rgba(16,27,40,0) 70%), var(--hero-scene);
+  background-size: auto, cover;
   background-position: center, right center;
   background-repeat: no-repeat, no-repeat;
   color: var(--hero-ink);
-  border: 1px solid rgba(34,57,92,.10);
-  box-shadow: 0 8px 24px rgba(34,57,92,.10);
+  border: 1px solid rgba(16,27,40,.35);
+  box-shadow: 0 10px 28px rgba(16,27,40,.22);
   overflow: hidden;
 }
-.page-hero--pipeline { --hero-scene: url('/img/banner/pipeline.svg'); background-color: #f3efe4; }
-.page-hero--capacity { --hero-scene: url('/img/banner/capacity.svg'); background-color: #f5f1e7; }
-.page-hero--configuration { --hero-scene: url('/img/banner/configuration.svg'); background-color: #eff4ef; }
+.page-hero--pipeline { --hero-scene: url('/img/banner/pipeline.webp'); }
+.page-hero--capacity { --hero-scene: url('/img/banner/capacity.webp'); }
+.page-hero--configuration { --hero-scene: url('/img/banner/configuration.webp'); }
 
-/* Once the band is narrow the scene would run under the page actions, so it
-   drops away and only its wash colour is left. */
-@media (max-width: 991.98px) {
-  .page-hero { background-image: none; }
-}
-
-.page-hero h2 { color: var(--hero-ink) !important; font-weight: 750; letter-spacing: -.02em; margin-bottom: 4px; }
-.page-hero h2 .bi { opacity: .7; }
-.page-hero p, .page-hero .text-muted { color: rgba(34,57,92,.72) !important; }
+.page-hero h2 { color: var(--hero-ink) !important; font-weight: 750; letter-spacing: -.02em; margin-bottom: 4px; text-shadow: 0 1px 12px rgba(0,0,0,.35); }
+.page-hero h2 .bi { opacity: .75; }
+.page-hero p, .page-hero .text-muted { color: rgba(241,236,226,.76) !important; }
 .page-hero .hero-eyebrow {
   display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px;
   padding: 3px 10px; border-radius: var(--radius-pill);
-  background: rgba(255,255,255,.75); border: 1px solid rgba(34,57,92,.14);
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
   color: var(--hero-ink);
   font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
 }
-.page-hero .hero-eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #ee8e6e; }
+.page-hero .hero-eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #ee9a52; }
 .page-hero .btn {
-  color: var(--hero-ink); background: rgba(255,255,255,.8); border: 1px solid rgba(34,57,92,.16);
+  color: var(--hero-ink); background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22);
   backdrop-filter: blur(4px);
 }
-.page-hero .btn:hover, .page-hero .btn:focus-visible { color: var(--hero-ink); background: #fff; border-color: rgba(34,57,92,.4); }
-.page-hero .btn.btn-secondary, .page-hero .btn[aria-current="page"] { background: var(--hero-ink); color: #fff; border-color: var(--hero-ink); }
-.page-hero .btn-outline-danger { color: #a3392b; border-color: rgba(163,57,43,.35); }
+.page-hero .btn:hover, .page-hero .btn:focus-visible { color: #fff; background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.45); }
+.page-hero .btn.btn-secondary, .page-hero .btn[aria-current="page"] { background: #f1ece2; color: #16263a; border-color: #f1ece2; }
+.page-hero .btn-outline-danger { color: #ffb4a6; border-color: rgba(255,180,166,.4); }
 .page-hero .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; color: #fff; }
-.page-hero .badge { background: rgba(255,255,255,.8) !important; color: var(--hero-ink) !important; border: 1px solid rgba(34,57,92,.14); }
+.page-hero .badge { background: rgba(255,255,255,.12) !important; color: var(--hero-ink) !important; border: 1px solid rgba(255,255,255,.2); }
 .page-hero form { margin: 0; }
-
-/* The scenes are painted in light pastels, so in dark mode they are dimmed to
-   a texture and the ink flips rather than the whole band being redrawn. */
-[data-theme="dark"] .page-hero {
-  --hero-ink: #f1ece2;
-  background-color: #24262a;
-  background-blend-mode: luminosity;
-  border-color: rgba(255,255,255,.08);
-  box-shadow: 0 8px 24px rgba(0,0,0,.35);
-}
-[data-theme="dark"] .page-hero::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: rgba(18,18,20,.62);
-}
-[data-theme="dark"] .page-hero > * { position: relative; z-index: 1; }
-[data-theme="dark"] .page-hero p, [data-theme="dark"] .page-hero .text-muted { color: rgba(241,236,226,.74) !important; }
-[data-theme="dark"] .page-hero .hero-eyebrow,
-[data-theme="dark"] .page-hero .btn,
-[data-theme="dark"] .page-hero .badge { background: rgba(255,255,255,.12) !important; border-color: rgba(255,255,255,.2); }
-[data-theme="dark"] .page-hero .btn.btn-secondary, [data-theme="dark"] .page-hero .btn[aria-current="page"] { background: #f1ece2 !important; color: #22395c; }
+[data-theme="dark"] .page-hero { border-color: rgba(255,255,255,.08); box-shadow: 0 10px 28px rgba(0,0,0,.4); }
 /* On the pipeline the tiles ride up onto the band, as one header block. */
 .page-hero-overlap { padding-bottom: 58px; margin-bottom: 0; }
 .page-hero-overlap + .stat-tiles, .page-hero-overlap ~ .stat-tiles { margin-top: -42px; position: relative; padding: 0 14px; }
