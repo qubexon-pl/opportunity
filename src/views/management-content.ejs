@@ -1,18 +1,18 @@
 <script type="application/json" id="mgmtPeopleDailyHours"><%- JSON.stringify(peopleDailyHours || {}).replace(/</g, '\\u003c') %></script>
-<div class="page-hero page-hero--capacity">
+<div class="page-hero page-hero--capacity page-hero--tall">
   <div>
-    <h2><i class="bi bi-diagram-3 me-2" aria-hidden="true"></i>Team capacity</h2>
-    <p class="text-muted mb-0">
+    <h2 class="hero-title"><i class="bi bi-people-fill hero-icon" aria-hidden="true"></i>Team capacity</h2>
+    <p class="hero-sub mb-0">
       Capacity window: <%= toDateText(view.window.start) %> &rarr; <%= toDateText(view.window.endExclusive) %>
       (<%= view.capacityBusinessDays %> working days, baseline <%= monthlyCapacity %>h/month).
     </p>
   </div>
-  <div class="d-flex gap-2 flex-wrap">
-    <span class="badge text-bg-secondary">Assignments: <%= view.stats.total %></span>
-    <span class="badge text-bg-success">Committed: <%= view.stats.committed %></span>
-    <span class="badge text-bg-warning">Soft booked: <%= view.stats.soft %></span>
-    <span class="badge text-bg-info">On hold: <%= view.stats.onHold %></span>
-    <span class="badge text-bg-light">Hidden: <%= view.stats.hidden %></span>
+  <div class="hero-stats">
+    <span class="hero-stat">Assignments: <strong><%= view.stats.total %></strong></span>
+    <span class="hero-stat">Committed: <strong><%= view.stats.committed %></strong></span>
+    <span class="hero-stat">Soft booked: <strong><%= view.stats.soft %></strong></span>
+    <span class="hero-stat">On hold: <strong><%= view.stats.onHold %></strong></span>
+    <span class="hero-stat">Hidden: <strong><%= view.stats.hidden %></strong></span>
   </div>
 </div>
 
@@ -22,7 +22,58 @@
   </div>
 <% } %>
 
-<ul class="nav nav-tabs mb-4" id="managementTabs" role="tablist">
+<%
+  // Same 75% line the chargeability bands and the team health pill use.
+  var chargeTarget = 75;
+  var chargeReal = view.chargeability.real;
+  var chargeBadge = chargeReal > 100
+    ? { cls: 'is-over', text: 'Over capacity' }
+    : chargeReal >= chargeTarget
+      ? { cls: 'is-good', text: 'On target' }
+      : { cls: 'is-bad', text: 'Below target' };
+%>
+<div class="row g-3 mb-3 mgmt-kpis">
+  <div class="col-sm-6 col-xl-3">
+    <div class="mgmt-kpi mgmt-kpi--members">
+      <div class="mgmt-kpi-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div>
+        <div class="mgmt-kpi-label">Team members</div>
+        <div class="mgmt-kpi-value"><%= view.people.length %></div>
+        <div class="mgmt-kpi-sub"><%= view.capacityBusinessDays %> working days in window</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="mgmt-kpi mgmt-kpi--assignments">
+      <div class="mgmt-kpi-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></div>
+      <div>
+        <div class="mgmt-kpi-label">Assignments</div>
+        <div class="mgmt-kpi-value"><%= view.stats.total %></div>
+        <div class="mgmt-kpi-sub"><%= view.stats.committed %> committed &middot; <%= view.stats.soft %> soft booked</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-6">
+    <div class="mgmt-kpi mgmt-kpi--charge">
+      <div class="mgmt-kpi-icon"><i class="bi bi-bar-chart-line-fill" aria-hidden="true"></i></div>
+      <div class="flex-grow-1">
+        <div class="mgmt-kpi-label">Chargeability</div>
+        <div class="d-flex align-items-baseline gap-3 flex-wrap">
+          <div class="mgmt-kpi-value"><%= chargeReal %>%</div>
+          <span class="mgmt-kpi-badge <%= chargeBadge.cls %>"><%= chargeBadge.text %></span>
+          <span class="mgmt-kpi-sub ms-auto">Target: <%= chargeTarget %>%</span>
+        </div>
+        <div class="mgmt-kpi-bar" title="Real <%= chargeReal %>% against a <%= chargeTarget %>% target">
+          <div class="mgmt-kpi-bar-fill" style="width: <%= Math.min(chargeReal, 100) %>%;"></div>
+          <div class="mgmt-kpi-bar-target" style="left: <%= chargeTarget %>%;"></div>
+        </div>
+        <div class="mgmt-kpi-sub">Predicted incl. soft bookings: <strong class="<%= view.chargeability.predictedClass %>"><%= view.chargeability.predicted %>%</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mgmt-tabs mb-3" id="managementTabs" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabCapacity" type="button" role="tab">
       <i class="bi bi-people me-1" aria-hidden="true"></i>Team capacity
@@ -50,41 +101,38 @@
   <!-- ═══════════════ Tab 1: Team capacity ═══════════════ -->
   <div class="tab-pane fade show active" id="tabCapacity" role="tabpanel">
 
-    <div class="card mb-4">
-      <div class="card-header">
-        <button type="button" class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePerspective" aria-expanded="false">
-          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-sliders me-2" aria-hidden="true"></i>Perspective</span>
-        </button>
-      </div>
-      <div class="card-body collapse" id="collapsePerspective">
-        <form method="get" action="/management" class="row g-3 align-items-end" data-mgmt-form>
+    <div class="card mb-4 filter-card">
+      <div class="card-body" id="collapsePerspective">
+        <form method="get" action="/management" class="row g-3 align-items-end mgmt-filter-form" data-mgmt-form>
           <input type="hidden" name="applied" value="1">
-          <div class="col-lg-3 col-md-4 col-6">
+          <div class="col-xl col-md-4 col-6">
             <label class="form-label" for="perspective">Timeline unit</label>
-            <select class="form-select" id="perspective" name="perspective">
+            <select class="form-select form-select-sm" id="perspective" name="perspective">
               <% timelineUnitOptions.forEach(function(option) { %>
                 <option value="<%= option.key %>" <%= perspective === option.key ? 'selected' : '' %>><%= option.label %></option>
               <% }) %>
             </select>
           </div>
-          <div class="col-lg-3 col-md-4 col-6">
-            <label class="form-label" for="units">Horizon (units)</label>
-            <input type="number" class="form-control" id="units" name="units" min="1" max="24" value="<%= unitsToShow %>">
+          <div class="col-xl col-md-4 col-6">
+            <label class="form-label" for="units">Horizon</label>
+            <input type="number" class="form-control form-control-sm" id="units" name="units" min="1" max="24" value="<%= unitsToShow %>">
           </div>
           <%/* Back / Current / Next combine with the horizon to pick the window:
                back by 1 month in November measures October. */ %>
-          <div class="col-lg-3 col-md-4 col-6">
+          <div class="col-xl col-md-4 col-6">
             <%- include('partials/period-select', {
               perspective: perspective,
               periodDirection: periodDirection,
+              periodSelectClass: 'form-select form-select-sm',
               periodHint: view.window.label + (view.window.isPast ? ' (past)' : ''),
             }) %>
           </div>
-          <div class="col-lg-3 col-md-4 col-6">
+          <div class="col-xl col-md-4 col-6">
             <%- include('partials/multiselect', {
               id: 'filter-timeline-stage',
               name: 'stage',
-              label: 'Stage filter',
+              label: 'Stage',
+              size: 'sm',
               allLabel: 'All stages',
               selected: stageFilters,
               options: [{ value: 'free', label: 'Free capacity' }].concat(stageLegend.map(function(item) {
@@ -92,42 +140,45 @@
               }))
             }) %>
           </div>
-          <div class="col-lg-3 col-md-4 col-6">
+          <div class="col-xl col-md-4 col-6">
             <%- include('partials/multiselect', {
               id: 'filter-timeline-status',
               name: 'status',
-              label: 'Status filter',
+              label: 'Status',
+              size: 'sm',
               allLabel: 'All statuses',
               selected: statusFilters,
               options: statusOptions.map(function(status) { return { value: status, label: status }; })
             }) %>
           </div>
-          <div class="col-lg-3 col-md-4 col-6">
+          <div class="col-xl col-md-4 col-6">
             <%- include('partials/multiselect', {
               id: 'filter-timeline-manager',
               name: 'manager',
               label: 'Manager',
+              size: 'sm',
               allLabel: 'All managers',
               selected: managerFilters,
               options: managerOptions.map(function(name) { return { value: name, label: name }; })
             }) %>
           </div>
-          <div class="col-lg-3 col-md-4 col-6">
+          <div class="col-xl col-md-4 col-6">
             <%- include('partials/multiselect', {
               id: 'filter-timeline-person',
               name: 'person',
               label: 'Person',
+              size: 'sm',
               allLabel: 'All people',
               selected: personFilters,
               options: personOptions.map(function(name) { return { value: name, label: name }; })
             }) %>
           </div>
-          <div class="col-lg-12 col-md-8 d-flex gap-2">
-            <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Apply</button>
-            <a class="btn btn-outline-secondary" href="/management?applied=1" title="Reset" data-mgmt-link><i class="bi bi-x-lg" aria-hidden="true"></i></a>
+          <div class="col-xl-auto col-md-4 col-12 d-flex align-items-center gap-3">
+            <button class="btn btn-sm btn-primary btn-pill" type="submit"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Apply</button>
+            <a class="filter-clear" href="/management?applied=1" data-mgmt-link>Clear all</a>
           </div>
         </form>
-        <form method="post" action="/management/defaults" class="mt-3 d-flex align-items-center gap-2 flex-wrap" data-mgmt-defaults>
+        <form method="post" action="/management/defaults" class="filter-defaults d-flex align-items-center gap-2 flex-wrap" data-mgmt-defaults>
           <input type="hidden" name="perspective" value="<%= perspective %>">
           <input type="hidden" name="units" value="<%= unitsToShow %>">
           <input type="hidden" name="period" value="<%= periodDirection %>">
@@ -167,13 +218,6 @@
               <option value="desc" <%= view.peopleSort.dir === 'desc' ? 'selected' : '' %>>Descending</option>
             </select>
           </div>
-          <div class="team-kpi">
-            <span class="team-kpi-label">Team chargeability</span>
-            <span class="team-kpi-value <%= view.chargeability.realClass %>"><%= view.chargeability.real %>%</span>
-            <span class="team-kpi-sep">/</span>
-            <span class="team-kpi-value <%= view.chargeability.predictedClass %>"><%= view.chargeability.predicted %>%</span>
-          </div>
-          <span class="text-muted small">real / predicted (incl. soft bookings)</span>
           <% if (view.chargeability.absenceHours > 0) { %>
             <span class="absence-impact small"
                   title="Absence removes working days from the window, so the same committed hours are measured against a smaller base.">
@@ -637,15 +681,33 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
 
     <%- include('partials/period-filter', { pfId: 'People' }) %>
 
-    <div class="card mb-4">
+    <%
+      // Manager counts as a people filter too, so this has to follow
+      // the resolved selection rather than the Person dropdown alone.
+      var filteredPeople = peopleSelectionActive
+        ? people.filter(function(name) { return selectedPeople.indexOf(name) !== -1; })
+        : people;
+      var memberByName = {};
+      view.people.forEach(function(member) { memberByName[member.person] = member; });
+      function initialsOf(name) {
+        return String(name || '').split(/\s+/).filter(Boolean).slice(0, 2)
+          .map(function(part) { return part.charAt(0); }).join('').toUpperCase() || '?';
+      }
+      function toneOf(name) {
+        var hash = 7;
+        for (var i = 0; i < String(name).length; i++) hash = (hash * 131 + String(name).charCodeAt(i)) % 104729;
+        return hash % 6;
+      }
+    %>
+    <div class="card mb-4 people-table-card">
       <div class="card-header">
-        <button type="button" class="card-collapse-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#collapsePeopleList" aria-expanded="false">
-          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-people me-2" aria-hidden="true"></i>People (<%= (peopleSelectionActive ? people.filter(function(name) { return selectedPeople.indexOf(name) !== -1; }) : people).length %>)</span>
+        <button type="button" class="card-collapse-toggle" data-bs-toggle="collapse" data-bs-target="#collapsePeopleList" aria-expanded="true">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i><span><i class="bi bi-people me-2" aria-hidden="true"></i>People (<%= filteredPeople.length %>)</span>
         </button>
       </div>
-      <div class="card-body collapse p-0" id="collapsePeopleList">
+      <div class="card-body collapse show p-0" id="collapsePeopleList">
         <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0" id="peopleListTable">
+          <table class="table align-middle mb-0 people-table" id="peopleListTable">
             <thead>
               <tr>
                 <th>Name</th>
@@ -653,50 +715,59 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                 <th class="col-w180">Manager</th>
                 <th class="text-end col-w100">Daily hours</th>
                 <th class="text-end col-w120">Cost (<%= costCurrency %>/day)</th>
-                <th class="text-end col-w120">Absences</th>
+                <th class="text-center col-w100">Absences</th>
+                <th class="col-w180">Utilization</th>
                 <th class="col-w80"></th>
               </tr>
             </thead>
             <tbody>
-              <%
-                // Manager counts as a people filter too, so this has to follow
-                // the resolved selection rather than the Person dropdown alone.
-                var filteredPeople = peopleSelectionActive
-                  ? people.filter(function(name) { return selectedPeople.indexOf(name) !== -1; })
-                  : people;
-              %>
               <% filteredPeople.forEach(function(personName) {
                 var dailyHours = peopleDailyHours[personName] || hoursPerDay;
                 var role = peopleRoles[personName] || '—';
                 var cost = peopleCosts[personName];
                 var absences = allAbsences[personName] || [];
+                var manager = peopleManagers[personName];
+                var member = memberByName[personName];
+                var personHref = '/management/people/' + encodeURIComponent(personName) + '?perspective=' + perspective + '&units=' + unitsToShow + '&period=' + periodDirection;
               %>
                 <tr>
                   <td>
-                    <a href="/management/people/<%= encodeURIComponent(personName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>&period=<%= periodDirection %>" class="text-decoration-none fw-semibold">
-                      <i class="bi bi-person me-1" aria-hidden="true"></i><%= personName %>
+                    <a href="<%= personHref %>" class="person-cell">
+                      <span class="avatar avatar-tone-<%= toneOf(personName) %>" aria-hidden="true"><%= initialsOf(personName) %></span><%= personName %>
                     </a>
                   </td>
                   <td class="text-muted small"><%= role %></td>
-                  <td class="text-muted small"><%= peopleManagers[personName] || '—' %></td>
+                  <td class="small">
+                    <% if (manager) { %>
+                      <span class="person-cell person-cell--plain">
+                        <span class="avatar avatar-sm avatar-tone-<%= toneOf(manager) %>" aria-hidden="true"><%= initialsOf(manager) %></span><%= manager %>
+                      </span>
+                    <% } else { %><span class="text-muted">—</span><% } %>
+                  </td>
                   <td class="text-end"><%= dailyHours %>h</td>
                   <td class="text-end"><%= cost !== undefined && cost !== null ? cost : '—' %></td>
-                  <td class="text-end">
+                  <td class="text-center">
                     <% if (absences.length) { %>
-                      <span class="badge text-bg-warning"><%= absences.length %></span>
+                      <span class="count-badge"><%= absences.length %></span>
                     <% } else { %>
                       <span class="text-muted">—</span>
                     <% } %>
                   </td>
                   <td>
-                    <a href="/management/people/<%= encodeURIComponent(personName) %>?perspective=<%= perspective %>&units=<%= unitsToShow %>&period=<%= periodDirection %>" class="btn btn-sm btn-outline-primary">
-                      Details
-                    </a>
+                    <% if (member) { %>
+                      <div class="util-cell" title="<%= member.activeHours %>h committed of <%= member.capacityHours %>h capacity">
+                        <span class="util-value <%= member.chargeabilityClass %>"><%= member.chargeabilityReal %>%</span>
+                        <span class="util-track"><span class="util-fill" style="width: <%= Math.min(member.chargeabilityReal, 100) %>%;"></span></span>
+                      </div>
+                    <% } else { %><span class="text-muted">—</span><% } %>
+                  </td>
+                  <td class="text-end">
+                    <a href="<%= personHref %>" class="btn btn-sm btn-outline-primary btn-pill">Details</a>
                   </td>
                 </tr>
               <% }) %>
               <% if (!filteredPeople.length) { %>
-                <tr><td colspan="7" class="text-center text-muted py-4">No people match the current filters.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted py-4">No people match the current filters.</td></tr>
               <% } %>
             </tbody>
           </table>
