@@ -106,7 +106,9 @@
           but do not reduce available hours until they progress. Individual opportunities can override
           this from the pipeline.
         </p>
+        <% var canEditStages = typeof access === 'undefined' || access.isAdmin; %>
         <form method="post" action="/settings/capacity/stages">
+          <fieldset <%= canEditStages ? '' : 'disabled' %>>
           <div class="row g-2">
             <% stages.forEach(function(stage) { %>
               <div class="col-sm-6 col-lg-4">
@@ -118,7 +120,12 @@
               </div>
             <% }) %>
           </div>
-          <button class="btn btn-primary mt-3" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Save booking rule</button>
+          <% if (canEditStages) { %>
+            <button class="btn btn-primary mt-3" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Save booking rule</button>
+          <% } else { %>
+            <p class="small text-muted mt-3 mb-0"><i class="bi bi-lock me-1" aria-hidden="true"></i>Shared by every team, so only an admin can change it.</p>
+          <% } %>
+          </fieldset>
         </form>
       </div>
     </div>

@@ -74,6 +74,14 @@
     action();
   });
 
+  /* Selects that save on their own, e.g. the admin team pickers. */
+  document.addEventListener('change', function (event) {
+    var field = event.target;
+    if (!field.matches || !field.matches('[data-submit-on-change]') || !field.form) return;
+    if (field.form.requestSubmit) field.form.requestSubmit();
+    else field.form.submit();
+  });
+
   /* Saved preferences, applied immediately. */
   var density = store('opp-density');
   if (density) applyDensity(density);
