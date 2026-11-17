@@ -6,6 +6,7 @@
  *
  *   appUsers  [{ email, name, role: 'admin' | 'member', teamIds: [id, ...], addedAt, addedBy }]
  *   teams     [{ id, name }]
+ *   teamJobTitles  { [teamId]: ['Data Scientist', ...] }   roles people in a team pick from
  *
  * A member sees and edits only their own teams: the people configured for
  * them, the opportunities created in them and everything hanging off those
@@ -31,6 +32,14 @@ const store = require('../config/store');
 const DEFAULT_TEAM_ID = 'default';
 const DEFAULT_TEAM_NAME = 'Default team';
 const ROLES = ['admin', 'member'];
+
+/* What the default team used before roles could be set per team. */
+const DEFAULT_JOB_TITLES = Object.freeze([
+  'Associate Expert Data Intelligence',
+  'Expert Data Intelligence',
+  'Sr Expert Data Intelligence',
+  'Lead Expert Data Intelligence',
+]);
 
 const UNRESTRICTED = Object.freeze({ all: true, teamId: null, teamIds: [], writeTeamId: DEFAULT_TEAM_ID, key: 'all' });
 
@@ -118,7 +127,64 @@ async function removeTeam(teamId, { opportunityCount = 0 } = {}) {
   }
   const config = store.snapshot();
   config.teams = listTeams().filter((entry) => entry.id !== team.id);
+  if (config.teamJobTitles && typeof config.teamJobTitles === 'object') {
+    config.teamJobTitles = { ...config.teamJobTitles };
+    delete config.teamJobTitles[team.id];
+  }
   await store.save(config);
+}
+
+/* ---------- roles (job titles) ---------- */
+
+function jobTitleMap() {
+  const stored = store.peek().teamJobTitles;
+  return stored && typeof stored === 'object' ? stored : {};
+}
+
+/**
+ * The roles people in a team pick from. The default team keeps the original
+ * list until it saves its own; a new team starts empty and defines its own.
+ */
+function listJobTitles(teamId) {
+  const id = String(teamId || DEFAULT_TEAM_ID);
+  const stored = jobTitleMap()[id];
+  if (Array.isArray(stored)) return stored.map((title) => String(title).trim()).filter(Boolean);
+  return id === DEFAULT_TEAM_ID ? DEFAULT_JOB_TITLES.slice() : [];
+}
+
+function normalizeJobTitle(title) {
+  const value = String(title || '').trim().replace(/\s+/g, ' ');
+  if (!value) throw new Error('Role name is required.');
+  if (value.length > 80) throw new Error('Role name must be 80 characters or fewer.');
+  return value;
+}
+
+async function writeJobTitles(teamId, titles) {
+  const config = store.snapshot();
+  config.teamJobTitles = { ...jobTitleMap(), [teamId]: titles };
+  await store.save(config);
+}
+
+async function addJobTitle(teamId, title) {
+  const team = findTeam(teamId);
+  if (!team) throw new Error('Choose an existing team.');
+  const value = normalizeJobTitle(title);
+  const titles = listJobTitles(team.id);
+  if (titles.some((existing) => existing.toLowerCase() === value.toLowerCase())) {
+    throw new Error(`${team.name} already has the role ${value}.`);
+  }
+  await writeJobTitles(team.id, titles.concat(value));
+  return value;
+}
+
+/** People keep a removed role until someone picks another; it is only no longer offered. */
+async function removeJobTitle(teamId, title) {
+  const team = findTeam(teamId);
+  if (!team) throw new Error('Choose an existing team.');
+  const value = String(title || '').trim();
+  const titles = listJobTitles(team.id);
+  if (!titles.includes(value)) throw new Error(`${team.name} has no role ${value}.`);
+  await writeJobTitles(team.id, titles.filter((existing) => existing !== value));
 }
 
 /* ---------- people's teams ---------- */
@@ -324,6 +390,10 @@ module.exports = {
   addTeam,
   renameTeam,
   removeTeam,
+  DEFAULT_JOB_TITLES,
+  listJobTitles,
+  addJobTitle,
+  removeJobTitle,
   personTeamMap,
   personTeam,
   listUsers,

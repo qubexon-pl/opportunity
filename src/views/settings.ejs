@@ -45,7 +45,7 @@
                   <td>
                     <select class="form-select form-select-sm" name="role" form="<%= rowFormId %>" aria-label="Role for <%= person.name %>">
                       <option value="">Not set</option>
-                      <% personRoles.forEach(function(role) { %>
+                      <% person.roleOptions.forEach(function(role) { %>
                         <option value="<%= role %>" <%= person.role === role ? 'selected' : '' %>><%= role %></option>
                       <% }) %>
                     </select>
@@ -150,6 +150,9 @@
                 <option value="<%= role %>"><%= role %></option>
               <% }) %>
             </select>
+            <div class="form-text">
+              Roles of <%= newPersonTeam %>.<% if (locals.access && locals.access.isAdmin) { %> Add more in <a href="/admin#roles">Admin → Roles</a>.<% } else { %> Ask an admin to add more.<% } %>
+            </div>
           </div>
           <div class="col-12">
             <label class="form-label" for="manager">Manager</label>

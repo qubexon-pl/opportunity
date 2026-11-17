@@ -128,3 +128,24 @@ test('a team with members or people cannot be removed', async () => {
   await access.removeTeam('t2');
   assert.deepEqual(access.listTeams().map((team) => team.id), ['default']);
 });
+
+test('roles are per team: added in Admin, offered in Configuration, kept on people after removal', async () => {
+  await resetConfig({ teams: [{ id: 'default', name: 'Default team' }, { id: 't2', name: 'Data Science' }] });
+  assert.deepEqual(access.listJobTitles('default'), access.DEFAULT_JOB_TITLES.slice());
+  assert.deepEqual(access.listJobTitles('t2'), []);
+
+  await access.addJobTitle('t2', '  Data   Scientist ');
+  assert.deepEqual(access.listJobTitles('t2'), ['Data Scientist']);
+  await assert.rejects(access.addJobTitle('t2', 'data scientist'), /already has the role/);
+
+  await asMember('t2', () => people.addPerson('Zoe', 8, 'Data Scientist'));
+  await assert.rejects(asMember('t2', () => people.addPerson('Yan', 8, 'Expert Data Intelligence')), /Unknown role/);
+  assert.equal(people.getPersonRole('Zoe'), 'Data Scientist');
+
+  await access.removeJobTitle('t2', 'Data Scientist');
+  assert.deepEqual(access.listJobTitles('t2'), []);
+  assert.equal(people.getPersonRole('Zoe'), 'Data Scientist');
+  assert.deepEqual(people.roleOptionsFor('Zoe'), ['Data Scientist']);
+  await asMember('t2', () => people.updatePersonProfile('Zoe', { dailyHours: 8, role: 'Data Scientist' }));
+  assert.equal(people.getPersonRole('Zoe'), 'Data Scientist');
+});

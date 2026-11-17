@@ -177,6 +177,41 @@
         </form>
       </div>
     </div>
+
+    <div class="card mt-3" id="roles">
+      <div class="card-header"><i class="bi bi-person-badge me-2" aria-hidden="true"></i>Roles</div>
+      <div class="card-body small text-muted pb-0">Roles each team gives its people in Configuration. Roles with &ldquo;Lead&rdquo; in the name are left out of team chargeability.</div>
+      <ul class="list-group list-group-flush">
+        <% teamRoles.forEach(function(team) { %>
+          <li class="list-group-item role-team">
+            <div class="fw-semibold mb-2"><%= team.name %></div>
+            <% if (team.roles.length) { %>
+              <div class="role-chips mb-2">
+                <% team.roles.forEach(function(role) { %>
+                  <span class="role-chip">
+                    <span><%= role.title %></span>
+                    <% if (role.people) { %><span class="role-chip-count" title="<%= role.people %> <%= role.people === 1 ? 'person has' : 'people have' %> this role"><%= role.people %></span><% } %>
+                    <form method="post" action="/admin/roles/remove" class="d-inline"
+                          data-confirm="Remove the role <%= role.title %> from <%= team.name %>?<%= role.people ? ' People who have it keep it until changed.' : '' %>" data-confirm-title="Remove role" data-confirm-text="Remove">
+                      <input type="hidden" name="teamId" value="<%= team.id %>">
+                      <input type="hidden" name="title" value="<%= role.title %>">
+                      <button class="role-chip-remove" type="submit" title="Remove <%= role.title %>"><i class="bi bi-x" aria-hidden="true"></i><span class="visually-hidden">Remove <%= role.title %></span></button>
+                    </form>
+                  </span>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="small text-muted mb-2">No roles yet.</div>
+            <% } %>
+            <form method="post" action="/admin/roles" class="d-flex gap-2">
+              <input type="hidden" name="teamId" value="<%= team.id %>">
+              <input class="form-control form-control-sm" type="text" name="title" maxlength="80" required placeholder="e.g. Data Scientist" aria-label="New role for <%= team.name %>">
+              <button class="btn btn-outline-primary btn-sm text-nowrap" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add role</button>
+            </form>
+          </li>
+        <% }) %>
+      </ul>
+    </div>
   </div>
 
   <div class="col-12">

@@ -6,7 +6,7 @@
 const express = require('express');
 const access = require('../services/accessService');
 const { requireAdmin } = require('../middleware/access');
-const { listAllPeople, movePersonToTeam } = require('../services/peopleService');
+const { listAllPeople, movePersonToTeam, getRoleMap } = require('../services/peopleService');
 const { countOpportunitiesByTeam } = require('../services/opportunityService');
 const { searchDirectoryUsers } = require('../services/graphService');
 
@@ -74,10 +74,22 @@ router.get('/', async (req, res, next) => {
     }));
 
     const envAdmins = access.envAdminEmails();
+    const roleMap = getRoleMap();
+    const teamRoles = teams.map((team) => {
+      const teamPeople = people.filter((person) => person.teamId === team.id);
+      return {
+        ...team,
+        roles: access.listJobTitles(team.id).map((title) => ({
+          title,
+          people: teamPeople.filter((person) => roleMap[person.name] === title).length,
+        })),
+      };
+    });
     res.render('admin', {
       title: 'Admin',
       teams,
       teamStats,
+      teamRoles,
       users: users.map((user) => ({ ...user, envAdmin: envAdmins.includes(user.email) })),
       envAdmins: envAdmins.filter((email) => !users.some((user) => user.email === email)),
       people,
@@ -170,6 +182,24 @@ router.post('/people/team', (req, res) =>
     const teamId = String(req.body.teamId || '');
     await movePersonToTeam(req.body.person, teamId);
     return `${String(req.body.person || '').trim()} moved to ${access.teamName(teamId)}.`;
+  })
+);
+
+/** Roles (job titles) people in a team are given in Configuration. */
+router.post('/roles', (req, res) =>
+  act(req, res, async () => {
+    const teamId = String(req.body.teamId || '');
+    const title = await access.addJobTitle(teamId, req.body.title);
+    return `Role ${title} added to ${access.teamName(teamId)}.`;
+  })
+);
+
+router.post('/roles/remove', (req, res) =>
+  act(req, res, async () => {
+    const teamId = String(req.body.teamId || '');
+    const title = String(req.body.title || '').trim();
+    await access.removeJobTitle(teamId, title);
+    return `Role ${title} removed from ${access.teamName(teamId)}. People who had it keep it until changed.`;
   })
 );
 
