@@ -43,6 +43,7 @@ const OpportunitySchema = z.object({
   plannedEndDate: z.string().optional().nullable(),
   allocationPercent: z.number().min(1).max(100).optional().nullable(),
   countsTowardsCapacity: z.boolean().optional().nullable(),
+  teamId: z.string().min(1).max(64).optional().nullable(),
 });
 
 const NoteSchema = z.object({
@@ -185,7 +186,7 @@ async function createOpportunity(payload) {
   const request = pool
     .request()
     .input('Id', sql.UniqueIdentifier, newId)
-    .input('TeamId', sql.NVarChar(64), currentScope().writeTeamId);
+    .input('TeamId', sql.NVarChar(64), body.teamId || currentScope().writeTeamId);
   await bindOpportunity(request, body).query(
     `INSERT INTO dbo.Opportunities
        (Id, Name, OppId, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline, PlannedStartDate, PlannedEndDate, AllocationPercent, CountsTowardsCapacity, TeamId)
@@ -201,7 +202,7 @@ async function updateOpportunity(rawId, payload) {
   const body = OpportunitySchema.parse(payload);
   const pool = await getPool();
 
-  const request = pool.request().input('Id', sql.UniqueIdentifier, id);
+  const request = pool.request().input('Id', sql.UniqueIdentifier, id).input('NewTeamId', sql.NVarChar(64), body.teamId || null);
   const team = teamFilter(request);
   const result = await bindOpportunity(request, body).query(
     `UPDATE dbo.Opportunities
@@ -224,6 +225,7 @@ async function updateOpportunity(rawId, payload) {
          PlannedEndDate=@PlannedEndDate,
          AllocationPercent=@AllocationPercent,
          CountsTowardsCapacity=@CountsTowardsCapacity,
+         TeamId=COALESCE(@NewTeamId, TeamId),
          UpdatedAt=SYSUTCDATETIME()
      WHERE Id=@Id${team};
      SELECT @@ROWCOUNT as affected;`
@@ -401,18 +403,6 @@ async function countOpportunitiesByTeam() {
   return Object.fromEntries(result.recordset.map((row) => [String(row.TeamId), Number(row.Total)]));
 }
 
-/** Admin only: hands an opportunity, with its assignments, notes and steps, to another team. */
-async function moveOpportunityToTeam(rawId, teamId) {
-  const id = toGuid(rawId);
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('Id', sql.UniqueIdentifier, id)
-    .input('TeamId', sql.NVarChar(64), String(teamId))
-    .query('UPDATE dbo.Opportunities SET TeamId=@TeamId, UpdatedAt=SYSUTCDATETIME() WHERE Id=@Id; SELECT @@ROWCOUNT as affected;');
-  if (!result.recordset[0].affected) throw new Error('Opportunity not found.');
-}
-
 module.exports = {
   STAGES,
   STATUSES,
@@ -423,7 +413,6 @@ module.exports = {
   listOpportunities,
   listOpenNextSteps,
   countOpportunitiesByTeam,
-  moveOpportunityToTeam,
   getOpportunity,
   createOpportunity,
   updateOpportunity,

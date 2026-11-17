@@ -97,10 +97,29 @@
           </button>
         </div>
         <div class="card-body row g-3 collapse show" id="collapseBasic">
-          <div class="col-12">
+          <% var teamChoices = typeof teams !== 'undefined' && Array.isArray(teams) ? teams : []; var currentTeamId = o.TeamId || 'default'; %>
+          <div class="<%= teamChoices.length ? 'col-md-8' : 'col-12' %>">
             <label class="form-label" for="name">Opportunity name</label>
             <input class="form-control" id="name" name="name" required maxlength="200" value="<%= o.Name || '' %>">
           </div>
+          <% if (teamChoices.length) { %>
+            <div class="col-md-4">
+              <label class="form-label" for="teamId">Team</label>
+              <% if (teamChoices.length === 1) { %>
+                <input type="hidden" name="teamId" value="<%= teamChoices[0].id %>">
+                <select class="form-select" id="teamId" disabled title="You belong to one team"><option selected><%= teamChoices[0].name %></option></select>
+              <% } else { %>
+                <select class="form-select" id="teamId" name="teamId">
+                  <% teamChoices.forEach(function(team) { %>
+                    <option value="<%= team.id %>" <%= team.id === currentTeamId ? 'selected' : '' %>><%= team.name %></option>
+                  <% }) %>
+                  <% if (!teamChoices.some(function(team) { return team.id === currentTeamId; })) { %>
+                    <option value="" selected>Current team (not one of yours)</option>
+                  <% } %>
+                </select>
+              <% } %>
+            </div>
+          <% } %>
           <div class="col-md-6">
             <label class="form-label" for="oppId">OPP ID</label>
             <input class="form-control" id="oppId" name="oppId" maxlength="50" placeholder="External ID" value="<%= o.OppId || '' %>">

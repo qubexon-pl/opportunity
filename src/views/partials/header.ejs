@@ -100,11 +100,11 @@
           <i class="bi bi-search" aria-hidden="true"></i><span class="btn-palette-text">Jump to…</span><kbd class="btn-palette-kbd">Ctrl K</kbd>
         </button>
         <% if (typeof access !== 'undefined' && access) { %>
-          <% if (access.isAdmin && access.teams.length > 1) { %>
+          <% if (access.teams.length > 1) { %>
             <form method="post" action="/admin/view-team" class="team-switch" data-no-live title="Which team's data you are looking at">
               <i class="bi bi-diagram-3" aria-hidden="true"></i>
               <select name="teamId" class="team-switch-select" data-submit-on-change aria-label="Team in view">
-                <option value="" <%= access.viewingAll ? 'selected' : '' %>>All teams</option>
+                <option value="" <%= access.viewingAll ? 'selected' : '' %>><%= access.isAdmin ? 'All teams' : 'All my teams' %></option>
                 <% access.teams.forEach(function(team) { %>
                   <option value="<%= team.id %>" <%= access.viewTeamId === team.id ? 'selected' : '' %>><%= team.name %></option>
                 <% }) %>

@@ -1,15 +1,38 @@
 <%- include('partials/header') %>
 <%
+  function esc(value) {
+    return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
   function teamOptions(selectedId) {
     return teams.map(function(team) {
-      return '<option value="' + team.id + '"' + (team.id === selectedId ? ' selected' : '') + '>' + team.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;') + '</option>';
+      return '<option value="' + esc(team.id) + '"' + (team.id === selectedId ? ' selected' : '') + '>' + esc(team.name) + '</option>';
     }).join('');
+  }
+  function teamNames(ids) {
+    return teams.filter(function(team) { return ids.indexOf(team.id) !== -1; }).map(function(team) { return team.name; }).join(', ');
+  }
+  /* A dropdown of team checkboxes; `formId` ties them to a form elsewhere in the row. */
+  function teamPicker(idPrefix, selectedIds, formId, autoSubmit, label) {
+    var html = '<div class="dropdown team-picker">' +
+      '<button type="button" class="form-select form-select-sm text-start team-picker-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-popper-config="{&quot;strategy&quot;:&quot;fixed&quot;}" aria-expanded="false" aria-label="' + esc(label) + '">' +
+      '<span class="team-picker-label">' + esc(teamNames(selectedIds) || 'Pick teams') + '</span></button>' +
+      '<div class="dropdown-menu team-picker-menu p-2">';
+    teams.forEach(function(team, i) {
+      var id = idPrefix + '-' + i;
+      html += '<div class="form-check">' +
+        '<input class="form-check-input" type="checkbox" name="teamIds" id="' + id + '" value="' + esc(team.id) + '"' +
+        (formId ? ' form="' + esc(formId) + '"' : '') +
+        (selectedIds.indexOf(team.id) !== -1 ? ' checked' : '') +
+        (autoSubmit ? ' data-submit-on-change' : ' data-team-picker-check') + '>' +
+        '<label class="form-check-label small" for="' + id + '">' + esc(team.name) + '</label></div>';
+    });
+    return html + '</div></div>';
   }
 %>
 <div class="page-hero page-hero--configuration">
   <div>
     <h2><i class="bi bi-shield-lock me-2" aria-hidden="true"></i>Admin</h2>
-    <p class="text-muted mb-0">Who can sign in, the teams they plan in, and which team owns each person and opportunity. Members only ever see their own team; admins see every team.</p>
+    <p class="text-muted mb-0">Who can sign in, the teams they plan in, and which team owns each person. Only people on this list can open the app. Members see the teams they belong to; admins see every team.</p>
   </div>
 </div>
 
@@ -21,10 +44,14 @@
         <span class="text-muted small"><%= users.length %> on the list</span>
       </div>
       <div class="card-body border-bottom">
-        <form method="post" action="/admin/users" class="row g-2 align-items-end">
+        <form method="post" action="/admin/users" class="row g-2 align-items-end" id="newUserForm">
           <div class="col-md-4">
             <label class="form-label small" for="newUserEmail">Email</label>
-            <input class="form-control form-control-sm" type="email" id="newUserEmail" name="email" required placeholder="name@company.com" autocomplete="off">
+            <div class="directory-search" data-directory-search>
+              <input class="form-control form-control-sm" type="email" id="newUserEmail" name="email" required placeholder="Search Entra ID or type an email" autocomplete="off"
+                     role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="newUserSuggestions">
+              <ul class="directory-suggestions list-unstyled d-none" id="newUserSuggestions" role="listbox"></ul>
+            </div>
           </div>
           <div class="col-md-3">
             <label class="form-label small" for="newUserName">Name</label>
@@ -38,8 +65,8 @@
             </select>
           </div>
           <div class="col-md-2">
-            <label class="form-label small" for="newUserTeam">Team</label>
-            <select class="form-select form-select-sm" id="newUserTeam" name="teamId"><%- teamOptions(teams[0] && teams[0].id) %></select>
+            <span class="form-label small d-block">Teams</span>
+            <%- teamPicker('newUserTeam', teams[0] ? [teams[0].id] : [], '', false, 'Teams for the new user') %>
           </div>
           <div class="col-md-1 d-grid">
             <button class="btn btn-primary btn-sm" type="submit" title="Give access"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add user</span></button>
@@ -48,7 +75,7 @@
       </div>
       <div class="card-body p-0">
         <% if (!users.length) { %>
-          <p class="text-muted small p-3 mb-0">Nobody is on the list yet, so anyone who can sign in becomes the first admin.</p>
+          <p class="text-muted small p-3 mb-0">Nobody is on the list yet. Only the addresses in <code>ADMIN_EMAILS</code> can sign in until you add people here.</p>
         <% } else { %>
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 admin-table">
@@ -56,7 +83,7 @@
                 <tr>
                   <th>User</th>
                   <th class="col-w140">Role</th>
-                  <th class="col-w200">Team</th>
+                  <th class="col-w200">Teams</th>
                   <th class="text-end col-w110"><span class="visually-hidden">Actions</span></th>
                 </tr>
               </thead>
@@ -85,7 +112,7 @@
                       <% } %>
                     </td>
                     <td>
-                      <select class="form-select form-select-sm" name="teamId" form="<%= formId %>" data-submit-on-change aria-label="Team for <%= user.email %>"><%- teamOptions(user.teamId) %></select>
+                      <%- teamPicker('userTeam' + idx, user.teamIds, formId, true, 'Teams for ' + user.email) %>
                     </td>
                     <td class="text-end">
                       <form method="post" action="/admin/users/remove" class="d-inline" data-confirm="Remove <%= user.email %>? They will no longer be able to open the app.">
@@ -140,6 +167,9 @@
           </li>
         <% }) %>
       </ul>
+      <% if (loadError) { %>
+        <div class="card-body border-top small text-danger"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Could not count opportunities: <%= loadError %></div>
+      <% } %>
       <div class="card-body border-top">
         <form method="post" action="/admin/teams" class="d-flex gap-2">
           <input class="form-control form-control-sm" type="text" name="name" maxlength="80" required placeholder="New team name" aria-label="New team name">
@@ -149,7 +179,7 @@
     </div>
   </div>
 
-  <div class="col-xl-4">
+  <div class="col-12">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-people me-2" aria-hidden="true"></i>People by team</span>
@@ -178,42 +208,5 @@
       </div>
     </div>
   </div>
-
-  <div class="col-xl-8" id="teamOpportunities">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-briefcase me-2" aria-hidden="true"></i>Opportunities by team</span>
-        <span class="text-muted small"><%= opportunities.length %></span>
-      </div>
-      <div class="card-body p-0 admin-scroll">
-        <% if (loadError) { %>
-          <p class="text-danger small p-3 mb-0"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Could not load opportunities: <%= loadError %></p>
-        <% } else if (!opportunities.length) { %>
-          <p class="text-muted small p-3 mb-0">No opportunities yet.</p>
-        <% } else { %>
-          <table class="table table-sm align-middle mb-0 admin-table">
-            <thead>
-              <tr><th>Opportunity</th><th class="col-w140">Stage</th><th class="col-w200">Team</th></tr>
-            </thead>
-            <tbody>
-              <% opportunities.forEach(function(opp) { %>
-                <tr>
-                  <td><a href="/opportunities/<%= opp.id %>"><%= opp.name %></a></td>
-                  <td class="small text-muted"><%= opp.stage %><%= opp.status === 'Closed' ? ' (closed)' : '' %></td>
-                  <td>
-                    <form method="post" action="/admin/opportunities/team">
-                      <input type="hidden" name="id" value="<%= opp.id %>">
-                      <input type="hidden" name="returnTo" value="opportunities">
-                      <select class="form-select form-select-sm" name="teamId" data-submit-on-change aria-label="Team for <%= opp.name %>"><%- teamOptions(opp.teamId) %></select>
-                    </form>
-                  </td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        <% } %>
-      </div>
-    </div>
-  </div>
 </div>
-<%- include('partials/footer') %>
+<%- include('partials/footer', { pageScripts: ['/js/admin-directory.js'] }) %>
