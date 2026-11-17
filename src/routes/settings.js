@@ -1,6 +1,6 @@
 const express = require('express');
 const {
-  PERSON_ROLES,
+  roleOptionsFor,
   COST_CURRENCY,
   listPeople,
   listManagers,
@@ -17,6 +17,7 @@ const { ABSENCE_KINDS, listAbsences, addAbsence, updateAbsence, removeAbsence } 
 const { STAGES } = require('../services/opportunityService');
 const { listFirmStages } = require('../services/bookingService');
 const { updateFirmStages } = require('../config/settings');
+const { listJobTitles, currentScope, teamName } = require('../services/accessService');
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ router.get('/', (req, res) => {
       name: person,
       dailyHours: getPersonDailyHours(person),
       role: getPersonRole(person),
+      roleOptions: roleOptionsFor(person),
       cost: getPersonCost(person),
       manager: getPersonManager(person),
       absences,
@@ -37,7 +39,9 @@ router.get('/', (req, res) => {
   res.render('settings', {
     title: 'Configuration',
     people,
-    personRoles: PERSON_ROLES,
+    // New people join the team being written to, so they pick from its roles.
+    personRoles: listJobTitles(currentScope().writeTeamId),
+    newPersonTeam: teamName(currentScope().writeTeamId),
     managerOptions: listManagers(),
     absenceKinds: ABSENCE_KINDS,
     costCurrency: COST_CURRENCY,

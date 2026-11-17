@@ -97,6 +97,12 @@ az rest --method POST --uri "https://graph.microsoft.com/v1.0/servicePrincipals/
 ```
 
 Without it the search falls back to people already on the list.
+Each team has its own list of **roles** (job titles such as "Data Scientist"). Admins
+add and remove them in **Admin → Roles**; people are then given a role in
+Configuration. The default team starts with the original Data Intelligence titles,
+new teams start empty. Removing a role only stops offering it; people who have it keep
+it until changed. Roles with "Lead" in the name are left out of team chargeability.
+
 Everything created before teams existed belongs to the
 **Default team**, which can be renamed but not removed. Which stages count as committed
 is shared by all teams, so only admins change it.
@@ -106,8 +112,8 @@ is shared by all teams, so only admins change it.
 - `/` &mdash; pipeline as a table or a stage board, with inline edits, next steps and Excel export
 - `/opportunities/new`, `/opportunities/:id` &mdash; create and edit opportunities, notes, next steps, assignments
 - `/management` &mdash; team capacity cards, assignment table, and the allocation timeline
-- `/settings` &mdash; people and daily capacity
-- `/admin` &mdash; admins only: users (with Entra ID search), teams, and which team owns each person
+- `/settings` &mdash; people, their roles and daily capacity
+- `/admin` &mdash; admins only: users (with Entra ID search), teams, roles per team, and which team owns each person
 - `/api/*` &mdash; JSON endpoints used by the client-side timeline helpers
 - `/health` &mdash; health probe
 

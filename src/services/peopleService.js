@@ -1,14 +1,6 @@
 const { getConfig, updatePeopleConfig } = require('../config/settings');
 const { HOURS_PER_DAY, round2 } = require('./dateService');
-const { currentScope, personTeam, personTeamMap, findTeam, teamVisible } = require('./accessService');
-
-/** Roles offered in the person configuration, most junior first. */
-const PERSON_ROLES = [
-  'Associate Expert Data Intelligence',
-  'Expert Data Intelligence',
-  'Sr Expert Data Intelligence',
-  'Lead Expert Data Intelligence',
-];
+const { currentScope, personTeam, personTeamMap, findTeam, teamVisible, listJobTitles } = require('./accessService');
 
 const COST_CURRENCY = 'CHF';
 
@@ -62,10 +54,16 @@ function getPersonDailyHours(personName) {
   return HOURS_PER_DAY;
 }
 
-/** An unset or unrecognised role reads back as empty rather than guessing. */
+/** The role as stored; one an admin has since removed from the team's list still reads back. */
 function getPersonRole(personName) {
-  const role = String(getConfig().people.roles[personName] || '').trim();
-  return PERSON_ROLES.includes(role) ? role : '';
+  return String(getConfig().people.roles[personName] || '').trim();
+}
+
+/** Roles a person can be given: their team's list, plus the one they hold if it was removed since. */
+function roleOptionsFor(personName) {
+  const options = listJobTitles(personTeam(personName));
+  const current = getPersonRole(personName);
+  return current && !options.includes(current) ? options.concat(current) : options;
 }
 
 function getPersonCost(personName) {
@@ -90,11 +88,11 @@ function normalizeDailyHours(dailyHours) {
   return hours;
 }
 
-/** An empty role clears it; anything unrecognised is rejected rather than stored. */
-function normalizeRole(role) {
+/** An empty role clears it; otherwise it must be one of `allowed`, so typos never get stored. */
+function normalizeRole(role, allowed) {
   const value = String(role ?? '').trim();
   if (!value) return '';
-  if (!PERSON_ROLES.includes(value)) throw new Error(`Unknown role: ${value}`);
+  if (!allowed.includes(value)) throw new Error(`Unknown role: ${value}. Admins add roles in Admin → Roles.`);
   return value;
 }
 
@@ -160,7 +158,7 @@ async function addPerson(personName, dailyHours, role, cost, manager) {
 
   return writePerson(name, {
     dailyHours: normalizeDailyHours(dailyHours),
-    role: normalizeRole(role),
+    role: normalizeRole(role, listJobTitles(currentScope().writeTeamId)),
     cost: normalizeCost(cost),
     manager: normalizeManager(manager),
   });
@@ -204,7 +202,7 @@ async function updatePersonProfile(personName, { dailyHours, role, cost, manager
 
   return writePerson(name, {
     dailyHours: normalizeDailyHours(dailyHours),
-    role: normalizeRole(role),
+    role: normalizeRole(role, roleOptionsFor(name)),
     cost: normalizeCost(cost),
     manager: normalizeManager(manager),
   });
@@ -227,8 +225,8 @@ async function movePersonToTeam(personName, teamId) {
 }
 
 module.exports = {
-  PERSON_ROLES,
   COST_CURRENCY,
+  roleOptionsFor,
   listPeople,
   listAllPeople,
   assertPersonVisible,

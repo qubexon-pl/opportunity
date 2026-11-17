@@ -2,7 +2,7 @@ const express = require('express');
 const ExcelJS = require('exceljs');
 const { listOpportunities } = require('../services/opportunityService');
 const { listAssignments, addAssignment, updateAssignment, ALLOCATION_MODES } = require('../services/assignmentService');
-const { listPeople, getDailyHoursMap, getRoleMap, getCostMap, getManagerMap, PERSON_ROLES, COST_CURRENCY } = require('../services/peopleService');
+const { listPeople, getDailyHoursMap, getRoleMap, getCostMap, getManagerMap, COST_CURRENCY } = require('../services/peopleService');
 const {
   MONTHLY_CAPACITY,
   toDateText,
@@ -185,7 +185,6 @@ router.get('/', async (req, res, next) => {
       peopleDailyHours: getDailyHoursMap(),
       peopleRoles: getRoleMap(),
       peopleCosts: getCostMap(),
-      personRoles: PERSON_ROLES,
       costCurrency: COST_CURRENCY,
       allAbsences: listAllAbsences(),
       absenceKinds: ABSENCE_KINDS,
