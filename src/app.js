@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const { getConfig, refreshSettings } = require('./config/settings');
 const { securityHeaders, createRateLimiter } = require('./middleware/security');
 const { authenticate } = require('./middleware/auth');
+const { authorize } = require('./middleware/access');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -78,6 +79,10 @@ app.use((_req, _res, next) => {
   refreshSettings().then(() => next(), () => next());
 });
 
+// Not on the allow-list: stop here. Otherwise the rest of the request only
+// sees the person's team (admins: every team, or the one they picked).
+app.use(authorize);
+
 // Cache-busting stamp for static assets, changed on every restart/deploy.
 const ASSET_VERSION = process.env.ASSET_VERSION || Date.now().toString(36);
 
@@ -93,6 +98,7 @@ app.use((req, res, next) => {
     opportunities: 'Opportunities',
     management: 'Management',
     settings: 'Configuration',
+    admin: 'Admin',
     new: 'New opportunity',
   };
 
@@ -113,6 +119,7 @@ app.use('/', require('./routes/index'));
 app.use('/opportunities', require('./routes/opportunities'));
 app.use('/management', require('./routes/management'));
 app.use('/settings', require('./routes/settings'));
+app.use('/admin', require('./routes/admin'));
 app.use('/api', require('./routes/api'));
 
 // 404

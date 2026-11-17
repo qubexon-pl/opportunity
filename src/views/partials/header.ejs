@@ -50,6 +50,11 @@
       <p class="nav-section-title">Settings</p>
       <%- navLink('/settings', pagePath.startsWith('/settings'), 'bi-gear', 'Configuration') %>
 
+      <% if (typeof access !== 'undefined' && access && access.isAdmin) { %>
+        <p class="nav-section-title">Administration</p>
+        <%- navLink('/admin', pagePath.startsWith('/admin'), 'bi-shield-lock', 'Admin') %>
+      <% } %>
+
       <button type="button" class="sidebar-link sidebar-collapse-btn mt-2" data-action="collapse-sidebar" title="Collapse sidebar" aria-controls="appSidebar">
         <i class="bi bi-layout-sidebar-inset" id="collapseIcon" aria-hidden="true"></i> <span>Collapse</span>
       </button>
@@ -81,6 +86,21 @@
 
       <!-- Top bar actions -->
       <div class="topbar-actions">
+        <% if (typeof access !== 'undefined' && access) { %>
+          <% if (access.isAdmin && access.teams.length > 1) { %>
+            <form method="post" action="/admin/view-team" class="team-switch" data-no-live title="Which team's data you are looking at">
+              <i class="bi bi-diagram-3" aria-hidden="true"></i>
+              <select name="teamId" class="team-switch-select" data-submit-on-change aria-label="Team in view">
+                <option value="" <%= access.viewingAll ? 'selected' : '' %>>All teams</option>
+                <% access.teams.forEach(function(team) { %>
+                  <option value="<%= team.id %>" <%= access.viewTeamId === team.id ? 'selected' : '' %>><%= team.name %></option>
+                <% }) %>
+              </select>
+            </form>
+          <% } else if (!access.isAdmin) { %>
+            <span class="team-chip" title="You see and plan this team's people and opportunities"><i class="bi bi-diagram-3" aria-hidden="true"></i><%= access.teamName %></span>
+          <% } %>
+        <% } %>
         <%/* Filled in by /js/team-health.js: a one-line verdict on the team over
              the selected period, so the headline number is never more than a
              glance away. */ %>
@@ -110,6 +130,9 @@
             <li class="dropdown-header">
               <div class="fw-semibold"><%= user ? user.name : 'Local workspace' %></div>
               <% if (user && user.email) { %><div class="small text-muted"><%= user.email %></div><% } %>
+              <% if (typeof access !== 'undefined' && access) { %>
+                <div class="small text-muted"><%= access.isAdmin ? 'Admin' : 'Member' %> &middot; <%= access.teamName %></div>
+              <% } %>
             </li>
             <li><hr class="dropdown-divider"></li>
             <% if (logoutUrl) { %>

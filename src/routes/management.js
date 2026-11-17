@@ -219,6 +219,7 @@ router.get('/people/:person', async (req, res, next) => {
   );
   const unitsToShow = normalizeUnits(req.query.units === undefined ? defaults.units : req.query.units, defaults.units);
   const person = String(req.params.person || '');
+  if (!listPeople().includes(person)) return next();
   const periodDirection = normalizeDirection(req.query.period === undefined ? defaults.period : req.query.period, defaults.period);
   const { offsetUnits, effectiveUnits } = resolveWindow(periodDirection, unitsToShow);
 

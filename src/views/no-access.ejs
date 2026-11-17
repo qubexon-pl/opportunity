@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> | Opportunities</title>
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link href="/vendor/inter/index.css" rel="stylesheet">
+  <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/css/main.css" rel="stylesheet">
+</head>
+<body class="no-access-page">
+  <main class="no-access-card">
+    <img src="/img/brand/icon-64.png" alt="" width="56" height="56" class="mb-3">
+    <h1 class="h4">You don't have access yet</h1>
+    <p class="text-muted mb-1">This app is shared by invitation. Ask an administrator to add you to a team.</p>
+    <% if (email) { %>
+      <p class="small text-muted">Signed in as <strong><%= email %></strong></p>
+    <% } %>
+    <% if (typeof signOutUrl !== 'undefined' && signOutUrl) { %>
+      <a class="btn btn-outline-secondary btn-sm mt-2" href="<%= signOutUrl %>"><i class="bi bi-box-arrow-right me-1" aria-hidden="true"></i>Sign in with another account</a>
+    <% } %>
+  </main>
+</body>
+</html>

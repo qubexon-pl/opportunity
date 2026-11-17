@@ -1,5 +1,6 @@
 const { getConfig, updatePeopleConfig } = require('../config/settings');
 const { parseDateOnlyUtc, toDateText, countBusinessDaysInclusive } = require('./dateService');
+const { assertPersonVisible } = require('./peopleService');
 
 /**
  * Absence is time a person is simply not available: it removes working days from
@@ -76,6 +77,7 @@ function normalizeInput({ startDate, endDate, kind, note }) {
 async function addAbsence(personName, input) {
   const person = String(personName || '').trim();
   if (!person) throw new Error('Person name is required.');
+  assertPersonVisible(person);
 
   const absence = normalizeInput(input || {});
   const map = absenceMap();
@@ -99,6 +101,7 @@ async function removeAbsence(personName, absenceId) {
   const person = String(personName || '').trim();
   const id = String(absenceId || '');
   if (!person || !id) throw new Error('Person and absence are required.');
+  assertPersonVisible(person);
 
   const map = absenceMap();
   const existing = map[person] || [];
@@ -113,6 +116,7 @@ async function updateAbsence(personName, absenceId, input) {
   const person = String(personName || '').trim();
   const id = String(absenceId || '');
   if (!person || !id) throw new Error('Person and absence are required.');
+  assertPersonVisible(person);
 
   const normalized = normalizeInput(input || {});
   const map = absenceMap();

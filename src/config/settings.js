@@ -88,7 +88,7 @@ function validateConfig({ requireProductionSecrets = false } = {}) {
   return cfg;
 }
 
-function updatePeopleConfig({ people, personDailyHours, personRoles, personCosts, personManagers, personAbsences }) {
+function updatePeopleConfig({ people, personDailyHours, personRoles, personCosts, personManagers, personAbsences, personTeams }) {
   const fileConfig = loadFileConfig();
   if (Array.isArray(people)) fileConfig.people = people;
   if (personDailyHours && typeof personDailyHours === 'object') fileConfig.personDailyHours = personDailyHours;
@@ -96,6 +96,7 @@ function updatePeopleConfig({ people, personDailyHours, personRoles, personCosts
   if (personCosts && typeof personCosts === 'object') fileConfig.personCosts = personCosts;
   if (personManagers && typeof personManagers === 'object') fileConfig.personManagers = personManagers;
   if (personAbsences && typeof personAbsences === 'object') fileConfig.personAbsences = personAbsences;
+  if (personTeams && typeof personTeams === 'object') fileConfig.personTeams = personTeams;
   return saveFileConfig(fileConfig);
 }
 
