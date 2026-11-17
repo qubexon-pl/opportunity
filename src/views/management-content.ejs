@@ -218,6 +218,13 @@
               <option value="desc" <%= view.peopleSort.dir === 'desc' ? 'selected' : '' %>>Descending</option>
             </select>
           </div>
+          <div class="team-kpi" title="Real counts committed work; predicted adds soft bookings">
+            <span class="team-kpi-label">Team chargeability</span>
+            <span class="team-kpi-value <%= view.chargeability.realClass %>"><%= view.chargeability.real %>%</span>
+            <span class="team-kpi-sep">/</span>
+            <span class="team-kpi-value <%= view.chargeability.predictedClass %>"><%= view.chargeability.predicted %>%</span>
+          </div>
+          <span class="text-muted small">real / predicted (incl. soft bookings)</span>
           <% if (view.chargeability.absenceHours > 0) { %>
             <span class="absence-impact small"
                   title="Absence removes working days from the window, so the same committed hours are measured against a smaller base.">
@@ -717,6 +724,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                 <th class="text-end col-w120">Cost (<%= costCurrency %>/day)</th>
                 <th class="text-center col-w100">Absences</th>
                 <th class="col-w180">Utilization</th>
+                <th class="col-w180" title="Includes soft bookings">Predicted</th>
                 <th class="col-w80"></th>
               </tr>
             </thead>
@@ -761,13 +769,21 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                       </div>
                     <% } else { %><span class="text-muted">—</span><% } %>
                   </td>
+                  <td>
+                    <% if (member) { %>
+                      <div class="util-cell" title="<%= member.activeHours + member.softHours %>h committed and soft booked of <%= member.capacityHours %>h capacity">
+                        <span class="util-value <%= member.chargeabilityPredictedClass %>"><%= member.chargeabilityPredicted %>%</span>
+                        <span class="util-track"><span class="util-fill util-fill--soft" style="width: <%= Math.min(member.chargeabilityPredicted, 100) %>%;"></span></span>
+                      </div>
+                    <% } else { %><span class="text-muted">—</span><% } %>
+                  </td>
                   <td class="text-end">
                     <a href="<%= personHref %>" class="btn btn-sm btn-outline-primary btn-pill">Details</a>
                   </td>
                 </tr>
               <% }) %>
               <% if (!filteredPeople.length) { %>
-                <tr><td colspan="8" class="text-center text-muted py-4">No people match the current filters.</td></tr>
+                <tr><td colspan="9" class="text-center text-muted py-4">No people match the current filters.</td></tr>
               <% } %>
             </tbody>
           </table>
