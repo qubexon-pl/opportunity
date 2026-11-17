@@ -26,6 +26,7 @@ const {
   countsTowardsCapacity,
   listFirmStages,
 } = require('../services/bookingService');
+const { listTeams } = require('../services/accessService');
 
 const router = express.Router();
 
@@ -154,6 +155,33 @@ function friendlyError(err) {
   return message || String(err);
 }
 
+/** Teams the signed-in person may file opportunities under. */
+function writableTeams(req) {
+  return (req.access && req.access.writableTeams) || listTeams();
+}
+
+/**
+ * The team picked on the form, checked against the person's teams. Empty
+ * means "unchanged" on edit and "the team in view" on create.
+ */
+function chosenTeamId(req) {
+  const teamId = String(req.body.teamId || '').trim();
+  if (!teamId) return undefined;
+  if (!writableTeams(req).some((team) => team.id === teamId)) {
+    const err = new Error('You can only file opportunities under your own teams.');
+    err.issues = [{ path: ['team'], message: 'You can only file opportunities under your own teams.' }];
+    throw err;
+  }
+  return teamId;
+}
+
+/** After moving work to a team outside the narrowed view, widen the view so it stays reachable. */
+function keepTeamInView(req, teamId) {
+  const scope = req.access && req.access.scope;
+  if (!teamId || !scope || scope.all || scope.teamIds.includes(teamId)) return;
+  if (req.session) req.session.viewTeamId = '';
+}
+
 // ──── New opportunity ────
 router.get('/', (req, res) => {
   res.redirect('/');
@@ -186,12 +214,15 @@ function isAjaxRequest(req) {
 }
 
 router.get('/new', (req, res) => {
+  const teams = writableTeams(req);
+  const inView = res.locals.access && res.locals.access.writeTeamId;
   res.render(
     'opportunities/form',
     baseViewModel({
       title: 'Create opportunity',
       mode: 'new',
-      opportunity: newFormDefaults(req),
+      opportunity: { ...newFormDefaults(req), TeamId: teams.some((team) => team.id === inView) ? inView : teams[0] && teams[0].id },
+      teams,
       plannedEndPreview: null,
       plannedDurationPreview: null,
       partial: false,
@@ -201,12 +232,13 @@ router.get('/new', (req, res) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const payload = opportunityPayload(req.body);
+    const payload = { ...opportunityPayload(req.body), teamId: chosenTeamId(req) };
     if (payload.opportunityHours == null || payload.opportunityHours < 0) {
       req.flash('error', 'Opportunity hours is required.');
       return res.redirect('/opportunities/new');
     }
     const id = await createOpportunity(payload);
+    keepTeamInView(req, payload.teamId);
     if (payload.techOwner) {
       res.cookie(LAST_LEAD_COOKIE, payload.techOwner, { maxAge: 365 * 24 * 60 * 60 * 1000, sameSite: 'lax', httpOnly: true });
     }
@@ -246,6 +278,7 @@ router.get('/:id', async (req, res, next) => {
         title: opportunity.Name,
         mode: 'detail',
         opportunity,
+        teams: writableTeams(req),
         notes: detail.notes,
         nextSteps: detail.nextSteps,
         assignments: detail.assignments,
@@ -264,13 +297,14 @@ router.get('/:id', async (req, res, next) => {
 router.post('/:id', async (req, res, next) => {
   const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
   try {
-    const payload = opportunityPayload(req.body);
+    const payload = { ...opportunityPayload(req.body), teamId: chosenTeamId(req) };
     if (payload.opportunityHours == null || payload.opportunityHours < 0) {
       if (isAjax) return res.json({ ok: false, error: 'Opportunity hours is required.' });
       req.flash('error', 'Opportunity hours is required.');
       return res.redirect(`/opportunities/${req.params.id}`);
     }
     const updated = await updateOpportunity(req.params.id, payload);
+    if (updated) keepTeamInView(req, payload.teamId);
     if (isAjax) return res.json({ ok: !!updated, error: updated ? null : 'Opportunity not found.' });
     req.flash(updated ? 'success' : 'error', updated ? 'Opportunity saved.' : 'Opportunity not found.');
     res.redirect(`/opportunities/${req.params.id}`);

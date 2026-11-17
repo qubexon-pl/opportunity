@@ -12,11 +12,15 @@ function wantsJson(req) {
   return req.path.startsWith('/api/') || req.get('X-Requested-With') === 'XMLHttpRequest' || req.accepts(['html', 'json']) === 'json';
 }
 
-async function authorize(req, res, next) {
+function authorize(req, res, next) {
   if (req.path === '/health' || req.path === '/api/health') return next();
 
   const resolved = access.resolveAccess(req.user);
   if (!resolved.allowed) {
+    // Not on the allow-list: drop any app session so nothing carries over, and
+    // offer a way to sign out of the identity provider or switch account.
+    if (req.session && typeof req.session.destroy === 'function') req.session.destroy(() => {});
+    if (resolved.email) console.warn(`[Access] Refused ${resolved.email}: not on the allow-list.`);
     if (wantsJson(req)) return res.status(403).json({ ok: false, error: 'You do not have access to this app. Ask an administrator to add you.' });
     return res.status(403).render('no-access', {
       title: 'No access',
@@ -25,31 +29,23 @@ async function authorize(req, res, next) {
     });
   }
 
-  if (resolved.bootstrap) {
-    // First sign-in on an empty list: keep this person as the first admin, so
-    // the list is never empty again and nobody else can claim it.
-    try {
-      await access.saveUser({ email: resolved.email, name: req.user && req.user.name, role: 'admin' }, resolved.email);
-      console.log(`[Access] ${resolved.email} is the first admin.`);
-    } catch (err) {
-      console.warn('[Access] Could not record the first admin:', err.message || err);
-    }
-  }
-
   const isAdmin = resolved.role === 'admin';
-  const viewTeamId = isAdmin && req.session ? req.session.viewTeamId || '' : '';
-  const scope = access.buildScope(resolved, viewTeamId);
+  const writableTeams = access.teamsFor(resolved);
+  const scope = access.buildScope(resolved, req.session ? req.session.viewTeamId || '' : '');
+  const viewingAll = scope.teamIds.length !== 1;
 
-  req.access = { ...resolved, isAdmin, scope };
+  req.access = { ...resolved, isAdmin, scope, writableTeams };
   res.locals.access = {
     isAdmin,
     role: resolved.role,
     teamId: resolved.teamId,
-    teamName: access.teamName(resolved.teamId),
-    viewingAll: scope.all,
-    viewTeamId: scope.all ? '' : scope.teamId,
-    viewTeamName: scope.all ? 'All teams' : access.teamName(scope.teamId),
-    teams: isAdmin ? access.listTeams() : [],
+    teamName: writableTeams.map((team) => team.name).join(', ') || access.teamName(resolved.teamId),
+    viewingAll,
+    viewTeamId: viewingAll ? '' : scope.teamIds[0],
+    viewTeamName: viewingAll ? (isAdmin ? 'All teams' : 'All my teams') : access.teamName(scope.teamIds[0]),
+    teams: writableTeams,
+    writableTeams,
+    writeTeamId: scope.writeTeamId,
   };
 
   access.runWithScope(scope, () => next());

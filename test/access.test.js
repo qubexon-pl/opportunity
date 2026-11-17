@@ -26,9 +26,11 @@ function asMember(teamId, fn) {
   return access.runWithScope(access.buildScope({ role: 'member', teamId }, ''), fn);
 }
 
-test('the first person on an empty list becomes admin; strangers are refused once someone is listed', async () => {
+test('only listed people get in: nobody becomes admin just by signing in first', async () => {
   await resetConfig({});
-  assert.equal(access.resolveAccess({ email: 'First@Example.com' }).bootstrap, true);
+  const first = access.resolveAccess({ email: 'First@Example.com' });
+  assert.equal(first.allowed, false);
+  assert.equal(first.reason, 'not-listed');
 
   await access.saveUser({ email: 'first@example.com', role: 'admin' }, 'first@example.com');
   assert.deepEqual(access.resolveAccess({ email: 'first@example.com' }).role, 'admin');
@@ -70,6 +72,36 @@ test('members are scoped to their team; admins see all unless they pick a team',
   const clause = asMember('t2', () => access.teamFilterSql(fakeRequest, 'o.TeamId', 'type'));
   assert.match(clause, /COALESCE\(o\.TeamId, 'default'\) = @scopeTeamId/);
   assert.deepEqual(inputs[0], ['scopeTeamId', 'type', 't2']);
+});
+
+test('people in several teams see all of them, can narrow to one, and keep old single-team entries', async () => {
+  await resetConfig({
+    teams: [{ id: 't2', name: 'Second' }, { id: 't3', name: 'Third' }],
+    appUsers: [{ email: 'old@example.com', role: 'member', teamId: 't3' }, { email: 'a@example.com', role: 'admin' }],
+  });
+  await access.saveUser({ email: 'multi@example.com', role: 'member', teamIds: ['t2', 'default'] }, 'a@example.com');
+  await assert.rejects(access.saveUser({ email: 'none@example.com', teamIds: [] }, 'a'), /at least one team/);
+
+  const multi = access.resolveAccess({ email: 'multi@example.com' });
+  assert.deepEqual(multi.teamIds, ['t2', 'default']);
+  assert.deepEqual(access.resolveAccess({ email: 'old@example.com' }).teamIds, ['t3']);
+  assert.deepEqual(access.teamsFor(multi).map((team) => team.id).sort(), ['default', 't2']);
+
+  const both = access.buildScope(multi, '');
+  assert.deepEqual(both.teamIds, ['default', 't2']);
+  assert.equal(access.buildScope(multi, 't2').teamIds.join(), 't2');
+  assert.deepEqual(access.buildScope(multi, 't3').teamIds, ['default', 't2']);
+
+  const inputs = [];
+  const clause = access.runWithScope(both, () => {
+    assert.equal(access.teamVisible('t2'), true);
+    assert.equal(access.teamVisible('t3'), false);
+    return access.teamFilterSql({ input: (...args) => inputs.push(args) }, 'TeamId', 'type');
+  });
+  assert.match(clause, /IN \(@scopeTeamId0, @scopeTeamId1\)/);
+  assert.deepEqual(inputs.map((args) => args[2]), ['default', 't2']);
+
+  await assert.rejects(access.removeTeam('t2'), /1 user/);
 });
 
 test('people are listed per team, new people join the creator team and names stay unique', async () => {

@@ -79,11 +79,25 @@ pipeline defaults are kept per person. Settings:
 ### Access and teams
 
 The app is shared by invitation. Admins manage the allow-list on `/admin`: each user is
-an **admin** or a **member** of one team. A member sees and plans only their team's
-people, opportunities, assignments and absences; admins see every team and can narrow
-the view with the team picker in the top bar. Anyone not on the list gets a "no access"
-page. While the list is empty and `ADMIN_EMAILS` is unset, the first person to sign in
-becomes the first admin. Everything created before teams existed belongs to the
+an **admin** or a **member** of one or more teams. A member sees and plans only their
+teams' people, opportunities, assignments and absences; admins see every team. Anyone
+with more than one team can narrow the view with the team picker in the top bar, and
+picks the owning team when creating or editing an opportunity. Only people on the list
+(or in `ADMIN_EMAILS`) can sign in; everyone else is signed out and gets a "no access"
+page, so set `ADMIN_EMAILS` to create the first admin.
+
+When adding a user, the email field searches Entra ID through Microsoft Graph. The app's
+managed identity needs the Graph application permission `User.ReadBasic.All`:
+
+```powershell
+$graph = az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv
+$role  = az ad sp show --id 00000003-0000-0000-c000-000000000000 --query "appRoles[?value=='User.ReadBasic.All'].id" -o tsv
+az rest --method POST --uri "https://graph.microsoft.com/v1.0/servicePrincipals/<identity-principal-id>/appRoleAssignments" `
+  --body "{\"principalId\":\"<identity-principal-id>\",\"resourceId\":\"$graph\",\"appRoleId\":\"$role\"}"
+```
+
+Without it the search falls back to people already on the list.
+Everything created before teams existed belongs to the
 **Default team**, which can be renamed but not removed. Which stages count as committed
 is shared by all teams, so only admins change it.
 
@@ -93,7 +107,7 @@ is shared by all teams, so only admins change it.
 - `/opportunities/new`, `/opportunities/:id` &mdash; create and edit opportunities, notes, next steps, assignments
 - `/management` &mdash; team capacity cards, assignment table, and the allocation timeline
 - `/settings` &mdash; people and daily capacity
-- `/admin` &mdash; admins only: users, teams, and which team owns each person and opportunity
+- `/admin` &mdash; admins only: users (with Entra ID search), teams, and which team owns each person
 - `/api/*` &mdash; JSON endpoints used by the client-side timeline helpers
 - `/health` &mdash; health probe
 
