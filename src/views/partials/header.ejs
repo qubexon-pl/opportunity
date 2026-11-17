@@ -86,6 +86,19 @@
 
       <!-- Top bar actions -->
       <div class="topbar-actions">
+        <%/* Filled in by /js/team-health.js: a bell coloured by the team's
+             chargeability over the selected period, with the figure as a
+             badge, so the headline number is never more than a glance away. */ %>
+        <div class="team-health is-loading" data-team-health hidden>
+          <span class="team-health-icon" aria-hidden="true">
+            <i class="bi bi-bell-fill"></i>
+            <span class="team-health-badge" data-team-health-badge></span>
+          </span>
+          <span class="team-health-text">Team chargeability</span>
+        </div>
+        <button type="button" class="btn-palette" data-action="open-palette" title="Jump to an opportunity or person (Ctrl+K)" aria-label="Search (Ctrl+K)">
+          <i class="bi bi-search" aria-hidden="true"></i><span class="btn-palette-text">Jump to…</span><kbd class="btn-palette-kbd">Ctrl K</kbd>
+        </button>
         <% if (typeof access !== 'undefined' && access) { %>
           <% if (access.isAdmin && access.teams.length > 1) { %>
             <form method="post" action="/admin/view-team" class="team-switch" data-no-live title="Which team's data you are looking at">
@@ -101,16 +114,6 @@
             <span class="team-chip" title="You see and plan this team's people and opportunities"><i class="bi bi-diagram-3" aria-hidden="true"></i><%= access.teamName %></span>
           <% } %>
         <% } %>
-        <%/* Filled in by /js/team-health.js: a one-line verdict on the team over
-             the selected period, so the headline number is never more than a
-             glance away. */ %>
-        <div class="team-health is-loading" data-team-health hidden>
-          <span class="team-health-dot" aria-hidden="true"></span>
-          <span class="team-health-text" data-team-health-text></span>
-        </div>
-        <button type="button" class="btn-palette" data-action="open-palette" title="Jump to an opportunity or person (Ctrl+K)" aria-label="Search (Ctrl+K)">
-          <i class="bi bi-search" aria-hidden="true"></i><span class="btn-palette-text">Jump to…</span><kbd class="btn-palette-kbd">Ctrl K</kbd>
-        </button>
         <a href="/opportunities/new" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">New opportunity</span><span class="d-sm-none">New</span></a>
         <button type="button" class="btn-density-toggle" data-action="toggle-density" title="Toggle compact/comfortable view (Ctrl+D)" aria-label="Toggle compact view">
           <i class="bi bi-distribute-vertical" id="densityIcon" aria-hidden="true"></i>

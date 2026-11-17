@@ -21,13 +21,14 @@
     return search ? '/api/team-health?' + search : '/api/team-health';
   }
 
-  function paint(el, tone, text, title) {
+  function paint(el, tone, percent, title) {
     TONE_CLASSES.forEach(function (name) { el.classList.remove(name); });
     el.classList.add(tone);
     el.hidden = false;
-    var label = el.querySelector('[data-team-health-text]');
-    if (label) label.textContent = text;
-    el.setAttribute('title', title || text);
+    var badge = el.querySelector('[data-team-health-badge]');
+    if (badge) badge.textContent = Math.round(percent) + '%';
+    el.setAttribute('title', title);
+    el.setAttribute('aria-label', 'Team chargeability ' + percent + '%');
   }
 
   var inFlight = null;
@@ -46,10 +47,12 @@
           el.hidden = true;
           return;
         }
-        var detail = data.peopleCount + ' people · ' + data.activeHours + 'h of ' + data.capacityHours +
+        var detail = data.headline + ' — ' + data.percent + '% chargeability\n' +
+          data.peopleCount + ' people · ' + data.activeHours + 'h of ' + data.capacityHours +
           'h · ' + data.windowLabel + (data.isPast ? ' (past period)' : '') +
-          ' · ' + data.predicted + '% including soft bookings';
-        paint(el, 'is-' + data.tone, data.summary, detail);
+          '\n' + data.predicted + '% including soft bookings' +
+          (data.excludedLeads ? '\nLead positions (' + data.excludedLeads + ') are not counted' : '');
+        paint(el, 'is-' + data.tone, data.percent, detail);
       })
       .catch(function () {
         el.hidden = true;

@@ -113,7 +113,8 @@ async function teamHealth(query, userId) {
     headline: band.headline,
     // "75% chargeability" reads better than a bare number in the pill.
     summary: `${band.headline} — ${percent}% chargeability`,
-    peopleCount: view.people.length,
+    peopleCount: view.people.length - view.chargeability.excludedLeads,
+    excludedLeads: view.chargeability.excludedLeads,
     capacityHours: view.chargeability.capacityHours,
     activeHours: view.chargeability.activeHours,
     windowLabel: view.window.label,

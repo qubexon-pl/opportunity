@@ -266,50 +266,59 @@ body.sidebar-collapsed .main-content {
   color: var(--color-primary);
 }
 
-/* Team-health pill: chargeability over the selected period */
+/* Team chargeability in the top bar: a bell coloured by how the team is doing,
+   with the figure as a badge on its top-right corner. */
 .team-health {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  max-width: 320px;
-  padding: 0.25rem 0.7rem;
+  gap: 0.55rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.4rem;
   border-radius: 999px;
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--color-text);
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.3;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   cursor: default;
 }
-.team-health-dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 8px;
+.team-health-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  background: currentColor;
+  font-size: 0.95rem;
+  color: var(--team-health-tone, var(--color-text-muted));
+  background: color-mix(in srgb, var(--team-health-tone, #8a94a6) 14%, transparent);
 }
-.team-health.is-good {
-  color: var(--color-success, #198754);
-  border-color: color-mix(in srgb, var(--color-success, #198754) 40%, transparent);
-  background: color-mix(in srgb, var(--color-success, #198754) 12%, transparent);
+.team-health-badge {
+  position: absolute;
+  top: -7px;
+  right: -12px;
+  min-width: 26px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  border: 2px solid var(--color-surface, #fff);
+  background: var(--team-health-tone, #8a94a6);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
 }
-.team-health.is-warn {
-  color: var(--color-warning, #b86e00);
-  border-color: color-mix(in srgb, var(--color-warning, #b86e00) 40%, transparent);
-  background: color-mix(in srgb, var(--color-warning, #b86e00) 12%, transparent);
-}
-.team-health.is-bad {
-  color: var(--color-danger, #dc3545);
-  border-color: color-mix(in srgb, var(--color-danger, #dc3545) 40%, transparent);
-  background: color-mix(in srgb, var(--color-danger, #dc3545) 12%, transparent);
-}
-/* Narrow screens have no room for a sentence beside the action buttons. */
+.team-health-badge:empty { display: none; }
+.team-health .team-health-text { padding-left: 0.35rem; }
+.team-health.is-good { --team-health-tone: var(--color-success, #198754); }
+.team-health.is-warn { --team-health-tone: var(--color-warning, #b86e00); }
+.team-health.is-bad { --team-health-tone: var(--color-danger, #dc3545); }
+/* Narrow screens keep the bell and its figure but drop the label. */
 @media (max-width: 991.98px) {
-  .team-health {
-    display: none;
-  }
+  .team-health { padding-right: 0.55rem; border-color: transparent; background: transparent; }
+  .team-health .team-health-text { display: none; }
 }
 
 /* Account menu in the top bar: always-reachable sign-out */.btn-topbar-user {
@@ -405,7 +414,15 @@ body.sidebar-collapsed .main-content {
   font-size: 0.875rem;
   background: transparent;
   border-bottom: 1px solid var(--color-divider);
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
   padding: 14px 16px;
+}
+/* A collapsed card is just its header: its divider would otherwise run along
+   the rounded bottom edge and poke out past the corners. */
+.card > .card-header:last-child,
+.card > .card-header:has(+ .collapse:not(.show)) {
+  border-bottom-color: transparent;
+  border-radius: calc(var(--radius-lg) - 1px);
 }
 
 /* Stat cards */

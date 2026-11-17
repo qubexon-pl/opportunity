@@ -627,11 +627,19 @@ function buildManagementPeople(assignmentRows, window) {
   });
 }
 
+/* Leads are not expected to be fully chargeable, so they would drag the team
+   figure down without saying anything about the team's utilization. */
+function isLeadRole(role) {
+  return /\blead\b/i.test(String(role || ''));
+}
+
 /**
  * Team-wide chargeability, weighted by capacity rather than averaged per head so
- * part-time people do not distort the number.
+ * part-time people do not distort the number. People in Lead positions are left
+ * out of the team figure; their own chargeability is still shown per person.
  */
-function summariseChargeability(people) {
+function summariseChargeability(allPeople) {
+  const people = allPeople.filter((member) => !isLeadRole(member.role));
   const capacityHours = people.reduce((total, member) => total + member.capacityHours, 0);
   const grossCapacityHours = people.reduce((total, member) => total + member.grossCapacityHours, 0);
   const activeHours = people.reduce((total, member) => total + member.activeHours, 0);
@@ -649,6 +657,7 @@ function summariseChargeability(people) {
     softHours: round2(softHours),
     absenceHours: round2(absenceHours),
     absentPeople: people.filter((member) => member.absentDays > 0).length,
+    excludedLeads: allPeople.length - people.length,
     real,
     predicted,
     withoutAbsence,
@@ -1099,6 +1108,8 @@ function buildPersonDetail({ opportunities, assignments, perspective, unitsToSho
 
 module.exports = {
   HOURS_PER_DAY,
+  isLeadRole,
+  summariseChargeability,
   TIMELINE_UNIT_OPTIONS,
   STAGE_LEGEND,
   UPCOMING_PERIODS,
