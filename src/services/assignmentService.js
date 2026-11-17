@@ -2,6 +2,8 @@ const crypto = require('crypto');
 const { z } = require('zod');
 const { sql, getPool, isMissingAssignmentsTable, isMissingColumn } = require('../db/pool');
 const { toGuid } = require('./opportunityService');
+const { currentScope, teamFilterSql } = require('./accessService');
+const { listPeople } = require('./peopleService');
 const { round2, toDateText, calculateAllocatedHours, countBusinessDaysInclusive, parseHolds } = require('./dateService');
 
 const MIGRATION_HINT = 'Missing database migration: run src/sql/004_create_opportunity_assignments.sql';
@@ -107,6 +109,19 @@ function holdsToJson(holds) {
   return JSON.stringify(holds);
 }
 
+function teamFilter(request) {
+  return teamFilterSql(request, 'o.TeamId', sql.NVarChar(64));
+}
+
+/**
+ * A team plans with its own people only. Admins looking at every team at once
+ * may staff anyone.
+ */
+function assertPersonInTeam(personName) {
+  if (currentScope().all) return;
+  if (!listPeople().includes(personName)) throw new Error(`${personName} is not in this team's people.`);
+}
+
 /** Surfaces a clear migration hint when the hold columns are not deployed yet. */
 function rethrowAssignmentError(err) {
   if (isMissingAssignmentsTable(err)) throw new Error(MIGRATION_HINT);
@@ -119,14 +134,14 @@ function rethrowAssignmentError(err) {
 async function listAssignments({ includeHidden = true } = {}) {
   const pool = await getPool();
   try {
-    const result = await pool
-      .request()
-      .input('includeHidden', sql.Bit, !!includeHidden)
+    const request = pool.request().input('includeHidden', sql.Bit, !!includeHidden);
+    const team = teamFilter(request);
+    const result = await request
       .query(
         `SELECT a.*, o.Name as OpportunityName, o.Stage, o.Status, o.OpportunityHours, o.CountsTowardsCapacity
          FROM dbo.OpportunityAssignments a
          INNER JOIN dbo.Opportunities o ON o.Id = a.OpportunityId
-         WHERE (@includeHidden = 1 OR a.IsTimelineVisible = 1)
+         WHERE (@includeHidden = 1 OR a.IsTimelineVisible = 1)${team}
          ORDER BY a.PersonName ASC, a.PlannedStartDate ASC, a.CreatedAt ASC;`
       );
     return result.recordset;
@@ -147,16 +162,20 @@ async function listAssignments({ includeHidden = true } = {}) {
 async function listAssignedPeople() {
   const pool = await getPool();
   try {
-    const result = await pool.request().query(
-      `SELECT OpportunityId,
-              PersonName,
-              SUM(AllocatedHours) AS AllocatedHours,
-              MIN(PlannedStartDate) AS StartDate,
-              MAX(PlannedEndDate) AS EndDate,
-              MAX(CAST(IsTimelineVisible AS INT)) AS IsTimelineVisible
-       FROM dbo.OpportunityAssignments
-       GROUP BY OpportunityId, PersonName
-       ORDER BY OpportunityId, PersonName;`
+    const request = pool.request();
+    const team = teamFilter(request);
+    const result = await request.query(
+      `SELECT a.OpportunityId,
+              a.PersonName,
+              SUM(a.AllocatedHours) AS AllocatedHours,
+              MIN(a.PlannedStartDate) AS StartDate,
+              MAX(a.PlannedEndDate) AS EndDate,
+              MAX(CAST(a.IsTimelineVisible AS INT)) AS IsTimelineVisible
+       FROM dbo.OpportunityAssignments a
+       INNER JOIN dbo.Opportunities o ON o.Id = a.OpportunityId
+       WHERE 1 = 1${team}
+       GROUP BY a.OpportunityId, a.PersonName
+       ORDER BY a.OpportunityId, a.PersonName;`
     );
     return result.recordset;
   } catch (err) {
@@ -199,11 +218,12 @@ async function addAssignment(rawOpportunityId, payload) {  const opportunityId =
     throw new Error('End date must be equal to or after start date.');
   }
 
+  assertPersonInTeam(body.personName);
+
   const pool = await getPool();
-  const opp = await pool
-    .request()
-    .input('id', sql.UniqueIdentifier, opportunityId)
-    .query('SELECT OpportunityHours FROM dbo.Opportunities WHERE Id=@id;');
+  const oppRequest = pool.request().input('id', sql.UniqueIdentifier, opportunityId);
+  const oppTeam = teamFilter(oppRequest);
+  const opp = await oppRequest.query(`SELECT o.OpportunityHours FROM dbo.Opportunities o WHERE o.Id=@id${oppTeam};`);
 
   if (!opp.recordset[0]) throw new Error('Opportunity not found.');
 
@@ -248,15 +268,14 @@ async function updateAssignment(rawAssignmentId, payload) {
 
   let current;
   try {
-    current = await pool
-      .request()
-      .input('id', sql.UniqueIdentifier, assignmentId)
-      .query(
-        `SELECT a.*, o.OpportunityHours
-         FROM dbo.OpportunityAssignments a
-         INNER JOIN dbo.Opportunities o ON o.Id = a.OpportunityId
-         WHERE a.Id=@id;`
-      );
+    const request = pool.request().input('id', sql.UniqueIdentifier, assignmentId);
+    const team = teamFilter(request);
+    current = await request.query(
+      `SELECT a.*, o.OpportunityHours
+       FROM dbo.OpportunityAssignments a
+       INNER JOIN dbo.Opportunities o ON o.Id = a.OpportunityId
+       WHERE a.Id=@id${team};`
+    );
   } catch (err) {
     if (isMissingAssignmentsTable(err)) throw new Error(MIGRATION_HINT);
     throw err;
@@ -264,6 +283,8 @@ async function updateAssignment(rawAssignmentId, payload) {
 
   const row = current.recordset[0];
   if (!row) throw new Error('Assignment not found.');
+
+  if (body.personName !== undefined && body.personName !== row.PersonName) assertPersonInTeam(body.personName);
 
   const currentStartDate = toDateText(row.PlannedStartDate);
   const currentEndDate = toDateText(row.PlannedEndDate);
@@ -372,10 +393,12 @@ async function deleteAssignment(rawAssignmentId) {
   const pool = await getPool();
 
   try {
-    const result = await pool
-      .request()
-      .input('Id', sql.UniqueIdentifier, assignmentId)
-      .query('DELETE FROM dbo.OpportunityAssignments WHERE Id=@Id; SELECT @@ROWCOUNT as affected;');
+    const request = pool.request().input('Id', sql.UniqueIdentifier, assignmentId);
+    const team = teamFilter(request);
+    const result = await request.query(
+      `DELETE a FROM dbo.OpportunityAssignments a INNER JOIN dbo.Opportunities o ON o.Id = a.OpportunityId
+       WHERE a.Id=@Id${team}; SELECT @@ROWCOUNT as affected;`
+    );
     return result.recordset[0].affected > 0;
   } catch (err) {
     if (isMissingAssignmentsTable(err)) throw new Error(MIGRATION_HINT);

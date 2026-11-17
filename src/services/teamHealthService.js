@@ -17,6 +17,7 @@ const { buildManagementView } = require('./capacityService');
 const { queryList, filterAgainst } = require('./filterService');
 const { normalizePerspective, normalizeUnits, normalizeDirection, resolveWindow, resolvePeopleSelection } = require('./managementQuery');
 const { getViewDefaults } = require('../config/settings');
+const { currentScope } = require('./accessService');
 
 const TIMELINE_FILTER_OPTIONS = [...STAGES, 'free'];
 
@@ -66,7 +67,7 @@ function resolveQuery(query, userId) {
 
 async function teamHealth(query, userId) {
   const resolved = resolveQuery(query || {}, userId);
-  const key = JSON.stringify([userId || '', resolved]);
+  const key = JSON.stringify([userId || '', currentScope().key, resolved]);
   if (cached && cached.key === key && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
 
   const [opportunities, assignments] = await Promise.all([

@@ -1,6 +1,22 @@
 const crypto = require('crypto');
 const { z } = require('zod');
 const { sql, getPool, isMissingAssignmentsTable } = require('../db/pool');
+const { currentScope, teamFilterSql } = require('./accessService');
+
+function teamFilter(request, column = 'TeamId') {
+  return teamFilterSql(request, column, sql.NVarChar(64));
+}
+
+/**
+ * Throws "Opportunity not found." unless the opportunity exists and belongs to
+ * a team the current request can see. Used before writing anything under it.
+ */
+async function assertOpportunityVisible(pool, opportunityId) {
+  const request = pool.request().input('id', sql.UniqueIdentifier, opportunityId);
+  const team = teamFilter(request);
+  const result = await request.query(`SELECT 1 AS found FROM dbo.Opportunities WHERE Id=@id${team};`);
+  if (!result.recordset[0]) throw new Error('Opportunity not found.');
+}
 
 const STAGES = ['New', 'Discovery', 'Proposal', 'Negotiation', 'Won', 'Lost'];
 const STATUSES = ['Open', 'On Hold', 'Closed'];
@@ -110,11 +126,12 @@ async function listOpportunities({ q = '', sort = 'updated', dir = 'desc', stage
 
   const stageClause = buildInClause(request, 'Stage', stages, 'stage', sql.NVarChar(60));
   const statusClause = buildInClause(request, 'Status', statuses, 'status', sql.NVarChar(30));
+  const teamClause = teamFilter(request);
 
   const result = await request.query(
     `SELECT ${top}*, COUNT(*) OVER () AS TotalCount
      FROM dbo.Opportunities
-     WHERE (@q IS NULL OR Name LIKE @q OR TechOwner LIKE @q OR BusinessOwner LIKE @q OR Tags LIKE @q OR OppId LIKE @q)${stageClause}${statusClause}
+     WHERE (@q IS NULL OR Name LIKE @q OR TechOwner LIKE @q OR BusinessOwner LIKE @q OR Tags LIKE @q OR OppId LIKE @q)${stageClause}${statusClause}${teamClause}
      ORDER BY ${sortColumn} ${sortDir}, ${tieBreaker};`
   );
 
@@ -130,8 +147,11 @@ async function getOpportunity(rawId) {
   // Four independent reads: run them side by side rather than one after another,
   // so the page waits for one round trip to Azure SQL instead of four.
   const byId = () => pool.request().input('id', sql.UniqueIdentifier, id);
+  const oppRequest = byId();
+  const oppTeam = teamFilter(oppRequest);
+  // The child rows are only returned when the opportunity itself is visible.
   const [opp, notes, steps, assignments] = await Promise.all([
-    byId().query('SELECT * FROM dbo.Opportunities WHERE Id = @id;'),
+    oppRequest.query(`SELECT * FROM dbo.Opportunities WHERE Id = @id${oppTeam};`),
     byId().query('SELECT * FROM dbo.OpportunityNotes WHERE OpportunityId = @id ORDER BY NoteDate DESC, CreatedAt DESC;'),
     byId().query('SELECT * FROM dbo.OpportunityNextSteps WHERE OpportunityId = @id ORDER BY IsDone ASC, DueDate ASC, CreatedAt DESC;'),
     byId()
@@ -162,11 +182,15 @@ async function createOpportunity(payload) {
   const newId = crypto.randomUUID();
   const pool = await getPool();
 
-  await bindOpportunity(pool.request().input('Id', sql.UniqueIdentifier, newId), body).query(
+  const request = pool
+    .request()
+    .input('Id', sql.UniqueIdentifier, newId)
+    .input('TeamId', sql.NVarChar(64), currentScope().writeTeamId);
+  await bindOpportunity(request, body).query(
     `INSERT INTO dbo.Opportunities
-       (Id, Name, OppId, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline, PlannedStartDate, PlannedEndDate, AllocationPercent, CountsTowardsCapacity)
+       (Id, Name, OppId, TechnologyStack, Description, TechOwner, BusinessOwner, FirstContactDate, Stage, Status, Priority, Tags, NextStepSummary, NextStepDueDate, OpportunityHours, OpportunityTimeline, PlannedStartDate, PlannedEndDate, AllocationPercent, CountsTowardsCapacity, TeamId)
      VALUES
-       (@Id, @Name, @OppId, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @CountsTowardsCapacity);`
+       (@Id, @Name, @OppId, @TechnologyStack, @Description, @TechOwner, @BusinessOwner, @FirstContactDate, @Stage, @Status, @Priority, @Tags, @NextStepSummary, @NextStepDueDate, @OpportunityHours, @OpportunityTimeline, @PlannedStartDate, @PlannedEndDate, @AllocationPercent, @CountsTowardsCapacity, @TeamId);`
   );
 
   return newId;
@@ -177,7 +201,9 @@ async function updateOpportunity(rawId, payload) {
   const body = OpportunitySchema.parse(payload);
   const pool = await getPool();
 
-  const result = await bindOpportunity(pool.request().input('Id', sql.UniqueIdentifier, id), body).query(
+  const request = pool.request().input('Id', sql.UniqueIdentifier, id);
+  const team = teamFilter(request);
+  const result = await bindOpportunity(request, body).query(
     `UPDATE dbo.Opportunities
      SET Name=@Name,
          OppId=@OppId,
@@ -199,7 +225,7 @@ async function updateOpportunity(rawId, payload) {
          AllocationPercent=@AllocationPercent,
          CountsTowardsCapacity=@CountsTowardsCapacity,
          UpdatedAt=SYSUTCDATETIME()
-     WHERE Id=@Id;
+     WHERE Id=@Id${team};
      SELECT @@ROWCOUNT as affected;`
   );
 
@@ -210,14 +236,15 @@ async function updateOpportunity(rawId, payload) {
 async function setBookingFlag(rawId, flag) {
   const id = toGuid(rawId);
   const pool = await getPool();
-  const result = await pool
+  const request = pool
     .request()
     .input('Id', sql.UniqueIdentifier, id)
-    .input('CountsTowardsCapacity', sql.Bit, flag === null || flag === undefined ? null : !!flag)
-    .query(
-      `UPDATE dbo.Opportunities SET CountsTowardsCapacity=@CountsTowardsCapacity, UpdatedAt=SYSUTCDATETIME() WHERE Id=@Id;
+    .input('CountsTowardsCapacity', sql.Bit, flag === null || flag === undefined ? null : !!flag);
+  const team = teamFilter(request);
+  const result = await request.query(
+    `UPDATE dbo.Opportunities SET CountsTowardsCapacity=@CountsTowardsCapacity, UpdatedAt=SYSUTCDATETIME() WHERE Id=@Id${team};
        SELECT @@ROWCOUNT as affected;`
-    );
+  );
   return result.recordset[0].affected > 0;
 }
 
@@ -251,8 +278,9 @@ async function quickUpdateOpportunity(rawId, patch) {
     request.input('TechOwner', sql.NVarChar(200), body.techOwner || null);
     sets.push('TechOwner=@TechOwner');
   }
+  const team = teamFilter(request);
   const result = await request.query(
-    `UPDATE dbo.Opportunities SET ${sets.join(', ')}, UpdatedAt=SYSUTCDATETIME() WHERE Id=@Id;
+    `UPDATE dbo.Opportunities SET ${sets.join(', ')}, UpdatedAt=SYSUTCDATETIME() WHERE Id=@Id${team};
      SELECT @@ROWCOUNT as affected;`
   );
   return result.recordset[0].affected > 0;
@@ -261,10 +289,9 @@ async function quickUpdateOpportunity(rawId, patch) {
 async function deleteOpportunity(rawId) {
   const id = toGuid(rawId);
   const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('Id', sql.UniqueIdentifier, id)
-    .query('DELETE FROM dbo.Opportunities WHERE Id=@Id; SELECT @@ROWCOUNT as affected;');
+  const request = pool.request().input('Id', sql.UniqueIdentifier, id);
+  const team = teamFilter(request);
+  const result = await request.query(`DELETE FROM dbo.Opportunities WHERE Id=@Id${team}; SELECT @@ROWCOUNT as affected;`);
   return result.recordset[0].affected > 0;
 }
 
@@ -273,6 +300,7 @@ async function addNote(rawOpportunityId, payload) {
   const body = NoteSchema.parse(payload);
   const newId = crypto.randomUUID();
   const pool = await getPool();
+  await assertOpportunityVisible(pool, opportunityId);
 
   await pool
     .request()
@@ -291,10 +319,12 @@ async function addNote(rawOpportunityId, payload) {
 async function deleteNote(rawNoteId) {
   const noteId = toGuid(rawNoteId);
   const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('Id', sql.UniqueIdentifier, noteId)
-    .query('DELETE FROM dbo.OpportunityNotes WHERE Id=@Id; SELECT @@ROWCOUNT as affected;');
+  const request = pool.request().input('Id', sql.UniqueIdentifier, noteId);
+  const team = teamFilter(request, 'o.TeamId');
+  const result = await request.query(
+    `DELETE n FROM dbo.OpportunityNotes n INNER JOIN dbo.Opportunities o ON o.Id = n.OpportunityId
+     WHERE n.Id=@Id${team}; SELECT @@ROWCOUNT as affected;`
+  );
   return result.recordset[0].affected > 0;
 }
 
@@ -303,6 +333,7 @@ async function addStep(rawOpportunityId, payload) {
   const body = StepSchema.parse(payload);
   const newId = crypto.randomUUID();
   const pool = await getPool();
+  await assertOpportunityVisible(pool, opportunityId);
 
   await pool
     .request()
@@ -321,21 +352,24 @@ async function addStep(rawOpportunityId, payload) {
 async function setStepDone(rawStepId, isDone) {
   const stepId = toGuid(rawStepId);
   const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('Id', sql.UniqueIdentifier, stepId)
-    .input('IsDone', sql.Bit, !!isDone)
-    .query('UPDATE dbo.OpportunityNextSteps SET IsDone=@IsDone WHERE Id=@Id; SELECT @@ROWCOUNT as affected;');
+  const request = pool.request().input('Id', sql.UniqueIdentifier, stepId).input('IsDone', sql.Bit, !!isDone);
+  const team = teamFilter(request, 'o.TeamId');
+  const result = await request.query(
+    `UPDATE s SET IsDone=@IsDone FROM dbo.OpportunityNextSteps s INNER JOIN dbo.Opportunities o ON o.Id = s.OpportunityId
+     WHERE s.Id=@Id${team}; SELECT @@ROWCOUNT as affected;`
+  );
   return result.recordset[0].affected > 0;
 }
 
 async function deleteStep(rawStepId) {
   const stepId = toGuid(rawStepId);
   const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('Id', sql.UniqueIdentifier, stepId)
-    .query('DELETE FROM dbo.OpportunityNextSteps WHERE Id=@Id; SELECT @@ROWCOUNT as affected;');
+  const request = pool.request().input('Id', sql.UniqueIdentifier, stepId);
+  const team = teamFilter(request, 'o.TeamId');
+  const result = await request.query(
+    `DELETE s FROM dbo.OpportunityNextSteps s INNER JOIN dbo.Opportunities o ON o.Id = s.OpportunityId
+     WHERE s.Id=@Id${team}; SELECT @@ROWCOUNT as affected;`
+  );
   return result.recordset[0].affected > 0;
 }
 
@@ -346,14 +380,37 @@ async function deleteStep(rawStepId) {
  */
 async function listOpenNextSteps() {
   const pool = await getPool();
-  const result = await pool.request().query(
+  const request = pool.request();
+  const team = teamFilter(request, 'o.TeamId');
+  const result = await request.query(
     `SELECT s.Id, s.OpportunityId, s.Title, s.DueDate, o.Name as OpportunityName, o.Stage, o.Status
      FROM dbo.OpportunityNextSteps s
      INNER JOIN dbo.Opportunities o ON o.Id = s.OpportunityId
-     WHERE s.IsDone = 0 AND o.Status <> 'Closed'
+     WHERE s.IsDone = 0 AND o.Status <> 'Closed'${team}
      ORDER BY CASE WHEN s.DueDate IS NULL THEN 1 ELSE 0 END, s.DueDate ASC, s.CreatedAt ASC;`
   );
   return result.recordset;
+}
+
+/** Admin only: how many opportunities each team holds, keyed by team id. */
+async function countOpportunitiesByTeam() {
+  const pool = await getPool();
+  const result = await pool.request().query(
+    `SELECT COALESCE(TeamId, 'default') AS TeamId, COUNT(*) AS Total FROM dbo.Opportunities GROUP BY COALESCE(TeamId, 'default');`
+  );
+  return Object.fromEntries(result.recordset.map((row) => [String(row.TeamId), Number(row.Total)]));
+}
+
+/** Admin only: hands an opportunity, with its assignments, notes and steps, to another team. */
+async function moveOpportunityToTeam(rawId, teamId) {
+  const id = toGuid(rawId);
+  const pool = await getPool();
+  const result = await pool
+    .request()
+    .input('Id', sql.UniqueIdentifier, id)
+    .input('TeamId', sql.NVarChar(64), String(teamId))
+    .query('UPDATE dbo.Opportunities SET TeamId=@TeamId, UpdatedAt=SYSUTCDATETIME() WHERE Id=@Id; SELECT @@ROWCOUNT as affected;');
+  if (!result.recordset[0].affected) throw new Error('Opportunity not found.');
 }
 
 module.exports = {
@@ -362,8 +419,11 @@ module.exports = {
   PAGE_SIZE,
   OpportunitySchema,
   toGuid,
+  assertOpportunityVisible,
   listOpportunities,
   listOpenNextSteps,
+  countOpportunitiesByTeam,
+  moveOpportunityToTeam,
   getOpportunity,
   createOpportunity,
   updateOpportunity,

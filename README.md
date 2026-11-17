@@ -74,6 +74,18 @@ pipeline defaults are kept per person. Settings:
 | `AUTH_PROVIDER=easyauth` | Trust the Easy Auth headers (detected automatically on App Service) |
 | `AUTH_REQUIRED=true` | Refuse requests with nobody signed in |
 | `DEV_USER_NAME`, `DEV_USER_EMAIL` | Act as this person locally (ignored in production) |
+| `ADMIN_EMAILS` | Comma-separated emails that are always admins (optional) |
+
+### Access and teams
+
+The app is shared by invitation. Admins manage the allow-list on `/admin`: each user is
+an **admin** or a **member** of one team. A member sees and plans only their team's
+people, opportunities, assignments and absences; admins see every team and can narrow
+the view with the team picker in the top bar. Anyone not on the list gets a "no access"
+page. While the list is empty and `ADMIN_EMAILS` is unset, the first person to sign in
+becomes the first admin. Everything created before teams existed belongs to the
+**Default team**, which can be renamed but not removed. Which stages count as committed
+is shared by all teams, so only admins change it.
 
 ## Pages
 
@@ -81,6 +93,7 @@ pipeline defaults are kept per person. Settings:
 - `/opportunities/new`, `/opportunities/:id` &mdash; create and edit opportunities, notes, next steps, assignments
 - `/management` &mdash; team capacity cards, assignment table, and the allocation timeline
 - `/settings` &mdash; people and daily capacity
+- `/admin` &mdash; admins only: users, teams, and which team owns each person and opportunity
 - `/api/*` &mdash; JSON endpoints used by the client-side timeline helpers
 - `/health` &mdash; health probe
 
