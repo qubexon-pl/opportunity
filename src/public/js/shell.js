@@ -1,4 +1,4 @@
-/* App shell: sidebar, theme and density.
+/* App shell: sidebar and density.
 
    Loaded at the top of <body>, straight after the sidebar markup, so saved
    preferences are applied before the first paint and the layout never jumps.
@@ -46,20 +46,6 @@
     store('opp-sidebar', collapsed ? 'collapsed' : 'expanded');
   }
 
-  function updateThemeIcon(theme) {
-    var icon = document.getElementById('themeIcon');
-    if (icon) icon.className = theme === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
-  }
-
-  function toggleTheme() {
-    var html = document.documentElement;
-    var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    store('opp-theme', next);
-    updateThemeIcon(next);
-    toast('Theme switched to ' + next + ' mode');
-  }
-
   function applyDensity(density) {
     document.body.setAttribute('data-density', density);
     var icon = document.getElementById('densityIcon');
@@ -76,7 +62,6 @@
   var actions = {
     'toggle-sidebar': toggleSidebar,
     'collapse-sidebar': collapseSidebar,
-    'toggle-theme': toggleTheme,
     'toggle-density': toggleDensity
   };
 
@@ -90,11 +75,10 @@
   });
 
   /* Saved preferences, applied immediately. */
-  updateThemeIcon(document.documentElement.getAttribute('data-theme'));
   var density = store('opp-density');
   if (density) applyDensity(density);
   // Sidebar: collapsed by default, expanded when the person chose so.
   setSidebarCollapsed(store('opp-sidebar') !== 'expanded');
 
-  window.OPP_shell = { toggleTheme: toggleTheme, toggleDensity: toggleDensity, toggleSidebar: toggleSidebar };
+  window.OPP_shell = { toggleDensity: toggleDensity, toggleSidebar: toggleSidebar };
 })();

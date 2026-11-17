@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,16 +7,6 @@
   <%
     var v = typeof assetVersion !== 'undefined' ? assetVersion : '1';
   %>
-  <script nonce="<%= typeof cspNonce !== 'undefined' ? cspNonce : '' %>">
-    /* Runs before any CSS is applied, so a saved dark theme never flashes white. */
-    (function () {
-      try {
-        var saved = localStorage.getItem('opp-theme');
-        var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        document.documentElement.setAttribute('data-theme', theme);
-      } catch (e) { /* storage disabled: light theme */ }
-    })();
-  </script>
   <link rel="icon" href="/favicon.ico" sizes="48x48">
   <link rel="icon" type="image/png" href="/img/brand/icon-192.png" sizes="192x192">
   <link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png">
@@ -104,9 +94,6 @@
         <a href="/opportunities/new" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">New opportunity</span><span class="d-sm-none">New</span></a>
         <button type="button" class="btn-density-toggle" data-action="toggle-density" title="Toggle compact/comfortable view (Ctrl+D)" aria-label="Toggle compact view">
           <i class="bi bi-distribute-vertical" id="densityIcon" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="btn-theme-toggle" data-action="toggle-theme" title="Toggle dark/light mode (Ctrl+Shift+D)" aria-label="Toggle dark mode">
-          <i class="bi bi-moon" id="themeIcon" aria-hidden="true"></i>
         </button>
         <%/* Signed-in person and sign-out. The sidebar carries the same block,
              but it is below the fold on short screens, so the way out of the

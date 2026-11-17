@@ -1,27 +1,20 @@
-/* ══════════════════════════════════════════════════════════════
-   Opportunities App — one stylesheet
-   Part 1: shared design system (sidebar layout, dark mode, toasts)
-   Part 2: app screens (pipeline, board, opportunity, capacity, timeline)
-   Part 3: newer patterns (palette, inline edits, save bar, mobile cards)
-   ══════════════════════════════════════════════════════════════ */
-
 /* ──── Design Tokens ──── */
 :root {
-  --color-bg: #f4f5fb;
-  --color-surface: #ffffff;
-  --color-surface-2: #fbfbf9;
-  --color-surface-offset: #f1f2f9;
-  --color-border: #e0e3ef;
-  --color-divider: #e8eaf3;
-  --color-text: #1a1a1a;
-  --color-text-muted: #5f6478;
-  --color-text-subtle: #6b7085;
-  --color-primary: #4f46e5;
-  --color-primary-strong: #3730a3;
-  --color-primary-soft: #e8e7fd;
-  --color-primary-hover: #6366f1;
-  --color-accent: #e8b923;
-  --color-shadow: rgba(49,46,129,.07);
+  --color-bg: #c9cfd4;
+  --color-surface: #fbf8f2;
+  --color-surface-2: #f6f2ea;
+  --color-surface-offset: #efeae0;
+  --color-border: #ddd5c6;
+  --color-divider: #e6dfd2;
+  --color-text: #16263a;
+  --color-text-muted: #4e5d70;
+  --color-text-subtle: #5d6b7c;
+  --color-primary: #1f6f78;
+  --color-primary-strong: #164f57;
+  --color-primary-soft: rgba(31,111,120,.12);
+  --color-primary-hover: #2a8791;
+  --color-accent: #d9822b;
+  --color-shadow: rgba(16,27,40,.10);
   --color-danger: #dc3545;
   --color-success: #198754;
   --color-warning: #ffc107;
@@ -37,99 +30,10 @@
   --shadow-md: 0 4px 16px rgba(0,0,0,.06);
   --shadow-lg: 0 8px 32px rgba(0,0,0,.08);
   --font-body: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
-  --hero-gradient: radial-gradient(1200px 400px at 100% 0%, rgba(56,189,248,.45), transparent 60%), linear-gradient(120deg, #312e81 0%, #4338ca 40%, #7c3aed 100%);
+  --hero-gradient: radial-gradient(260px 120px at 100% 0%, rgba(217,130,43,.38), transparent 70%), linear-gradient(120deg, #16263a 0%, #1d4152 55%, #1f6f78 100%);
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
 }
-
-/* ──── Dark Mode Tokens ──── */
-[data-theme="dark"] {
-  --color-bg: #121212;
-  --color-surface: #1e1e1e;
-  --color-surface-2: #252525;
-  --color-surface-offset: #2a2a2a;
-  --color-border: #3a3a3a;
-  --color-divider: #333333;
-  --color-text: #e8e6e3;
-  --color-text-muted: #a0a0a0;
-  --color-text-subtle: #8f8f8f;
-  --color-primary: #a5b4fc;
-  --color-primary-strong: #c7d2fe;
-  --color-primary-soft: rgba(129,140,248,.16);
-  --color-primary-hover: #c7d2fe;
-  --hero-gradient: radial-gradient(1200px 400px at 100% 0%, rgba(14,165,233,.35), transparent 60%), linear-gradient(120deg, #1e1b4b 0%, #312e81 45%, #4c1d95 100%);
-  --color-shadow: rgba(0,0,0,.3);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.2), 0 4px 12px rgba(0,0,0,.15);
-  --shadow-md: 0 4px 16px rgba(0,0,0,.25);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,.35);
-  color-scheme: dark;
-}
-
-/* Dark mode: override Bootstrap text/bg utilities */
-[data-theme="dark"] .text-dark { color: var(--color-text) !important; }
-[data-theme="dark"] .text-muted { color: var(--color-text-muted) !important; }
-[data-theme="dark"] .text-secondary { color: #b0b0b0 !important; }
-[data-theme="dark"] .text-black { color: var(--color-text) !important; }
-[data-theme="dark"] .text-body-secondary { color: var(--color-text-muted) !important; }
-[data-theme="dark"] .text-primary { color: #a5b4fc !important; }
-[data-theme="dark"] .text-success { color: #4ade80 !important; }
-[data-theme="dark"] .text-info { color: #7dd3fc !important; }
-[data-theme="dark"] .text-warning { color: #fcd34d !important; }
-[data-theme="dark"] .text-danger { color: #f87171 !important; }
-[data-theme="dark"] .text-body { color: var(--color-text) !important; }
-[data-theme="dark"] .text-reset { color: var(--color-text) !important; }
-[data-theme="dark"] .form-label { color: var(--color-text) !important; }
-[data-theme="dark"] .breadcrumb-item.active { color: var(--color-text-muted) !important; }
-[data-theme="dark"] .bg-light { background-color: var(--color-surface-2) !important; }
-[data-theme="dark"] .bg-white { background-color: var(--color-surface) !important; }
-[data-theme="dark"] .border { border-color: var(--color-border) !important; }
-[data-theme="dark"] .border-top { border-color: var(--color-border) !important; }
-[data-theme="dark"] .border-bottom { border-color: var(--color-border) !important; }
-[data-theme="dark"] .card { background: var(--color-surface); border-color: var(--color-border); }
-[data-theme="dark"] .card-header { background: var(--color-surface-offset); border-color: var(--color-divider); color: var(--color-text); }
-[data-theme="dark"] .card-footer { background: var(--color-surface-offset); border-color: var(--color-divider); color: var(--color-text-muted); }
-[data-theme="dark"] .table { color: var(--color-text); }
-[data-theme="dark"] .table th { color: var(--color-text-muted); background: var(--color-surface-2); border-color: var(--color-divider); }
-[data-theme="dark"] .table td { color: var(--color-text); border-color: var(--color-divider); }
-[data-theme="dark"] .table tbody tr:nth-child(even) { background: var(--color-surface-2); }
-[data-theme="dark"] .table tbody tr:hover { background: var(--color-primary-soft); }
-[data-theme="dark"] .modal-content { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
-[data-theme="dark"] .modal-header { border-color: var(--color-divider); }
-[data-theme="dark"] .modal-footer { border-color: var(--color-divider); }
-[data-theme="dark"] .btn-close { filter: invert(1); }
-[data-theme="dark"] .dropdown-menu { background: var(--color-surface); border-color: var(--color-border); }
-[data-theme="dark"] .dropdown-item { color: var(--color-text); }
-[data-theme="dark"] .dropdown-item:hover { background: var(--color-surface-offset); }
-[data-theme="dark"] .alert { color: var(--color-text); }
-[data-theme="dark"] .badge.bg-light { background-color: var(--color-surface-offset) !important; color: var(--color-text) !important; }
-[data-theme="dark"] .btn-outline-secondary {
-  color: var(--color-text-muted);
-  border-color: var(--color-border);
-}
-[data-theme="dark"] .btn-outline-secondary:hover {
-  color: var(--color-text);
-  background: var(--color-surface-offset);
-  border-color: var(--color-text-subtle);
-}
-[data-theme="dark"] .btn-outline-warning {
-  color: #fcd34d;
-  border-color: #f59e0b;
-}
-[data-theme="dark"] .btn-outline-warning:hover {
-  color: #111827;
-  background: #f59e0b;
-  border-color: #f59e0b;
-}
-[data-theme="dark"] code { color: #7dd3fc; }
-[data-theme="dark"] .fs-3, [data-theme="dark"] .fw-bold { color: var(--color-text); }
-[data-theme="dark"] .stat-card .fs-3 { color: inherit; }
-[data-theme="dark"] .form-check-input { background-color: var(--color-surface-offset); border-color: var(--color-border); }
-[data-theme="dark"] .form-check-input:checked { background-color: var(--color-primary); border-color: var(--color-primary); }
-[data-theme="dark"] .form-text { color: var(--color-text-muted) !important; }
-[data-theme="dark"] .modal .badge.bg-info { color: #082f49 !important; }
-[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3, [data-theme="dark"] h4, [data-theme="dark"] h5, [data-theme="dark"] h6 { color: var(--color-text); }
-[data-theme="dark"] strong { color: var(--color-text); }
-[data-theme="dark"] small { color: var(--color-text-muted); }
 
 /* ──── Base ──── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -682,28 +586,6 @@ body.sidebar-collapsed .main-content {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
-[data-theme="dark"] .form-control,
-[data-theme="dark"] .form-select {
-  background: var(--color-surface-2);
-  color: var(--color-text) !important;
-  border-color: var(--color-border);
-  caret-color: var(--color-text);
-  -webkit-text-fill-color: var(--color-text);
-}
-[data-theme="dark"] .form-control::placeholder {
-  color: var(--color-text-muted) !important;
-  opacity: 1;
-}
-[data-theme="dark"] .form-control:disabled,
-[data-theme="dark"] .form-select:disabled {
-  background: var(--color-surface-offset);
-  color: var(--color-text-muted) !important;
-  -webkit-text-fill-color: var(--color-text-muted);
-}
-[data-theme="dark"] .form-select option {
-  background: var(--color-surface);
-  color: var(--color-text);
-}
 
 /* ──── Alerts ──── */
 .alert {
@@ -1007,9 +889,6 @@ body.sidebar-collapsed .main-content {
 .stage-badge-negotiation { background: rgba(253,126,20,.14); color: #b35309; border-color: rgba(253,126,20,.3); }
 .stage-badge-won { background: rgba(25,135,84,.14); color: #198754; border-color: rgba(25,135,84,.3); }
 .stage-badge-lost { background: rgba(220,53,69,.12); color: #dc3545; border-color: rgba(220,53,69,.3); }
-
-[data-theme="dark"] .stage-badge-proposal { color: #f0cf5c; }
-[data-theme="dark"] .stage-badge-negotiation { color: #ffa657; }
 
 /* --- Upcoming panel ------------------------------------------------------ */
 
@@ -1504,8 +1383,6 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
 .timeline-free-primary { font-weight: 600; }
 .timeline-free-secondary { font-size: .68rem; opacity: .85; }
 
-[data-theme="dark"] .timeline-free-label { color: var(--color-primary); }
-
 /*
  * A bar can be resized past the capacity it draws from, which leaves negative
  * free hours. That reads red rather than as a very small "free" figure, since
@@ -1521,8 +1398,6 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
   color: var(--bs-danger-text-emphasis, #b02a37);
   font-weight: 600;
 }
-
-[data-theme="dark"] .timeline-free.is-over .timeline-free-label { color: #ea868f; }
 
 /* The stage rides next to the name, so a bar says what it is without hovering. */
 .timeline-chip-stage {
@@ -1560,9 +1435,7 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
 }
 
 /* Data rows in the assignments table get the base surface colour so they
-   stand out against the gray group headers. In light mode this is white;
-   in dark mode --color-surface is #1e1e1e and --color-surface-offset is
-   #2a2a2a, so the contrast is maintained automatically. */
+   stand out against the gray group headers. */
 .management-table tbody tr:not(.assignment-group-header) td {
   background: var(--color-surface, #fff);
 }
@@ -1840,23 +1713,11 @@ body.timeline-resizing { cursor: ew-resize; user-select: none; }
   text-overflow: ellipsis;
 }
 
-[data-theme="dark"] .timeline-absence {
-  border-color: #6c757d;
-  background: rgba(173, 181, 189, .18);
-}
-
-[data-theme="dark"] .timeline-absence-label { color: #dee2e6; }
-
 .legend-chip.legend-absence {
   cursor: help;
   border-color: var(--color-absence-border, #868e96);
   background: var(--color-absence-soft, #ced4da);
   color: var(--color-absence-text, #212529);
-}
-
-[data-theme="dark"] .legend-chip.legend-absence {
-  background: rgba(173, 181, 189, .18);
-  color: #dee2e6;
 }
 
 /* --- Over/under assignment against opportunity scope --------------------- */
@@ -2133,7 +1994,6 @@ button.card-collapse-toggle {
 .stat-label { display: block; font-size: .8rem; color: var(--color-text-muted); }
 .text-primary-app { color: var(--color-primary); }
 .text-accent-app { color: #8a6d0b; }
-[data-theme="dark"] .text-accent-app { color: #f0cf5c; }
 
 .filter-chip {
   display: inline-flex;
@@ -2188,7 +2048,6 @@ th[aria-sort="ascending"] .sort-link .bi, th[aria-sort="descending"] .sort-link 
 .next-step-due { font-size: .75rem; color: var(--color-text-muted); }
 .next-step-due.is-overdue { color: var(--color-danger); font-weight: 600; }
 .next-step-due.is-today { color: #b35309; font-weight: 600; }
-[data-theme="dark"] .next-step-due.is-today { color: #ffa657; }
 .next-step-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .next-step-actions .btn { padding: .1rem .4rem; }
 
@@ -2347,10 +2206,6 @@ th[aria-sort="ascending"] .sort-link .bi, th[aria-sort="descending"] .sort-link 
 .empty-state-sm .empty-state-title { font-size: .88rem; }
 .empty-state-sm .empty-state-hint { font-size: .78rem; }
 
-/* The drawings are built on paper-white grounds, so take the glare off them
-   when the rest of the page is dark. */
-[data-theme="dark"] .empty-state-art { opacity: .82; }
-
 /* ──── Opportunity page ──── */
 .opportunity-tabs .badge { font-weight: 500; margin-left: 4px; }
 
@@ -2370,7 +2225,6 @@ th[aria-sort="ascending"] .sort-link .bi, th[aria-sort="descending"] .sort-link 
 }
 .sticky-save-status { margin-right: auto; font-size: .85rem; color: var(--color-text-muted); }
 .sticky-save-bar.is-dirty .sticky-save-status { color: #b35309; font-weight: 600; }
-[data-theme="dark"] .sticky-save-bar.is-dirty .sticky-save-status { color: #ffa657; }
 .sticky-save-bar.is-dirty .btn-primary { box-shadow: 0 0 0 3px var(--color-primary-soft); }
 @media (max-width: 991px) {
   .sticky-save-bar { margin: 16px -12px -16px; padding: 10px 12px; }
@@ -2426,11 +2280,7 @@ th[aria-sort="ascending"] .sort-link .bi, th[aria-sort="descending"] .sort-link 
    slightly transparent, so the drawing reads faintly through them rather than
    being hidden by them. */
 body { background:
-  linear-gradient(rgba(244,245,251,.3), rgba(244,245,251,.3)),
-  url('/img/bg/canvas.svg') center / cover no-repeat,
-  var(--color-bg); background-attachment: fixed, fixed, fixed; }
-[data-theme="dark"] body { background:
-  linear-gradient(rgba(18,18,18,.82), rgba(18,18,18,.82)),
+  linear-gradient(rgba(201,207,212,.5), rgba(201,207,212,.5)),
   url('/img/bg/canvas.svg') center / cover no-repeat,
   var(--color-bg); background-attachment: fixed, fixed, fixed; }
 .main-content { background: transparent; }
@@ -2438,12 +2288,11 @@ body { background:
 .btn-primary { --bs-btn-bg: var(--color-primary); --bs-btn-border-color: var(--color-primary);
   --bs-btn-hover-bg: var(--color-primary-strong); --bs-btn-hover-border-color: var(--color-primary-strong);
   --bs-btn-active-bg: var(--color-primary-strong); --bs-btn-active-border-color: var(--color-primary-strong); }
-[data-theme="dark"] .btn-primary { --bs-btn-color: #1e1b4b; --bs-btn-hover-color: #1e1b4b; --bs-btn-active-color: #1e1b4b; }
 
 /* Page header: a painted band. Each page opts into its own painting with a
    modifier class; the artwork keeps its left side as dark, quiet brushwork,
    and a soft left-to-right shade keeps the title readable over it at any
-   width. The paintings are dark, so the ink is light in both themes. */
+   width. The paintings are dark, so the ink is light. */
 .page-hero {
   --hero-ink: #f1ece2;
   --hero-scene: none;
@@ -2488,7 +2337,6 @@ body { background:
 .page-hero .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; color: #fff; }
 .page-hero .badge { background: rgba(255,255,255,.12) !important; color: var(--hero-ink) !important; border: 1px solid rgba(255,255,255,.2); }
 .page-hero form { margin: 0; }
-[data-theme="dark"] .page-hero { border-color: rgba(255,255,255,.08); box-shadow: 0 10px 28px rgba(0,0,0,.4); }
 /* On the pipeline the tiles ride up onto the band, as one header block. */
 .page-hero-overlap { padding-bottom: 58px; margin-bottom: 0; }
 .page-hero-overlap + .stat-tiles, .page-hero-overlap ~ .stat-tiles { margin-top: -42px; position: relative; padding: 0 14px; }
@@ -2500,11 +2348,8 @@ body { background:
 .stat-tiles .stat-label { font-size: .78rem; color: var(--color-text-muted); }
 .stat-link.is-active { box-shadow: 0 0 0 2px var(--tone, var(--color-primary)) inset, var(--shadow-md); border-color: var(--tone); }
 .stat-link:hover { border-color: var(--tone, var(--color-primary)); }
-.tone-indigo { --tone: #4f46e5; } .tone-green { --tone: #16a34a; } .tone-cyan { --tone: #0891b2; }
-.tone-amber { --tone: #d97706; } .tone-pink { --tone: #db2777; } .tone-violet { --tone: #7c3aed; }
-[data-theme="dark"] .tone-indigo { --tone: #818cf8; } [data-theme="dark"] .tone-green { --tone: #4ade80; }
-[data-theme="dark"] .tone-cyan { --tone: #22d3ee; } [data-theme="dark"] .tone-amber { --tone: #fbbf24; }
-[data-theme="dark"] .tone-pink { --tone: #f472b6; } [data-theme="dark"] .tone-violet { --tone: #a78bfa; }
+.tone-indigo { --tone: #1f6f78; } .tone-green { --tone: #16a34a; } .tone-cyan { --tone: #0891b2; }
+.tone-amber { --tone: #d97706; } .tone-pink { --tone: #db2777; } .tone-violet { --tone: #3e6e9e; }
 
 /* Toolbar: small caps labels, tighter rhythm. */
 .pipeline-toolbar .card-body { padding: 14px 16px !important; }
@@ -2518,8 +2363,8 @@ body { background:
 
 /* Upcoming actions: compact cards with a coloured edge. */
 #collapseUpcoming { padding: 10px 14px; }
-.upcoming-item { padding: .45rem .7rem; border-left: 3px solid #7c3aed; background: var(--color-surface); }
-.upcoming-item:hover { border-color: var(--color-primary); border-left-color: #7c3aed; }
+.upcoming-item { padding: .45rem .7rem; border-left: 3px solid var(--color-accent); background: var(--color-surface); }
+.upcoming-item:hover { border-color: var(--color-primary); border-left-color: var(--color-accent); }
 .upcoming-title { font-size: .9rem; color: var(--color-text); }
 .upcoming-summary { font-size: .8rem; }
 
@@ -2562,19 +2407,40 @@ body { background:
    a frosted blur so text stays crisp while the drawing stays visible
    underneath, and the chrome (sidebar, top bar) is treated the same way so the
    whole window reads as one surface. */
-.card { background: rgba(255,255,255,.62); backdrop-filter: blur(12px); }
-.card:hover { background: rgba(255,255,255,.72); }
+.card { background: rgba(251,248,242,.8); backdrop-filter: blur(12px); }
+.card:hover { background: rgba(251,248,242,.86); }
 .card-header, .card-footer { background: transparent; }
-.sidebar, .topbar { background: rgba(255,255,255,.68); backdrop-filter: blur(16px); }
+.sidebar, .topbar { background: rgba(251,248,242,.8); backdrop-filter: blur(16px); }
 .table-responsive, .table { background: transparent; }
-.table tbody tr:nth-child(even) { background: rgba(255,255,255,.35); }
+.table tbody tr:nth-child(even) { background: rgba(22,38,58,.03); }
 .main-content > footer, .app-footer { background: transparent; }
-
-[data-theme="dark"] .card { background: rgba(30,30,30,.66); }
-[data-theme="dark"] .card:hover { background: rgba(34,34,34,.76); }
-[data-theme="dark"] .sidebar, [data-theme="dark"] .topbar { background: rgba(26,26,26,.74); }
-[data-theme="dark"] .table tbody tr:nth-child(even) { background: rgba(255,255,255,.04); }
 
 /* Overlay chrome must stay opaque: a translucent menu over a busy canvas is
    unreadable. */
 .dropdown-menu, .modal-content, .offcanvas { backdrop-filter: none; }
+
+/* ──── Painted theme ──── */
+/* Matches the painted page banners: ink-navy text, a teal primary, burnt
+   amber accents. */
+h4, h5, h6, .h4, .h5, .h6, .card-header { color: var(--color-text); }
+
+a { color: var(--color-primary); }
+a:hover { color: var(--color-primary-strong); }
+.form-control:focus, .form-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 .2rem var(--color-primary-soft);
+}
+.form-check-input:checked { background-color: var(--color-primary); border-color: var(--color-primary); }
+.nav-tabs .nav-link.active, .nav-pills .nav-link.active { color: var(--color-primary-strong); border-bottom-color: var(--color-accent); }
+.btn-outline-primary { --bs-btn-color: var(--color-primary); --bs-btn-border-color: var(--color-primary);
+  --bs-btn-hover-bg: var(--color-primary); --bs-btn-hover-border-color: var(--color-primary);
+  --bs-btn-active-bg: var(--color-primary-strong); --bs-btn-active-border-color: var(--color-primary-strong); }
+.sidebar-link.active { box-shadow: inset 3px 0 0 var(--color-accent); }
+.page-hero .hero-eyebrow::before { background: var(--color-accent); }
+/* Tabs sit straight on the painted backdrop, so they get the same frosted
+   strip as the cards to stay readable. */
+.main-content > .nav-tabs, .main-content .nav-tabs:not(.card .nav-tabs) {
+  background: rgba(251,248,242,.8); backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  padding: 4px 8px 0;
+}
