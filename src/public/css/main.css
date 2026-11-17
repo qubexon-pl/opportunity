@@ -2426,6 +2426,9 @@ body { background:
    whole window reads as one surface. */
 .card { background: rgba(251,248,242,.8); backdrop-filter: blur(12px); }
 .card:hover { background: rgba(251,248,242,.86); }
+/* backdrop-filter gives every card its own stacking context, so a menu opened in
+   one card would slide under the next card. Lift the card while its menu is open. */
+.card:has(.dropdown-menu.show, .dropdown-toggle.show, .directory-suggestions:not([hidden])) { z-index: 10; }
 .card-header, .card-footer { background: transparent; }
 .sidebar, .topbar { background: rgba(251,248,242,.8); backdrop-filter: blur(16px); }
 .table-responsive, .table { background: transparent; }
