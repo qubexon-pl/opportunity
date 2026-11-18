@@ -23,14 +23,13 @@
 <% } %>
 
 <%
-  // Same 75% line the chargeability bands and the team health pill use.
-  var chargeTarget = 75;
+  // Team utilization against the capacity-weighted average of personal targets.
+  var chargeTarget = view.chargeability.target;
   var chargeReal = view.chargeability.real;
-  var chargeBadge = chargeReal > 100
-    ? { cls: 'is-over', text: 'Over capacity' }
-    : chargeReal >= chargeTarget
-      ? { cls: 'is-good', text: 'On target' }
-      : { cls: 'is-bad', text: 'Below target' };
+  var chargeBadge = { cls: 'is-' + view.chargeability.status.tone, text: view.chargeability.status.label };
+  function ragDot(status) {
+    return '<span class="rag-dot rag-dot--' + status.tone + '" title="' + status.label + '" aria-label="' + status.label + '"></span>';
+  }
 %>
 <div class="row g-3 mb-3 mgmt-kpis">
   <div class="col-sm-6 col-xl-3">
@@ -57,15 +56,17 @@
     <div class="mgmt-kpi mgmt-kpi--charge">
       <div class="mgmt-kpi-icon"><i class="bi bi-bar-chart-line-fill" aria-hidden="true"></i></div>
       <div class="flex-grow-1">
-        <div class="mgmt-kpi-label">Chargeability</div>
+        <div class="mgmt-kpi-label" title="Utilization = committed hours ÷ capacity in the window. Status compares it with the average chargeability target, weighted by each person's capacity.">
+          Utilization vs chargeability target <i class="bi bi-info-circle ms-1" aria-hidden="true"></i>
+        </div>
         <div class="d-flex align-items-baseline gap-3 flex-wrap">
           <div class="mgmt-kpi-value"><%= chargeReal %>%</div>
           <span class="mgmt-kpi-badge <%= chargeBadge.cls %>"><%= chargeBadge.text %></span>
-          <span class="mgmt-kpi-sub ms-auto">Target: <%= chargeTarget %>%</span>
+          <span class="mgmt-kpi-sub ms-auto">Average target: <strong><%= chargeTarget %>%</strong> &middot; gap <%= view.chargeability.gap > 0 ? '+' : '' %><%= view.chargeability.gap %> pts</span>
         </div>
-        <div class="mgmt-kpi-bar" title="Real <%= chargeReal %>% against a <%= chargeTarget %>% target">
+        <div class="mgmt-kpi-bar" title="Utilization <%= chargeReal %>% against a <%= chargeTarget %>% average target">
           <div class="mgmt-kpi-bar-fill" style="width: <%= Math.min(chargeReal, 100) %>%;"></div>
-          <div class="mgmt-kpi-bar-target" style="left: <%= chargeTarget %>%;"></div>
+          <div class="mgmt-kpi-bar-target" style="left: <%= Math.min(chargeTarget, 100) %>%;"></div>
         </div>
         <div class="mgmt-kpi-sub">Predicted incl. soft bookings: <strong class="<%= view.chargeability.predictedClass %>"><%= view.chargeability.predicted %>%</strong></div>
       </div>
@@ -218,13 +219,14 @@
               <option value="desc" <%= view.peopleSort.dir === 'desc' ? 'selected' : '' %>>Descending</option>
             </select>
           </div>
-          <div class="team-kpi" title="Real counts committed work; predicted adds soft bookings">
-            <span class="team-kpi-label">Team chargeability</span>
+          <div class="team-kpi" title="Real counts committed work; predicted adds soft bookings. Status compares real utilization with the average target.">
+            <%- ragDot(view.chargeability.status) %>
+            <span class="team-kpi-label">Team utilization</span>
             <span class="team-kpi-value <%= view.chargeability.realClass %>"><%= view.chargeability.real %>%</span>
             <span class="team-kpi-sep">/</span>
             <span class="team-kpi-value <%= view.chargeability.predictedClass %>"><%= view.chargeability.predicted %>%</span>
           </div>
-          <span class="text-muted small">real / predicted (incl. soft bookings)</span>
+          <span class="text-muted small">real / predicted &middot; target <%= view.chargeability.target %>%</span>
           <% if (view.chargeability.absenceHours > 0) { %>
             <span class="absence-impact small"
                   title="Absence removes working days from the window, so the same committed hours are measured against a smaller base.">
@@ -252,7 +254,9 @@
                  data-held="<%= member.heldHours %>"
                  data-absence="<%= member.absenceHours %>"
                  data-real="<%= member.chargeabilityReal %>"
-                 data-predicted="<%= member.chargeabilityPredicted %>">
+                 data-predicted="<%= member.chargeabilityPredicted %>"
+                 data-target="<%= member.chargeabilityTarget %>"
+                 data-gap="<%= member.chargeabilityGap %>">
               <div class="card h-100 capacity-card">
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-start mb-2">
@@ -263,15 +267,23 @@
                     <span class="small text-muted text-nowrap"><%= member.dailyHours %>h/day</span>
                   </div>
 
-                  <div class="kpi-pair" title="Chargeability = booked hours divided by capacity in the selected window">
+                  <div class="kpi-pair" title="Utilization = committed hours divided by capacity in the selected window">
                     <div class="kpi">
                       <div class="kpi-value <%= member.chargeabilityClass %>"><%= member.chargeabilityReal %>%</div>
-                      <div class="kpi-label">Real</div>
+                      <div class="kpi-label">Utilization</div>
                     </div>
                     <div class="kpi">
                       <div class="kpi-value <%= member.chargeabilityPredictedClass %>"><%= member.chargeabilityPredicted %>%</div>
                       <div class="kpi-label">Predicted</div>
                     </div>
+                    <div class="kpi">
+                      <div class="kpi-value kpi-target"><%= member.chargeabilityTarget %>%</div>
+                      <div class="kpi-label">Target</div>
+                    </div>
+                  </div>
+                  <div class="rag-line small mb-2 rag-line--<%= member.chargeabilityStatus.tone %>">
+                    <%- ragDot(member.chargeabilityStatus) %><%= member.chargeabilityStatus.label %>
+                    <span class="text-muted">(<%= member.chargeabilityGap > 0 ? '+' : '' %><%= member.chargeabilityGap %> pts)</span>
                   </div>
 
                   <div class="capacity-track" title="<%= member.activeHours %>h committed, <%= member.softHours %>h soft booked">
@@ -723,7 +735,9 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                 <th class="text-end col-w100">Daily hours</th>
                 <th class="text-end col-w120">Cost (<%= costCurrency %>/day)</th>
                 <th class="text-center col-w100">Absences</th>
-                <th class="col-w180">Utilization</th>
+                <th class="col-w180" title="Committed hours ÷ capacity in the window">Utilization</th>
+                <th class="text-end col-w100">Target</th>
+                <th class="col-w140">Status</th>
                 <th class="col-w180" title="Includes soft bookings">Predicted</th>
                 <th class="col-w80"></th>
               </tr>
@@ -769,6 +783,12 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                       </div>
                     <% } else { %><span class="text-muted">—</span><% } %>
                   </td>
+                  <td class="text-end"><%= member ? member.chargeabilityTarget : peopleTargets[personName] %>%</td>
+                  <td class="small">
+                    <% if (member) { %>
+                      <span class="rag-line rag-line--<%= member.chargeabilityStatus.tone %>"><%- ragDot(member.chargeabilityStatus) %><%= member.chargeabilityStatus.label %></span>
+                    <% } else { %><span class="text-muted">—</span><% } %>
+                  </td>
                   <td>
                     <% if (member) { %>
                       <div class="util-cell" title="<%= member.activeHours + member.softHours %>h committed and soft booked of <%= member.capacityHours %>h capacity">
@@ -783,7 +803,7 @@ In this window: <%= chip.windowHours %>h = <%= chip.capacityPercent %>% of <%= r
                 </tr>
               <% }) %>
               <% if (!filteredPeople.length) { %>
-                <tr><td colspan="9" class="text-center text-muted py-4">No people match the current filters.</td></tr>
+                <tr><td colspan="11" class="text-center text-muted py-4">No people match the current filters.</td></tr>
               <% } %>
             </tbody>
           </table>

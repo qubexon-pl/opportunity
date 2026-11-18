@@ -8,6 +8,9 @@ const {
   getPersonRole,
   getPersonCost,
   getPersonManager,
+  getPersonChargeabilityTarget,
+  hasPersonChargeabilityTarget,
+  DEFAULT_CHARGEABILITY_TARGET,
   addPerson,
   removePerson,
   updatePersonProfile,
@@ -30,6 +33,7 @@ router.get('/', (req, res) => {
       role: getPersonRole(person),
       roleOptions: roleOptionsFor(person),
       cost: getPersonCost(person),
+      target: hasPersonChargeabilityTarget(person) ? getPersonChargeabilityTarget(person) : null,
       manager: getPersonManager(person),
       absences,
       absenceDays: absences.reduce((total, absence) => total + absence.businessDays, 0),
@@ -45,6 +49,7 @@ router.get('/', (req, res) => {
     managerOptions: listManagers(),
     absenceKinds: ABSENCE_KINDS,
     costCurrency: COST_CURRENCY,
+    defaultChargeabilityTarget: DEFAULT_CHARGEABILITY_TARGET,
     defaultDailyHours: HOURS_PER_DAY,
     monthlyCapacity: MONTHLY_CAPACITY,
     stages: STAGES,
@@ -74,7 +79,7 @@ router.post('/capacity/stages', async (req, res) => {
 
 router.post('/people', async (req, res) => {
   try {
-    await addPerson(req.body.personName, req.body.dailyHours, req.body.role, req.body.internalCost, req.body.manager);
+    await addPerson(req.body.personName, req.body.dailyHours, req.body.role, req.body.internalCost, req.body.manager, req.body.chargeabilityTarget);
     req.flash('success', `${String(req.body.personName).trim()} added.`);
   } catch (err) {
     req.flash('error', err.message || String(err));
@@ -89,6 +94,7 @@ router.post('/people/profile', async (req, res) => {
       role: req.body.role,
       cost: req.body.internalCost,
       manager: req.body.manager,
+      target: req.body.chargeabilityTarget,
     });
     req.flash('success', `${String(req.body.personName).trim()} updated.`);
   } catch (err) {
