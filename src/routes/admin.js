@@ -1,7 +1,8 @@
 /**
  * Admin panel: who may use the app and the teams, and which team owns which
- * people. Everything here is admin only, and always looks at every team
- * regardless of the team the admin is currently viewing.
+ * people. Everything here is admin only. The lists follow the team picked in
+ * the top bar (every team when "All teams" is picked); team dropdowns still
+ * offer every team so people can be moved between them.
  */
 const express = require('express');
 const access = require('../services/accessService');
@@ -52,9 +53,14 @@ async function act(req, res, work) {
 router.get('/', async (req, res, next) => {
   try {
     const teams = access.listTeams();
-    const users = access.listUsers();
+    const scope = req.access.scope || {};
+    const viewTeamId = !scope.all && scope.teamIds && scope.teamIds.length === 1 ? scope.teamIds[0] : '';
+    const inView = (teamId) => !viewTeamId || teamId === viewTeamId;
+    const allUsers = access.listUsers();
+    const users = allUsers.filter((user) => !viewTeamId || user.teamIds.includes(viewTeamId));
     const people = listAllPeople()
       .map((name) => ({ name, teamId: access.personTeam(name) }))
+      .filter((person) => inView(person.teamId))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     let opportunityCounts = {};
@@ -65,7 +71,7 @@ router.get('/', async (req, res, next) => {
       loadError = err.message || String(err);
     }
 
-    const teamStats = teams.map((team) => ({
+    const teamStats = teams.filter((team) => inView(team.id)).map((team) => ({
       ...team,
       isDefault: team.id === access.DEFAULT_TEAM_ID,
       users: users.filter((user) => user.teamIds.includes(team.id)).length,
@@ -75,7 +81,7 @@ router.get('/', async (req, res, next) => {
 
     const envAdmins = access.envAdminEmails();
     const roleMap = getRoleMap();
-    const teamRoles = teams.map((team) => {
+    const teamRoles = teams.filter((team) => inView(team.id)).map((team) => {
       const teamPeople = people.filter((person) => person.teamId === team.id);
       return {
         ...team,
@@ -91,8 +97,10 @@ router.get('/', async (req, res, next) => {
       teamStats,
       teamRoles,
       users: users.map((user) => ({ ...user, envAdmin: envAdmins.includes(user.email) })),
-      envAdmins: envAdmins.filter((email) => !users.some((user) => user.email === email)),
+      envAdmins: envAdmins.filter((email) => !allUsers.some((user) => user.email === email)),
       people,
+      viewTeamId,
+      viewTeamName: viewTeamId ? access.teamName(viewTeamId) : '',
       loadError,
       roles: access.ROLES,
       me: req.access.email,

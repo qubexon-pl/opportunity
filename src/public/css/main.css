@@ -2512,6 +2512,10 @@ a:hover { color: var(--color-primary-strong); }
 }
 .admin-table select.form-select-sm { min-width: 120px; }
 .admin-scroll { max-height: 420px; overflow-y: auto; }
+.admin-people-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px 16px; padding: 10px 14px; }
+.admin-person { display: flex; align-items: center; gap: 8px; margin: 0; padding: 2px 0; }
+.admin-person-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .875rem; }
+.admin-person .form-select { flex: 0 0 150px; width: 150px; }
 .team-row .form-control { background: transparent; }
 
 .role-team { background: transparent; }
