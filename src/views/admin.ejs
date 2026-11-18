@@ -33,6 +33,9 @@
   <div>
     <h2><i class="bi bi-shield-lock me-2" aria-hidden="true"></i>Admin</h2>
     <p class="text-muted mb-0">Who can sign in, the teams they plan in, and which team owns each person. Only people on this list can open the app. Members see the teams they belong to; admins see every team.</p>
+    <% if (viewTeamId) { %>
+      <p class="mb-0 mt-2 small"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Showing <strong><%= viewTeamName %></strong> only. Pick &ldquo;All teams&rdquo; in the top bar to see everyone.</p>
+    <% } %>
   </div>
 </div>
 
@@ -41,7 +44,7 @@
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-person-badge me-2" aria-hidden="true"></i>Users</span>
-        <span class="text-muted small"><%= users.length %> on the list</span>
+        <span class="text-muted small"><%= users.length %> on the list<%= viewTeamId ? ' in ' + viewTeamName : '' %></span>
       </div>
       <div class="card-body border-bottom">
         <form method="post" action="/admin/users" class="row g-2 align-items-end" id="newUserForm">
@@ -66,7 +69,7 @@
           </div>
           <div class="col-md-2">
             <span class="form-label small d-block">Teams</span>
-            <%- teamPicker('newUserTeam', teams[0] ? [teams[0].id] : [], '', false, 'Teams for the new user') %>
+            <%- teamPicker('newUserTeam', viewTeamId ? [viewTeamId] : (teams[0] ? [teams[0].id] : []), '', false, 'Teams for the new user') %>
           </div>
           <div class="col-md-1 d-grid">
             <button class="btn btn-primary btn-sm" type="submit" title="Give access"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add user</span></button>
@@ -224,21 +227,15 @@
         <% if (!people.length) { %>
           <p class="text-muted small p-3 mb-0">No people configured yet. Each team adds its own people under Configuration.</p>
         <% } else { %>
-          <table class="table table-sm align-middle mb-0 admin-table">
-            <tbody>
-              <% people.forEach(function(person) { %>
-                <tr>
-                  <td><%= person.name %></td>
-                  <td class="col-w200">
-                    <form method="post" action="/admin/people/team">
-                      <input type="hidden" name="person" value="<%= person.name %>">
-                      <select class="form-select form-select-sm" name="teamId" data-submit-on-change aria-label="Team for <%= person.name %>"><%- teamOptions(person.teamId) %></select>
-                    </form>
-                  </td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
+          <div class="admin-people-grid">
+            <% people.forEach(function(person) { %>
+              <form method="post" action="/admin/people/team" class="admin-person">
+                <span class="admin-person-name" title="<%= person.name %>"><%= person.name %></span>
+                <input type="hidden" name="person" value="<%= person.name %>">
+                <select class="form-select form-select-sm" name="teamId" data-submit-on-change aria-label="Team for <%= person.name %>"><%- teamOptions(person.teamId) %></select>
+              </form>
+            <% }) %>
+          </div>
         <% } %>
       </div>
     </div>
