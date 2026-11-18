@@ -40,6 +40,14 @@ function safeBack(req) {
   return '/';
 }
 
+/** "Miasik, Jakub" or "Jakub Miasik" -> "Miasik". */
+function lastNameOf(name) {
+  const text = String(name || '').trim();
+  if (text.includes(',')) return text.split(',')[0].trim();
+  const parts = text.split(/\s+/);
+  return parts[parts.length - 1] || text;
+}
+
 async function act(req, res, work) {
   try {
     const message = await work();
@@ -58,10 +66,11 @@ router.get('/', async (req, res, next) => {
     const inView = (teamId) => !viewTeamId || teamId === viewTeamId;
     const allUsers = access.listUsers();
     const users = allUsers.filter((user) => !viewTeamId || user.teamIds.includes(viewTeamId));
+    const roleMap = getRoleMap();
     const people = listAllPeople()
-      .map((name) => ({ name, teamId: access.personTeam(name) }))
+      .map((name) => ({ name, lastName: lastNameOf(name), role: roleMap[name] || '', teamId: access.personTeam(name) }))
       .filter((person) => inView(person.teamId))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.name.localeCompare(b.name));
 
     let opportunityCounts = {};
     let loadError = null;
@@ -80,7 +89,6 @@ router.get('/', async (req, res, next) => {
     }));
 
     const envAdmins = access.envAdminEmails();
-    const roleMap = getRoleMap();
     const teamRoles = teams.filter((team) => inView(team.id)).map((team) => {
       const teamPeople = people.filter((person) => person.teamId === team.id);
       return {

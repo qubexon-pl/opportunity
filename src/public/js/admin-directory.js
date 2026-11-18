@@ -130,4 +130,32 @@
       .map(function (box) { return box.labels[0] ? box.labels[0].textContent : box.value; });
     picker.querySelector('.team-picker-label').textContent = names.join(', ') || 'Pick teams';
   });
+
+  /* People by team: sort by last name or role; remembered across reloads. */
+  var grid = document.querySelector('[data-people-grid]');
+  var sortButtons = document.querySelectorAll('[data-people-sort]');
+  function sortPeople(key) {
+    if (!grid) return;
+    var items = Array.prototype.slice.call(grid.children);
+    items.sort(function (a, b) {
+      var byLast = a.dataset.last.localeCompare(b.dataset.last) || a.dataset.name.localeCompare(b.dataset.name);
+      if (key !== 'role') return byLast;
+      var ra = a.dataset.role, rb = b.dataset.role;
+      if (!ra !== !rb) return ra ? -1 : 1; // people without a role go last
+      return ra.localeCompare(rb) || byLast;
+    });
+    items.forEach(function (item) { grid.appendChild(item); });
+    sortButtons.forEach(function (btn) {
+      var on = btn.dataset.peopleSort === key;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    try { localStorage.setItem('adminPeopleSort', key); } catch (_e) { /* private mode */ }
+  }
+  sortButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () { sortPeople(btn.dataset.peopleSort); });
+  });
+  var saved = null;
+  try { saved = localStorage.getItem('adminPeopleSort'); } catch (_e) { /* private mode */ }
+  if (saved === 'role') sortPeople('role');
 })();
