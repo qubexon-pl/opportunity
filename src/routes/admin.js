@@ -125,7 +125,14 @@ router.get('/directory-search', async (req, res) => {
     });
   } catch (err) {
     console.warn('[Admin] Directory search unavailable:', err.message || err);
-    res.json({ ok: true, source: 'local', warning: 'Entra ID search is unavailable; showing people already on the list.', users: local });
+    // Only admins reach this route, so the reason is shown to help them fix the setup.
+    const reason = String(err.message || err).slice(0, 400);
+    res.json({
+      ok: true,
+      source: 'local',
+      warning: `Entra ID search is unavailable (${reason}); showing people already on the list.`,
+      users: local,
+    });
   }
 });
 

@@ -34,12 +34,16 @@ async function getAccessToken() {
   // Re-request a minute early so a request never starts with an expiring token.
   if (cachedToken && cachedToken.expiresOnTimestamp - Date.now() > 60_000) return cachedToken.token;
   let token;
+  let cause = '';
   try {
     token = await getCredential().getToken(GRAPH_SCOPE);
-  } catch (_err) {
+  } catch (err) {
     token = null;
+    cause = String((err && err.message) || err || '').split('\n')[0].slice(0, 300);
   }
-  if (!token || !token.token) throw graphError('Could not get a Microsoft Graph token for the app identity.', 'GRAPH_AUTH_FAILED');
+  if (!token || !token.token) {
+    throw graphError(`Could not get a Microsoft Graph token for the app identity${cause ? `: ${cause}` : '.'}`, 'GRAPH_AUTH_FAILED');
+  }
   cachedToken = token;
   return token.token;
 }
@@ -67,7 +71,7 @@ async function searchDirectoryUsers(query, top = 10) {
     const body = await response.text().catch(() => '');
     if (response.status === 401 || response.status === 403) {
       throw graphError(
-        'The app identity may not read the directory. Grant it the Graph permission User.ReadBasic.All with admin consent.',
+        `The app identity may not read the directory (Graph ${response.status}: ${body.slice(0, 200)}). Grant it the Graph permission User.ReadBasic.All with admin consent.`,
         'GRAPH_FORBIDDEN',
         response.status
       );
