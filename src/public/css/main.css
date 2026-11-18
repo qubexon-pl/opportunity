@@ -2682,7 +2682,11 @@ a:hover { color: var(--color-primary-strong); }
   margin: 0 0 1rem; padding: 14px 18px 16px;
   background: rgba(251,248,242,.85); backdrop-filter: blur(12px);
   border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  position: relative;
 }
+/* Same as .card: the blur makes its own stacking context, so lift the bar above
+   the cards below while one of its filter menus is open. */
+.mgmt-period-filter:has(.dropdown-menu.show) { z-index: 10; backdrop-filter: none; background: rgba(251,248,242,.94); }
 .btn-pill { border-radius: var(--radius-pill); padding-left: 1rem; padding-right: 1rem; }
 .filter-clear { font-size: .85rem; font-weight: 600; color: var(--color-text-muted); text-decoration: none; white-space: nowrap; }
 .filter-clear:hover { color: var(--color-primary); text-decoration: underline; }
