@@ -52,7 +52,7 @@
       </div>
       <div class="col-lg-3 col-md-4 col-6">
         <label class="form-label" for="units">Horizon (units)</label>
-        <input type="number" class="form-control" id="units" name="units" min="1" max="24" value="<%= unitsToShow %>">
+        <%- include('partials/horizon-input', {}) %>
       </div>
       <div class="col-lg-3 col-md-4 col-6">
         <%- include('partials/period-select', { perspective: perspective, periodDirection: periodDirection }) %>

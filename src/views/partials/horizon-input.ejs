@@ -1,0 +1,18 @@
+<%
+/*
+ * The horizon box next to the period picker. "Current" means this unit only,
+ * so the box then shows 0 and is greyed out; the hidden field keeps the typed
+ * horizon so it comes back when Back or Next is picked again.
+ *
+ * Locals: unitsToShow, periodDirection, and optionally horizonId,
+ * horizonClass, horizonStyle.
+ */
+var horizonId = typeof horizonId !== 'undefined' ? horizonId : 'units';
+var horizonClass = typeof horizonClass !== 'undefined' ? horizonClass : 'form-control';
+var horizonStyle = typeof horizonStyle !== 'undefined' ? horizonStyle : '';
+var horizonCurrent = periodDirection === 'current';
+%>
+<input type="number" class="<%= horizonClass %>" id="<%= horizonId %>" name="units" min="<%= horizonCurrent ? 0 : 1 %>" max="24"
+       value="<%= horizonCurrent ? 0 : unitsToShow %>" data-horizon-input data-horizon="<%= unitsToShow %>"
+       <% if (horizonCurrent) { %>disabled title="Current covers this unit only"<% } %><%- horizonStyle ? ' style="' + horizonStyle + '"' : '' %>>
+<% if (horizonCurrent) { %><input type="hidden" name="units" value="<%= unitsToShow %>" data-horizon-keep><% } %>

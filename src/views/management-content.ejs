@@ -115,7 +115,7 @@
           </div>
           <div class="col-xl col-md-4 col-6">
             <label class="form-label" for="units">Horizon</label>
-            <input type="number" class="form-control form-control-sm" id="units" name="units" min="1" max="24" value="<%= unitsToShow %>">
+            <%- include('partials/horizon-input', { horizonClass: 'form-control form-control-sm' }) %>
           </div>
           <%/* Back / Current / Next combine with the horizon to pick the window:
                back by 1 month in November measures October. */ %>
