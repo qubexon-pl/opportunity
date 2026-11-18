@@ -2429,6 +2429,10 @@ body { background:
 /* backdrop-filter gives every card its own stacking context, so a menu opened in
    one card would slide under the next card. Lift the card while its menu is open. */
 .card:has(.dropdown-menu.show, .dropdown-toggle.show, .directory-suggestions:not([hidden])) { z-index: 10; }
+/* backdrop-filter also makes the card the containing block for position:fixed
+   children, which shifts fixed-strategy menus (Admin team picker) by the card's
+   offset. Drop the blur while such a menu is open so it lines up with its button. */
+.card:has(.dropdown-menu.show) { backdrop-filter: none; background: rgba(251,248,242,.94); }
 .card-header, .card-footer { background: transparent; }
 .sidebar, .topbar { background: rgba(251,248,242,.8); backdrop-filter: blur(16px); }
 .table-responsive, .table { background: transparent; }
