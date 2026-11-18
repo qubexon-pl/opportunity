@@ -3,6 +3,8 @@ const { HOURS_PER_DAY, round2 } = require('./dateService');
 const { currentScope, personTeam, personTeamMap, findTeam, teamVisible, listJobTitles } = require('./accessService');
 
 const COST_CURRENCY = 'CHF';
+/* The share of capacity a person is expected to bill when no target is set. */
+const DEFAULT_CHARGEABILITY_TARGET = 75;
 
 /** Every configured person, whichever team they are in. */
 function listAllPeople() {
@@ -71,6 +73,18 @@ function getPersonCost(personName) {
   return Number.isFinite(cost) && cost >= 0 ? cost : null;
 }
 
+/** The chargeability a person is expected to reach, in percent of their capacity. */
+function getPersonChargeabilityTarget(personName) {
+  const stored = getConfig().people.chargeabilityTargets[personName];
+  const value = Number(stored);
+  return stored !== undefined && stored !== null && stored !== '' && Number.isFinite(value) ? value : DEFAULT_CHARGEABILITY_TARGET;
+}
+
+/** Whether a target was set for this person, as opposed to the default. */
+function hasPersonChargeabilityTarget(personName) {
+  return Object.prototype.hasOwnProperty.call(getConfig().people.chargeabilityTargets, personName);
+}
+
 function getPersonManager(personName) {
   return String(getConfig().people.managers[personName] || '').trim();
 }
@@ -104,13 +118,21 @@ function normalizeCost(cost) {
   return round2(value);
 }
 
+/** An empty target clears it (the default applies); otherwise 0-100 percent. */
+function normalizeChargeabilityTarget(target) {
+  if (target === undefined || target === null || String(target).trim() === '') return null;
+  const value = Number(target);
+  if (!Number.isFinite(value) || value < 0 || value > 100) throw new Error('Chargeability target must be between 0 and 100%.');
+  return round2(value);
+}
+
 /** An empty manager clears it; otherwise it's stored as a trimmed string. */
 function normalizeManager(manager) {
   const value = String(manager ?? '').trim();
   return value || '';
 }
 
-function writePerson(name, { dailyHours, role, cost, manager }) {
+function writePerson(name, { dailyHours, role, cost, manager, target }) {
   // Written back whole, so these are everyone's, not just the team in view.
   const people = listAllPeople();
   const personTeams = { ...personTeamMap() };
@@ -123,6 +145,7 @@ function writePerson(name, { dailyHours, role, cost, manager }) {
   const roleMap = getRoleMap();
   const costMap = getCostMap();
   const managerMap = { ...getConfig().people.managers };
+  const targetMap = { ...getConfig().people.chargeabilityTargets };
 
   if (dailyHours !== undefined) dailyHoursMap[name] = dailyHours;
   if (role !== undefined) {
@@ -137,6 +160,10 @@ function writePerson(name, { dailyHours, role, cost, manager }) {
     if (manager) managerMap[name] = manager;
     else delete managerMap[name];
   }
+  if (target !== undefined) {
+    if (target === null) delete targetMap[name];
+    else targetMap[name] = target;
+  }
 
   return updatePeopleConfig({
     people,
@@ -144,11 +171,12 @@ function writePerson(name, { dailyHours, role, cost, manager }) {
     personRoles: roleMap,
     personCosts: costMap,
     personManagers: managerMap,
+    personChargeabilityTargets: targetMap,
     personTeams,
   });
 }
 
-async function addPerson(personName, dailyHours, role, cost, manager) {
+async function addPerson(personName, dailyHours, role, cost, manager, target) {
   const name = String(personName || '').trim();
   if (!name) throw new Error('Person name is required.');
   // Assignments refer to people by name, so a name is unique across teams.
@@ -161,6 +189,7 @@ async function addPerson(personName, dailyHours, role, cost, manager) {
     role: normalizeRole(role, listJobTitles(currentScope().writeTeamId)),
     cost: normalizeCost(cost),
     manager: normalizeManager(manager),
+    target: normalizeChargeabilityTarget(target),
   });
 }
 
@@ -175,8 +204,10 @@ async function removePerson(personName) {
   const costMap = getCostMap();
   const managerMap = { ...getConfig().people.managers };
   const absenceMap = getAbsenceMap();
+  const targetMap = { ...getConfig().people.chargeabilityTargets };
   const personTeams = { ...personTeamMap() };
   delete personTeams[name];
+  delete targetMap[name];
   delete dailyHoursMap[name];
   delete roleMap[name];
   delete costMap[name];
@@ -190,12 +221,13 @@ async function removePerson(personName) {
     personCosts: costMap,
     personManagers: managerMap,
     personAbsences: absenceMap,
+    personChargeabilityTargets: targetMap,
     personTeams,
   });
 }
 
 /** Saves the editable columns of a configured person in one go. */
-async function updatePersonProfile(personName, { dailyHours, role, cost, manager }) {
+async function updatePersonProfile(personName, { dailyHours, role, cost, manager, target }) {
   const name = String(personName || '').trim();
   if (!name) throw new Error('Person name is required.');
   assertPersonVisible(name);
@@ -205,6 +237,7 @@ async function updatePersonProfile(personName, { dailyHours, role, cost, manager
     role: normalizeRole(role, roleOptionsFor(name)),
     cost: normalizeCost(cost),
     manager: normalizeManager(manager),
+    target: target === undefined ? undefined : normalizeChargeabilityTarget(target),
   });
 }
 
@@ -226,6 +259,9 @@ async function movePersonToTeam(personName, teamId) {
 
 module.exports = {
   COST_CURRENCY,
+  DEFAULT_CHARGEABILITY_TARGET,
+  getPersonChargeabilityTarget,
+  hasPersonChargeabilityTarget,
   roleOptionsFor,
   listPeople,
   listAllPeople,

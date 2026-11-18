@@ -17,7 +17,16 @@ const {
   parseHolds,
   isCurrentlyOnHold,
 } = require('./dateService');
-const { listPeople, getPersonDailyHours, getPersonRole, getPersonCost, getPersonManager, COST_CURRENCY } = require('./peopleService');
+const {
+  listPeople,
+  getPersonDailyHours,
+  getPersonRole,
+  getPersonCost,
+  getPersonManager,
+  getPersonChargeabilityTarget,
+  DEFAULT_CHARGEABILITY_TARGET,
+  COST_CURRENCY,
+} = require('./peopleService');
 const { absenceBusinessDays, absencesInWindow } = require('./absenceService');
 const { countsTowardsCapacity, listFirmStages } = require('./bookingService');
 
@@ -104,8 +113,10 @@ const PEOPLE_SORT_FIELDS = [
   { key: 'free', label: 'Free hours', type: 'number', value: (member) => member.availableHours },
   { key: 'held', label: 'Hours on hold', type: 'number', value: (member) => member.heldHours },
   { key: 'absence', label: 'Absence hours', type: 'number', value: (member) => member.absenceHours },
-  { key: 'real', label: 'Chargeability (real)', type: 'number', value: (member) => member.chargeabilityReal },
-  { key: 'predicted', label: 'Chargeability (predicted)', type: 'number', value: (member) => member.chargeabilityPredicted },
+  { key: 'real', label: 'Utilization (real)', type: 'number', value: (member) => member.chargeabilityReal },
+  { key: 'predicted', label: 'Utilization (predicted)', type: 'number', value: (member) => member.chargeabilityPredicted },
+  { key: 'target', label: 'Chargeability target', type: 'number', value: (member) => member.chargeabilityTarget },
+  { key: 'gap', label: 'Gap to target', type: 'number', value: (member) => member.chargeabilityGap },
 ];
 
 /** Falls back to the first field, so an unknown or absent key still sorts predictably. */
@@ -138,12 +149,23 @@ function sortBy(rows, fields, key, dir) {
     .map((entry) => entry.row);
 }
 
-/** Traffic-light band for a chargeability percentage. */
-function chargeabilityClass(percent) {
-  if (percent > 100) return 'kpi-over';
-  if (percent >= 75) return 'kpi-good';
-  if (percent >= 50) return 'kpi-fair';
-  return 'kpi-low';
+/* How far below the chargeability target utilization may fall and still be amber. */
+const AMBER_POINTS = 10;
+
+/**
+ * RAG status of a utilization figure against a chargeability target:
+ * green at or above the target, amber up to AMBER_POINTS below it, red further
+ * below, and over capacity once more than 100% is booked.
+ */
+function chargeabilityStatus(percent, target = DEFAULT_CHARGEABILITY_TARGET) {
+  if (percent > 100) return { cls: 'kpi-over', tone: 'over', label: 'Over capacity' };
+  if (percent >= target) return { cls: 'kpi-good', tone: 'good', label: 'On target' };
+  if (percent >= target - AMBER_POINTS) return { cls: 'kpi-fair', tone: 'warn', label: 'Slightly below target' };
+  return { cls: 'kpi-bad', tone: 'bad', label: 'Below target' };
+}
+
+function chargeabilityClass(percent, target) {
+  return chargeabilityStatus(percent, target).cls;
 }
 
 /** Joins assignments with their opportunity, filling in derived hours. */
@@ -591,6 +613,10 @@ function buildManagementPeople(assignmentRows, window) {
     const chargeabilityWithoutAbsence =
       capacity.grossHours > 0 ? round2((activeHours / capacity.grossHours) * 100) : 0;
 
+    // Utilization is judged against what this person is expected to bill.
+    const chargeabilityTarget = getPersonChargeabilityTarget(person);
+    const status = chargeabilityStatus(chargeabilityReal, chargeabilityTarget);
+
     return {
       person,
       role: getPersonRole(person),
@@ -621,8 +647,11 @@ function buildManagementPeople(assignmentRows, window) {
       absences: capacity.absentDays > 0 ? absencesInWindow(person, window.start, window.endExclusive) : [],
       chargeabilityWithoutAbsence,
       absencePercentPoints: round2(Math.max(0, chargeabilityReal - chargeabilityWithoutAbsence)),
-      chargeabilityClass: chargeabilityClass(chargeabilityReal),
-      chargeabilityPredictedClass: chargeabilityClass(chargeabilityPredicted),
+      chargeabilityTarget,
+      chargeabilityGap: round2(chargeabilityReal - chargeabilityTarget),
+      chargeabilityStatus: status,
+      chargeabilityClass: status.cls,
+      chargeabilityPredictedClass: chargeabilityClass(chargeabilityPredicted, chargeabilityTarget),
     };
   });
 }
@@ -634,13 +663,19 @@ function isLeadRole(role) {
 }
 
 /**
- * Team-wide chargeability, weighted by capacity rather than averaged per head so
- * part-time people do not distort the number. People in Lead positions are left
- * out of the team figure; their own chargeability is still shown per person.
+ * Team-wide utilization and chargeability target, both weighted by capacity
+ * rather than averaged per head so part-time people do not distort them: the
+ * team target is what the team would bill if everyone hit their own target.
+ * People in Lead positions are left out of the team figure; their own numbers
+ * are still shown per person.
  */
 function summariseChargeability(allPeople) {
   const people = allPeople.filter((member) => !isLeadRole(member.role));
   const capacityHours = people.reduce((total, member) => total + member.capacityHours, 0);
+  const targetHours = people.reduce(
+    (total, member) => total + member.capacityHours * (member.chargeabilityTarget ?? DEFAULT_CHARGEABILITY_TARGET),
+    0
+  );
   const grossCapacityHours = people.reduce((total, member) => total + member.grossCapacityHours, 0);
   const activeHours = people.reduce((total, member) => total + member.activeHours, 0);
   const softHours = people.reduce((total, member) => total + member.softHours, 0);
@@ -649,6 +684,8 @@ function summariseChargeability(allPeople) {
   const real = capacityHours > 0 ? round2((activeHours / capacityHours) * 100) : 0;
   const predicted = capacityHours > 0 ? round2(((activeHours + softHours) / capacityHours) * 100) : 0;
   const withoutAbsence = grossCapacityHours > 0 ? round2((activeHours / grossCapacityHours) * 100) : 0;
+  const target = capacityHours > 0 ? round2(targetHours / capacityHours) : DEFAULT_CHARGEABILITY_TARGET;
+  const status = chargeabilityStatus(real, target);
 
   return {
     capacityHours: round2(capacityHours),
@@ -662,8 +699,11 @@ function summariseChargeability(allPeople) {
     predicted,
     withoutAbsence,
     absencePercentPoints: round2(Math.max(0, real - withoutAbsence)),
-    realClass: chargeabilityClass(real),
-    predictedClass: chargeabilityClass(predicted),
+    target,
+    gap: round2(real - target),
+    status,
+    realClass: status.cls,
+    predictedClass: chargeabilityClass(predicted, target),
   };
 }
 
@@ -1091,6 +1131,7 @@ function buildPersonDetail({ opportunities, assignments, perspective, unitsToSho
     member,
     cost: getPersonCost(name),
     costCurrency: COST_CURRENCY,
+    chargeabilityTarget: getPersonChargeabilityTarget(name),
     periods,
     rows,
     inWindow,
@@ -1121,6 +1162,8 @@ module.exports = {
   stageBadgeClass,
   capacityClass,
   chargeabilityClass,
+  chargeabilityStatus,
+  AMBER_POINTS,
   sortBy,
   buildAssignmentRows,
   assignmentHoursInWindow,

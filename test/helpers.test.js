@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { nextStepByOpportunity, summariseChargeability } = require('../src/services/capacityService');
+const { nextStepByOpportunity, summariseChargeability, chargeabilityStatus } = require('../src/services/capacityService');
 const { nextMonday } = require('../src/routes/opportunities');
 const { contentSecurityPolicy } = require('../src/middleware/security');
 
@@ -16,6 +16,25 @@ test('team chargeability leaves out people in Lead positions', () => {
   ]);
   assert.equal(summary.excludedLeads, 2);
   assert.equal(summary.real, 70);
+});
+
+test('chargeability status is green at target, amber within 10 points, red below', () => {
+  assert.equal(chargeabilityStatus(80, 80).tone, 'good');
+  assert.equal(chargeabilityStatus(71, 80).tone, 'warn');
+  assert.equal(chargeabilityStatus(70, 80).tone, 'warn');
+  assert.equal(chargeabilityStatus(69.9, 80).tone, 'bad');
+  assert.equal(chargeabilityStatus(101, 80).tone, 'over');
+});
+
+test('team chargeability target is weighted by capacity', () => {
+  const member = (capacityHours, activeHours, chargeabilityTarget) => ({
+    role: 'Expert', capacityHours, grossCapacityHours: capacityHours, activeHours, softHours: 0,
+    absenceHours: 0, absentDays: 0, chargeabilityTarget,
+  });
+  const summary = summariseChargeability([member(150, 135, 90), member(50, 25, 50)]);
+  assert.equal(summary.real, 80);
+  assert.equal(summary.target, 80);
+  assert.equal(summary.status.tone, 'good');
 });
 
 test('nextMonday always moves forward to the following Monday', () => {

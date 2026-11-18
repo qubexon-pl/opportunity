@@ -28,7 +28,7 @@
     var badge = el.querySelector('[data-team-health-badge]');
     if (badge) badge.textContent = Math.round(percent) + '%';
     el.setAttribute('title', title);
-    el.setAttribute('aria-label', 'Team chargeability ' + percent + '%');
+    el.setAttribute('aria-label', 'Team utilization ' + percent + '%');
   }
 
   var inFlight = null;
@@ -47,7 +47,7 @@
           el.hidden = true;
           return;
         }
-        var detail = data.headline + ' — ' + data.percent + '% chargeability\n' +
+        var detail = data.headline + ' — ' + data.percent + '% utilization vs ' + data.target + '% target\n' +
           data.peopleCount + ' people · ' + data.activeHours + 'h of ' + data.capacityHours +
           'h · ' + data.windowLabel + (data.isPast ? ' (past period)' : '') +
           '\n' + data.predicted + '% including soft bookings' +

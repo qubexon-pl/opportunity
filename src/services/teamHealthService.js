@@ -21,24 +21,22 @@ const { currentScope } = require('./accessService');
 
 const TIMELINE_FILTER_OPTIONS = [...STAGES, 'free'];
 
-/*
- * Reading down: at or above 75% the team is where it should be, 60-74% is
- * worth watching, and below 60% is a problem. The boundaries are inclusive of
- * the lower number, so 75 is good and 59 is not merely "watch".
- */
-const HEALTH_BANDS = [
-  { min: 75, tone: 'good', headline: 'Team is in good shape' },
-  { min: 60, tone: 'warn', headline: 'Team is below target' },
-  { min: -Infinity, tone: 'bad', headline: 'Team is well below target' },
-];
+/* The pill follows the same RAG status as the Management page: team
+   utilization against the capacity-weighted average chargeability target. */
+const HEALTH_HEADLINES = {
+  good: { tone: 'good', headline: 'Team is on target' },
+  warn: { tone: 'warn', headline: 'Team is slightly below target' },
+  bad: { tone: 'bad', headline: 'Team is below target' },
+  over: { tone: 'warn', headline: 'Team is over capacity' },
+};
 
 /* Recomputing on every page load would mean a second full capacity build per
    request. The number moves slowly, so a short shared cache is enough. */
 const CACHE_TTL_MS = 20000;
 let cached = null;
 
-function bandFor(percent) {
-  return HEALTH_BANDS.find((band) => percent >= band.min) || HEALTH_BANDS[HEALTH_BANDS.length - 1];
+function bandFor(status) {
+  return HEALTH_HEADLINES[status.tone] || HEALTH_HEADLINES.bad;
 }
 
 /** Turns a management-page query into the arguments the capacity build needs. */
@@ -104,15 +102,15 @@ async function teamHealth(query, userId) {
   });
 
   const percent = view.chargeability.real;
-  const band = bandFor(percent);
+  const band = bandFor(view.chargeability.status);
   const value = {
     ok: true,
     percent,
     predicted: view.chargeability.predicted,
     tone: band.tone,
     headline: band.headline,
-    // "75% chargeability" reads better than a bare number in the pill.
-    summary: `${band.headline} — ${percent}% chargeability`,
+    target: view.chargeability.target,
+    summary: `${band.headline} — ${percent}% utilization vs ${view.chargeability.target}% target`,
     peopleCount: view.people.length - view.chargeability.excludedLeads,
     excludedLeads: view.chargeability.excludedLeads,
     capacityHours: view.chargeability.capacityHours,
@@ -130,4 +128,4 @@ function resetTeamHealthCache() {
   cached = null;
 }
 
-module.exports = { teamHealth, resetTeamHealthCache, HEALTH_BANDS };
+module.exports = { teamHealth, resetTeamHealthCache, HEALTH_HEADLINES };

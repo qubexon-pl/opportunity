@@ -81,7 +81,10 @@
     <div class="card h-100"><div class="card-body">
       <div class="kpi-label">Committed</div>
       <div class="kpi-value <%= detail.member.chargeabilityClass %>"><%= detail.member.activeHours %>h</div>
-      <div class="text-muted small"><%= detail.member.chargeabilityReal %>% utilization</div>
+      <div class="text-muted small"><%= detail.member.chargeabilityReal %>% utilization &middot; target <%= detail.member.chargeabilityTarget %>%</div>
+      <div class="rag-line small mt-1 rag-line--<%= detail.member.chargeabilityStatus.tone %>">
+        <span class="rag-dot rag-dot--<%= detail.member.chargeabilityStatus.tone %>" aria-hidden="true"></span><%= detail.member.chargeabilityStatus.label %>
+      </div>
     </div></div>
   </div>
   <div class="col-lg-3 col-md-6">
