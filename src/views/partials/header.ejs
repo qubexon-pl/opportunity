@@ -104,13 +104,13 @@
             <form method="post" action="/admin/view-team" class="team-switch" data-no-live title="Which team's data you are looking at">
               <i class="bi bi-diagram-3" aria-hidden="true"></i>
               <select name="teamId" class="team-switch-select" data-submit-on-change aria-label="Team in view">
-                <option value="" <%= access.viewingAll ? 'selected' : '' %>><%= access.isAdmin ? 'All teams' : 'All my teams' %></option>
+                <option value="" <%= access.viewingAll ? 'selected' : '' %>><%= access.isSuperadmin ? 'All teams' : 'All my teams' %></option>
                 <% access.teams.forEach(function(team) { %>
                   <option value="<%= team.id %>" <%= access.viewTeamId === team.id ? 'selected' : '' %>><%= team.name %></option>
                 <% }) %>
               </select>
             </form>
-          <% } else if (!access.isAdmin) { %>
+          <% } else if (!access.isSuperadmin) { %>
             <span class="team-chip" title="You see and plan this team's people and opportunities"><i class="bi bi-diagram-3" aria-hidden="true"></i><%= access.teamName %></span>
           <% } %>
         <% } %>
@@ -134,7 +134,7 @@
               <div class="fw-semibold"><%= user ? user.name : 'Local workspace' %></div>
               <% if (user && user.email) { %><div class="small text-muted"><%= user.email %></div><% } %>
               <% if (typeof access !== 'undefined' && access) { %>
-                <div class="small text-muted"><%= access.isAdmin ? 'Admin' : 'Member' %> &middot; <%= access.teamName %></div>
+                <div class="small text-muted"><%= access.roleLabel %> &middot; <%= access.teamName %></div>
               <% } %>
             </li>
             <li><hr class="dropdown-divider"></li>

@@ -4,19 +4,23 @@
  * Access is an allow-list kept with the other settings (dbo.AppSettings, or
  * config.local.json without a database):
  *
- *   appUsers  [{ email, name, role: 'admin' | 'member', teamIds: [id, ...], addedAt, addedBy }]
+ *   appUsers  [{ email, name, role: 'superadmin' | 'admin' | 'member', teamIds: [id, ...], addedAt, addedBy }]
  *   teams     [{ id, name }]
  *   teamJobTitles  { [teamId]: ['Data Scientist', ...] }   roles people in a team pick from
  *
  * A member sees and edits only their own teams: the people configured for
  * them, the opportunities created in them and everything hanging off those
  * (assignments, notes, next steps, absences). Someone in several teams sees
- * them together and can narrow the view to one. An admin sees every team, can
- * narrow the view to one, and manages the allow-list and the teams.
+ * them together and can narrow the view to one. An admin sees the same as a
+ * member of their teams, and also manages those teams' users, people and roles
+ * in the Admin panel. A superadmin sees every team, can narrow the view to
+ * one, and manages everything including the teams themselves.
  *
  * Only people on the list get in. Emails in ADMIN_EMAILS (comma separated) are
- * always admins, which is how the first admin of a fresh deployment gets in;
- * nobody is let in just for being first.
+ * always superadmins, which is how the first superadmin of a fresh deployment
+ * gets in; nobody is let in just for being first. Lists saved before
+ * superadmins existed (no superadmin stored, no ADMIN_EMAILS) treat their
+ * admins as superadmins so nobody loses access.
  *
  * Data created before teams existed has no team, and belongs to the default
  * team. The default team cannot be deleted, only renamed.
@@ -31,7 +35,8 @@ const store = require('../config/store');
 
 const DEFAULT_TEAM_ID = 'default';
 const DEFAULT_TEAM_NAME = 'Default team';
-const ROLES = ['admin', 'member'];
+const ROLES = ['superadmin', 'admin', 'member'];
+const ROLE_LABELS = Object.freeze({ superadmin: 'Superadmin', admin: 'Admin', member: 'Member' });
 
 /* What the default team used before roles could be set per team. */
 const DEFAULT_JOB_TITLES = Object.freeze([
@@ -216,15 +221,16 @@ function storedTeamIds(user) {
 }
 
 function listUsers() {
-  const stored = store.peek().appUsers;
-  return (Array.isArray(stored) ? stored : [])
-    .filter((user) => user && user.email)
+  const stored = (Array.isArray(store.peek().appUsers) ? store.peek().appUsers : []).filter((user) => user && user.email);
+  const legacy = !envAdminEmails().length && !stored.some((user) => user.role === 'superadmin');
+  return stored
     .map((user) => {
       const teamIds = storedTeamIds(user);
+      const role = ROLES.includes(user.role) ? user.role : 'member';
       return {
         email: normalizeEmail(user.email),
         name: String(user.name || ''),
-        role: ROLES.includes(user.role) ? user.role : 'member',
+        role: legacy && role === 'admin' ? 'superadmin' : role,
         teamIds,
         teamId: teamIds[0],
         addedAt: user.addedAt || null,
@@ -239,12 +245,13 @@ function findUser(email) {
   return listUsers().find((user) => user.email === key) || null;
 }
 
-function adminCount(users) {
-  return users.filter((user) => user.role === 'admin').length + envAdminEmails().filter((email) => !users.some((user) => user.email === email)).length;
+function superadminCount(users) {
+  const env = envAdminEmails();
+  return users.filter((user) => user.role === 'superadmin' || env.includes(user.email)).length + env.filter((email) => !users.some((user) => user.email === email)).length;
 }
 
 function assertKeepsAnAdmin(users) {
-  if (adminCount(users) === 0) throw new Error('At least one admin has to remain, or nobody could manage access.');
+  if (superadminCount(users) === 0) throw new Error('At least one superadmin has to remain, or nobody could manage access.');
 }
 
 async function writeUsers(users) {
@@ -297,14 +304,14 @@ async function removeUser(email) {
 function resolveAccess(user) {
   if (!user) {
     if (process.env.NODE_ENV === 'production') return { allowed: false, reason: 'signed-out' };
-    return { allowed: true, role: 'admin', teamIds: [DEFAULT_TEAM_ID], teamId: DEFAULT_TEAM_ID, email: '', local: true };
+    return { allowed: true, role: 'superadmin', teamIds: [DEFAULT_TEAM_ID], teamId: DEFAULT_TEAM_ID, email: '', local: true };
   }
   const email = normalizeEmail(user.email || user.id);
   const listed = listUsers().find((entry) => entry.email === email);
   const envAdmin = envAdminEmails().includes(email);
 
-  if (listed) return { allowed: true, role: envAdmin ? 'admin' : listed.role, teamIds: listed.teamIds, teamId: listed.teamId, email };
-  if (envAdmin) return { allowed: true, role: 'admin', teamIds: [DEFAULT_TEAM_ID], teamId: DEFAULT_TEAM_ID, email };
+  if (listed) return { allowed: true, role: envAdmin ? 'superadmin' : listed.role, teamIds: listed.teamIds, teamId: listed.teamId, email };
+  if (envAdmin) return { allowed: true, role: 'superadmin', teamIds: [DEFAULT_TEAM_ID], teamId: DEFAULT_TEAM_ID, email };
   return { allowed: false, reason: 'not-listed', email };
 }
 
@@ -313,22 +320,23 @@ function accessTeamIds(access) {
   return ids.map(String);
 }
 
-/** The teams someone may look at and file work under: every team for admins, their own otherwise. */
+/** The teams someone may look at and file work under: every team for superadmins, their own otherwise. */
 function teamsFor(access) {
-  if (access.role === 'admin') return listTeams();
+  if (access.role === 'superadmin') return listTeams();
   const ids = accessTeamIds(access);
   const teams = listTeams().filter((team) => ids.includes(team.id));
   return teams.length ? teams : listTeams().filter((team) => team.id === DEFAULT_TEAM_ID);
 }
 
 /**
- * The data a request may touch. Admins look at every team unless they picked
- * one; members look at all of their teams unless they picked one of those.
- * New work goes to the team being looked at, or the person's first team.
+ * The data a request may touch. Superadmins look at every team unless they
+ * picked one; admins and members look at all of their teams unless they picked
+ * one of those. New work goes to the team being looked at, or the person's
+ * first team.
  */
 function buildScope(access, viewTeamId) {
   const own = accessTeamIds(access);
-  if (access.role === 'admin') {
+  if (access.role === 'superadmin') {
     const viewing = viewTeamId && findTeam(viewTeamId) ? String(viewTeamId) : '';
     if (!viewing) return { all: true, teamId: null, teamIds: [], writeTeamId: own[0], key: 'all' };
     return { all: false, teamId: viewing, teamIds: [viewing], writeTeamId: viewing, key: `team:${viewing}` };
@@ -382,6 +390,7 @@ module.exports = {
   DEFAULT_TEAM_ID,
   DEFAULT_TEAM_NAME,
   ROLES,
+  ROLE_LABELS,
   normalizeEmail,
   envAdminEmails,
   listTeams,

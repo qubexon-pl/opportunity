@@ -32,36 +32,40 @@ test('only listed people get in: nobody becomes admin just by signing in first',
   assert.equal(first.allowed, false);
   assert.equal(first.reason, 'not-listed');
 
-  await access.saveUser({ email: 'first@example.com', role: 'admin' }, 'first@example.com');
-  assert.deepEqual(access.resolveAccess({ email: 'first@example.com' }).role, 'admin');
+  await access.saveUser({ email: 'first@example.com', role: 'superadmin' }, 'first@example.com');
+  assert.deepEqual(access.resolveAccess({ email: 'first@example.com' }).role, 'superadmin');
   const stranger = access.resolveAccess({ email: 'someone@example.com' });
   assert.equal(stranger.allowed, false);
   assert.equal(stranger.reason, 'not-listed');
 });
 
-test('ADMIN_EMAILS grants admin even when the list says member', async () => {
+test('ADMIN_EMAILS grants superadmin even when the list says member', async () => {
   await resetConfig({ appUsers: [{ email: 'boss@example.com', role: 'member' }, { email: 'a@example.com', role: 'admin' }] });
   process.env.ADMIN_EMAILS = 'boss@example.com';
   try {
-    assert.equal(access.resolveAccess({ email: 'boss@example.com' }).role, 'admin');
+    assert.equal(access.resolveAccess({ email: 'boss@example.com' }).role, 'superadmin');
   } finally {
     delete process.env.ADMIN_EMAILS;
   }
 });
 
-test('the last admin cannot be removed or demoted', async () => {
-  await resetConfig({ appUsers: [{ email: 'admin@example.com', role: 'admin' }, { email: 'm@example.com', role: 'member' }] });
-  await assert.rejects(access.removeUser('admin@example.com'), /At least one admin/);
-  await assert.rejects(access.saveUser({ email: 'admin@example.com', role: 'member' }, 'x'), /At least one admin/);
+test('the last superadmin cannot be removed or demoted', async () => {
+  await resetConfig({ appUsers: [{ email: 'admin@example.com', role: 'superadmin' }, { email: 'm@example.com', role: 'member' }] });
+  await assert.rejects(access.removeUser('admin@example.com'), /At least one superadmin/);
+  await assert.rejects(access.saveUser({ email: 'admin@example.com', role: 'member' }, 'x'), /At least one superadmin/);
   await access.removeUser('m@example.com');
   assert.equal(access.listUsers().length, 1);
 });
 
-test('members are scoped to their team; admins see all unless they pick a team', async () => {
+test('members and admins are scoped to their teams; superadmins see all unless they pick a team', async () => {
   await resetConfig({ teams: [{ id: 't2', name: 'Second' }] });
-  assert.equal(access.buildScope({ role: 'admin', teamId: 'default' }, '').all, true);
-  assert.equal(access.buildScope({ role: 'admin', teamId: 'default' }, 't2').teamId, 't2');
-  assert.equal(access.buildScope({ role: 'admin', teamId: 'default' }, 'gone').all, true);
+  assert.equal(access.buildScope({ role: 'superadmin', teamId: 'default' }, '').all, true);
+  assert.equal(access.buildScope({ role: 'superadmin', teamId: 'default' }, 't2').teamId, 't2');
+  assert.equal(access.buildScope({ role: 'superadmin', teamId: 'default' }, 'gone').all, true);
+  const admin = access.buildScope({ role: 'admin', teamIds: ['t2'] }, '');
+  assert.equal(admin.all, false);
+  assert.deepEqual(admin.teamIds, ['t2']);
+  assert.deepEqual(access.teamsFor({ role: 'admin', teamIds: ['t2'] }).map((team) => team.id), ['t2']);
   const member = access.buildScope({ role: 'member', teamId: 't2' }, 'default');
   assert.equal(member.teamId, 't2');
   assert.equal(member.all, false);
@@ -148,4 +152,21 @@ test('roles are per team: added in Admin, offered in Configuration, kept on peop
   assert.deepEqual(people.roleOptionsFor('Zoe'), ['Data Scientist']);
   await asMember('t2', () => people.updatePersonProfile('Zoe', { dailyHours: 8, role: 'Data Scientist' }));
   assert.equal(people.getPersonRole('Zoe'), 'Data Scientist');
+});
+
+test('stored admins count as superadmins only on lists from before superadmins existed', async () => {
+  await resetConfig({ appUsers: [{ email: 'old@example.com', role: 'admin' }] });
+  assert.equal(access.resolveAccess({ email: 'old@example.com' }).role, 'superadmin');
+
+  await resetConfig({ appUsers: [{ email: 'old@example.com', role: 'admin' }, { email: 'top@example.com', role: 'superadmin' }] });
+  assert.equal(access.resolveAccess({ email: 'old@example.com' }).role, 'admin');
+
+  process.env.ADMIN_EMAILS = 'env@example.com';
+  try {
+    await resetConfig({ appUsers: [{ email: 'old@example.com', role: 'admin' }] });
+    assert.equal(access.resolveAccess({ email: 'old@example.com' }).role, 'admin');
+    assert.equal(access.resolveAccess({ email: 'env@example.com' }).role, 'superadmin');
+  } finally {
+    delete process.env.ADMIN_EMAILS;
+  }
 });

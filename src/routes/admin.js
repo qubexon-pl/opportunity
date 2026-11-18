@@ -1,12 +1,12 @@
 /**
  * Admin panel: who may use the app and the teams, and which team owns which
- * people. Everything here is admin only. The lists follow the team picked in
- * the top bar (every team when "All teams" is picked); team dropdowns still
- * offer every team so people can be moved between them.
+ * people. Superadmins manage every team and the teams themselves; admins
+ * manage only the users, people and roles of their own teams. The lists
+ * follow the team picked in the top bar.
  */
 const express = require('express');
 const access = require('../services/accessService');
-const { requireAdmin } = require('../middleware/access');
+const { requireAdmin, requireSuperadmin } = require('../middleware/access');
 const { listAllPeople, movePersonToTeam, getRoleMap } = require('../services/peopleService');
 const { countOpportunitiesByTeam } = require('../services/opportunityService');
 const { searchDirectoryUsers } = require('../services/graphService');
@@ -48,6 +48,23 @@ function lastNameOf(name) {
   return parts[parts.length - 1] || text;
 }
 
+/** The teams this admin manages: every team for superadmins, their own otherwise. */
+function managedTeamIds(req) {
+  return req.access.isSuperadmin ? access.listTeams().map((team) => team.id) : (req.access.writableTeams || []).map((team) => team.id);
+}
+
+function assertManages(req, teamId) {
+  if (!managedTeamIds(req).includes(String(teamId || ''))) throw new Error('You can only manage your own teams.');
+}
+
+/** Whether this admin may change or remove a listed user. */
+function canManageUser(req, user, { remove = false } = {}) {
+  if (req.access.isSuperadmin) return true;
+  if (!user || user.role === 'superadmin' || access.envAdminEmails().includes(user.email)) return false;
+  const managed = managedTeamIds(req);
+  return remove ? user.teamIds.every((id) => managed.includes(id)) : user.teamIds.some((id) => managed.includes(id));
+}
+
 async function act(req, res, work) {
   try {
     const message = await work();
@@ -60,12 +77,13 @@ async function act(req, res, work) {
 
 router.get('/', async (req, res, next) => {
   try {
-    const teams = access.listTeams();
+    const managed = managedTeamIds(req);
+    const teams = access.listTeams().filter((team) => managed.includes(team.id));
     const scope = req.access.scope || {};
     const viewTeamId = !scope.all && scope.teamIds && scope.teamIds.length === 1 ? scope.teamIds[0] : '';
-    const inView = (teamId) => !viewTeamId || teamId === viewTeamId;
+    const inView = (teamId) => managed.includes(teamId) && (!viewTeamId || teamId === viewTeamId);
     const allUsers = access.listUsers();
-    const users = allUsers.filter((user) => !viewTeamId || user.teamIds.includes(viewTeamId));
+    const users = allUsers.filter((user) => user.teamIds.some(inView));
     const roleMap = getRoleMap();
     const people = listAllPeople()
       .map((name) => ({ name, lastName: lastNameOf(name), role: roleMap[name] || '', teamId: access.personTeam(name) }))
@@ -104,13 +122,22 @@ router.get('/', async (req, res, next) => {
       teams,
       teamStats,
       teamRoles,
-      users: users.map((user) => ({ ...user, envAdmin: envAdmins.includes(user.email) })),
-      envAdmins: envAdmins.filter((email) => !allUsers.some((user) => user.email === email)),
+      users: users.map((user) => ({
+        ...user,
+        envAdmin: envAdmins.includes(user.email),
+        role: envAdmins.includes(user.email) ? 'superadmin' : user.role,
+        editable: canManageUser(req, user),
+        removable: canManageUser(req, user, { remove: true }),
+        otherTeams: user.teamIds.filter((id) => !managed.includes(id)).length,
+      })),
+      envAdmins: req.access.isSuperadmin ? envAdmins.filter((email) => !allUsers.some((user) => user.email === email)) : [],
+      isSuperadmin: req.access.isSuperadmin,
+      roleLabels: access.ROLE_LABELS,
       people,
       viewTeamId,
       viewTeamName: viewTeamId ? access.teamName(viewTeamId) : '',
       loadError,
-      roles: access.ROLES,
+      roles: req.access.isSuperadmin ? access.ROLES : access.ROLES.filter((role) => role !== 'superadmin'),
       me: req.access.email,
     });
   } catch (err) {
@@ -128,6 +155,7 @@ router.get('/directory-search', async (req, res) => {
   if (query.length < 2) return res.json({ ok: true, source: 'none', users: [] });
   const local = access
     .listUsers()
+    .filter((user) => canManageUser(req, user))
     .filter((user) => `${user.email} ${user.name}`.toLowerCase().includes(query.toLowerCase()))
     .slice(0, 10)
     .map((user) => ({ email: user.email, name: user.name, listed: true }));
@@ -159,8 +187,19 @@ function listValue(value) {
 
 router.post('/users', (req, res) =>
   act(req, res, async () => {
+    let teamIds = listValue(req.body.teamIds);
+    const role = String(req.body.role || 'member').toLowerCase();
+    if (!req.access.isSuperadmin) {
+      if (role === 'superadmin') throw new Error('Only superadmins can make someone a superadmin.');
+      teamIds.forEach((id) => assertManages(req, id));
+      const existing = access.findUser(req.body.email);
+      if (existing && !canManageUser(req, existing)) throw new Error('You can only change users of your own teams.');
+      // Keep the teams this admin does not manage.
+      const managed = managedTeamIds(req);
+      if (existing) teamIds = [...new Set(teamIds.concat(existing.teamIds.filter((id) => !managed.includes(id))))];
+    }
     const { user, created } = await access.saveUser(
-      { email: req.body.email, name: req.body.name, role: req.body.role, teamIds: listValue(req.body.teamIds) },
+      { email: req.body.email, name: req.body.name, role, teamIds },
       req.access.email
     );
     return created ? `${user.email} can now use the app.` : `${user.email} updated.`;
@@ -170,12 +209,13 @@ router.post('/users', (req, res) =>
 router.post('/users/remove', (req, res) =>
   act(req, res, async () => {
     const email = access.normalizeEmail(req.body.email);
+    if (!canManageUser(req, access.findUser(email), { remove: true })) throw new Error('Only superadmins can remove users who belong to other teams.');
     await access.removeUser(email);
     return `${email} no longer has access.`;
   })
 );
 
-router.post('/teams', (req, res) =>
+router.post('/teams', requireSuperadmin, (req, res) =>
   act(req, res, async () => {
     const team = await access.addTeam(req.body.name);
     return `Team ${team.name} created.`;
@@ -184,12 +224,13 @@ router.post('/teams', (req, res) =>
 
 router.post('/teams/rename', (req, res) =>
   act(req, res, async () => {
+    assertManages(req, req.body.teamId);
     await access.renameTeam(String(req.body.teamId || ''), req.body.name);
     return 'Team renamed.';
   })
 );
 
-router.post('/teams/remove', (req, res) =>
+router.post('/teams/remove', requireSuperadmin, (req, res) =>
   act(req, res, async () => {
     const teamId = String(req.body.teamId || '');
     const counts = await access.runWithScope(EVERY_TEAM, () => countOpportunitiesByTeam());
@@ -203,6 +244,8 @@ router.post('/teams/remove', (req, res) =>
 router.post('/people/team', (req, res) =>
   act(req, res, async () => {
     const teamId = String(req.body.teamId || '');
+    assertManages(req, teamId);
+    assertManages(req, access.personTeam(req.body.person));
     await movePersonToTeam(req.body.person, teamId);
     return `${String(req.body.person || '').trim()} moved to ${access.teamName(teamId)}.`;
   })
@@ -212,6 +255,7 @@ router.post('/people/team', (req, res) =>
 router.post('/roles', (req, res) =>
   act(req, res, async () => {
     const teamId = String(req.body.teamId || '');
+    assertManages(req, teamId);
     const title = await access.addJobTitle(teamId, req.body.title);
     return `Role ${title} added to ${access.teamName(teamId)}.`;
   })
@@ -221,6 +265,7 @@ router.post('/roles/remove', (req, res) =>
   act(req, res, async () => {
     const teamId = String(req.body.teamId || '');
     const title = String(req.body.title || '').trim();
+    assertManages(req, teamId);
     await access.removeJobTitle(teamId, title);
     return `Role ${title} removed from ${access.teamName(teamId)}. People who had it keep it until changed.`;
   })
