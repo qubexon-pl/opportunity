@@ -140,6 +140,37 @@
         <% } %>
       </div>
     </div>
+
+    <div class="card mt-3" id="people">
+      <div class="card-header d-flex justify-content-between align-items-center gap-2">
+        <span><i class="bi bi-people me-2" aria-hidden="true"></i>People by team <span class="text-muted small ms-1"><%= people.length %></span></span>
+        <% if (people.length > 1) { %>
+          <div class="btn-group btn-group-sm people-sort" role="group" aria-label="Sort people">
+            <span class="small text-muted me-2 align-self-center">Sort</span>
+            <button type="button" class="btn btn-outline-secondary active" data-people-sort="last" aria-pressed="true">Last name</button>
+            <button type="button" class="btn btn-outline-secondary" data-people-sort="role" aria-pressed="false">Role</button>
+          </div>
+        <% } %>
+      </div>
+      <div class="card-body p-0 admin-scroll">
+        <% if (!people.length) { %>
+          <p class="text-muted small p-3 mb-0">No people configured yet. Each team adds its own people under Configuration.</p>
+        <% } else { %>
+          <div class="admin-people-grid" data-people-grid>
+            <% people.forEach(function(person) { %>
+              <form method="post" action="/admin/people/team" class="admin-person" data-last="<%= person.lastName %>" data-name="<%= person.name %>" data-role="<%= person.role %>">
+                <span class="admin-person-text">
+                  <span class="admin-person-name" title="<%= person.name %>"><%= person.name %></span>
+                  <span class="admin-person-role" title="<%= person.role || 'No role' %>"><%= person.role || 'No role' %></span>
+                </span>
+                <input type="hidden" name="person" value="<%= person.name %>">
+                <select class="form-select form-select-sm" name="teamId" data-submit-on-change aria-label="Team for <%= person.name %>"><%- teamOptions(person.teamId) %></select>
+              </form>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
   </div>
 
   <div class="col-xl-4">
@@ -214,30 +245,6 @@
           </li>
         <% }) %>
       </ul>
-    </div>
-  </div>
-
-  <div class="col-12">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-people me-2" aria-hidden="true"></i>People by team</span>
-        <span class="text-muted small"><%= people.length %></span>
-      </div>
-      <div class="card-body p-0 admin-scroll">
-        <% if (!people.length) { %>
-          <p class="text-muted small p-3 mb-0">No people configured yet. Each team adds its own people under Configuration.</p>
-        <% } else { %>
-          <div class="admin-people-grid">
-            <% people.forEach(function(person) { %>
-              <form method="post" action="/admin/people/team" class="admin-person">
-                <span class="admin-person-name" title="<%= person.name %>"><%= person.name %></span>
-                <input type="hidden" name="person" value="<%= person.name %>">
-                <select class="form-select form-select-sm" name="teamId" data-submit-on-change aria-label="Team for <%= person.name %>"><%- teamOptions(person.teamId) %></select>
-              </form>
-            <% }) %>
-          </div>
-        <% } %>
-      </div>
     </div>
   </div>
 </div>
