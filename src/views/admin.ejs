@@ -32,8 +32,11 @@
 <div class="page-hero page-hero--configuration">
   <div>
     <h2><i class="bi bi-shield-lock me-2" aria-hidden="true"></i>Admin</h2>
-    <p class="text-muted mb-0">Who can sign in, the teams they plan in, and which team owns each person. Only people on this list can open the app. Members see the teams they belong to; admins see every team.</p>
-    <% if (viewTeamId) { %>
+    <p class="text-muted mb-0">Who can sign in, the teams they plan in, and which team owns each person. Only people on this list can open the app. Members see the teams they belong to; admins also manage those teams here; superadmins see and manage every team.</p>
+    <% if (!isSuperadmin) { %>
+      <p class="mb-0 mt-2 small"><i class="bi bi-shield me-1" aria-hidden="true"></i>You manage <strong><%= teams.map(function(team) { return team.name; }).join(', ') %></strong>. Ask a superadmin to add or remove teams.</p>
+    <% } %>
+    <% if (viewTeamId && teams.length > 1) { %>
       <p class="mb-0 mt-2 small"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Showing <strong><%= viewTeamName %></strong> only. Pick &ldquo;All teams&rdquo; in the top bar to see everyone.</p>
     <% } %>
   </div>
@@ -63,8 +66,9 @@
           <div class="col-md-2">
             <label class="form-label small" for="newUserRole">Role</label>
             <select class="form-select form-select-sm" id="newUserRole" name="role">
-              <option value="member" selected>Member</option>
-              <option value="admin">Admin</option>
+              <% roles.slice().reverse().forEach(function(role) { %>
+                <option value="<%= role %>" <%= role === 'member' ? 'selected' : '' %>><%= roleLabels[role] %></option>
+              <% }) %>
             </select>
           </div>
           <div class="col-md-2">
@@ -104,24 +108,33 @@
                     </td>
                     <td>
                       <% if (user.envAdmin) { %>
-                        <span class="role-badge role-badge--admin" title="Set by the ADMIN_EMAILS app setting">Admin</span>
-                        <input type="hidden" name="role" value="admin" form="<%= formId %>">
+                        <span class="role-badge role-badge--admin" title="Set by the ADMIN_EMAILS app setting">Superadmin</span>
+                        <input type="hidden" name="role" value="superadmin" form="<%= formId %>">
+                      <% } else if (!user.editable) { %>
+                        <span class="role-badge role-badge--admin" title="Only a superadmin can change this user"><%= roleLabels[user.role] %></span>
                       <% } else { %>
                         <select class="form-select form-select-sm" name="role" form="<%= formId %>" data-submit-on-change aria-label="Role for <%= user.email %>">
                           <% roles.forEach(function(role) { %>
-                            <option value="<%= role %>" <%= role === user.role ? 'selected' : '' %>><%= role === 'admin' ? 'Admin' : 'Member' %></option>
+                            <option value="<%= role %>" <%= role === user.role ? 'selected' : '' %>><%= roleLabels[role] %></option>
                           <% }) %>
                         </select>
                       <% } %>
                     </td>
                     <td>
-                      <%- teamPicker('userTeam' + idx, user.teamIds, formId, true, 'Teams for ' + user.email) %>
+                      <% if (user.editable) { %>
+                        <%- teamPicker('userTeam' + idx, user.teamIds, formId, true, 'Teams for ' + user.email) %>
+                      <% } else { %>
+                        <span class="small"><%= teamNames(user.teamIds) %></span>
+                      <% } %>
+                      <% if (user.otherTeams) { %><div class="small text-muted">+ <%= user.otherTeams %> other team<%= user.otherTeams === 1 ? '' : 's' %></div><% } %>
                     </td>
                     <td class="text-end">
+                      <% if (user.removable) { %>
                       <form method="post" action="/admin/users/remove" class="d-inline" data-confirm="Remove <%= user.email %>? They will no longer be able to open the app.">
                         <input type="hidden" name="email" value="<%= user.email %>">
                         <button class="btn btn-outline-danger btn-sm" type="submit" title="Remove access"><i class="bi bi-person-x" aria-hidden="true"></i><span class="visually-hidden">Remove <%= user.email %></span></button>
                       </form>
+                      <% } %>
                     </td>
                   </tr>
                 <% }) %>
@@ -132,11 +145,11 @@
       </div>
       <div class="card-footer small text-muted">
         <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-        Changes save as soon as you pick a role or team. The last admin cannot be removed or demoted.
+        Changes save as soon as you pick a role or team. The last superadmin cannot be removed or demoted.
         <% if (envAdmins.length) { %>
-          Always admins through the <code>ADMIN_EMAILS</code> setting: <%= envAdmins.join(', ') %>.
-        <% } else { %>
-          Set <code>ADMIN_EMAILS</code> in the app settings to make an address an admin that cannot be removed here.
+          Always superadmins through the <code>ADMIN_EMAILS</code> setting: <%= envAdmins.join(', ') %>.
+        <% } else if (isSuperadmin) { %>
+          Set <code>ADMIN_EMAILS</code> in the app settings to make an address a superadmin that cannot be removed here.
         <% } %>
       </div>
     </div>
@@ -191,7 +204,7 @@
                 <%= team.opportunities %> opportunit<%= team.opportunities === 1 ? 'y' : 'ies' %>
                 <% if (team.isDefault) { %><span class="badge text-bg-light ms-1" title="Holds everything created before teams existed">Default</span><% } %>
               </span>
-              <% if (!team.isDefault) { %>
+              <% if (!team.isDefault && isSuperadmin) { %>
                 <form method="post" action="/admin/teams/remove" data-confirm="Remove the team <%= team.name %>?">
                   <input type="hidden" name="teamId" value="<%= team.id %>">
                   <button class="btn btn-link btn-sm text-danger p-0" type="submit">Remove</button>
@@ -204,12 +217,14 @@
       <% if (loadError) { %>
         <div class="card-body border-top small text-danger"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Could not count opportunities: <%= loadError %></div>
       <% } %>
+      <% if (isSuperadmin) { %>
       <div class="card-body border-top">
         <form method="post" action="/admin/teams" class="d-flex gap-2">
           <input class="form-control form-control-sm" type="text" name="name" maxlength="80" required placeholder="New team name" aria-label="New team name">
           <button class="btn btn-primary btn-sm text-nowrap" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add team</button>
         </form>
       </div>
+      <% } %>
     </div>
 
     <div class="card mt-3" id="roles">

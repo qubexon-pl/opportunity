@@ -29,20 +29,23 @@ function authorize(req, res, next) {
     });
   }
 
-  const isAdmin = resolved.role === 'admin';
+  const isSuperadmin = resolved.role === 'superadmin';
+  const isAdmin = isSuperadmin || resolved.role === 'admin';
   const writableTeams = access.teamsFor(resolved);
   const scope = access.buildScope(resolved, req.session ? req.session.viewTeamId || '' : '');
   const viewingAll = scope.teamIds.length !== 1;
 
-  req.access = { ...resolved, isAdmin, scope, writableTeams };
+  req.access = { ...resolved, isAdmin, isSuperadmin, scope, writableTeams };
   res.locals.access = {
     isAdmin,
+    isSuperadmin,
     role: resolved.role,
+    roleLabel: access.ROLE_LABELS[resolved.role] || 'Member',
     teamId: resolved.teamId,
     teamName: writableTeams.map((team) => team.name).join(', ') || access.teamName(resolved.teamId),
     viewingAll,
     viewTeamId: viewingAll ? '' : scope.teamIds[0],
-    viewTeamName: viewingAll ? (isAdmin ? 'All teams' : 'All my teams') : access.teamName(scope.teamIds[0]),
+    viewTeamName: viewingAll ? (isSuperadmin ? 'All teams' : 'All my teams') : access.teamName(scope.teamIds[0]),
     teams: writableTeams,
     writableTeams,
     writeTeamId: scope.writeTeamId,
@@ -62,4 +65,15 @@ function requireAdmin(req, res, next) {
   });
 }
 
-module.exports = { authorize, requireAdmin };
+function requireSuperadmin(req, res, next) {
+  if (req.access && req.access.isSuperadmin) return next();
+  if (wantsJson(req)) return res.status(403).json({ ok: false, error: 'Only superadmins can do that.' });
+  res.status(403).render('error', {
+    title: 'Superadmins only',
+    message: 'Only superadmins can do that.',
+    currentPath: req.path,
+    breadcrumb: [{ label: 'Superadmins only', href: '#' }],
+  });
+}
+
+module.exports = { authorize, requireAdmin, requireSuperadmin };

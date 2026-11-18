@@ -55,9 +55,9 @@ router.get('/', (req, res) => {
 
 /** Chooses which stages consume real capacity; every other stage is a soft booking. */
 router.post('/capacity/stages', async (req, res) => {
-  // Committed stages shape every team's numbers, so only an admin changes them.
-  if (!req.access || !req.access.isAdmin) {
-    req.flash('error', 'Only an admin can change which stages are committed.');
+  // Committed stages shape every team's numbers, so only a superadmin changes them.
+  if (!req.access || !req.access.isSuperadmin) {
+    req.flash('error', 'Only a superadmin can change which stages are committed.');
     return res.redirect('/settings');
   }
   try {
