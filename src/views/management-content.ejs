@@ -16,6 +16,24 @@
   </div>
 </div>
 
+<%
+  var unitNames = { weeks: ['week', 'weeks'], months: ['month', 'months'], quarters: ['quarter', 'quarters'], halfyears: ['half year', 'half years'] };
+  var unitName = unitNames[perspective] || unitNames.months;
+  var analysisUnits = view.window.units;
+  var analysisScope = periodDirection === 'current'
+    ? 'Current ' + unitName[0]
+    : (periodDirection === 'back' ? 'Last ' : 'Next ') + analysisUnits + ' ' + unitName[analysisUnits === 1 ? 0 : 1];
+  var analysisRange = view.window.fromKey === view.window.toKey ? view.window.fromKey : view.window.fromKey + ' to ' + view.window.toKey;
+%>
+<div class="analysis-period" role="status">
+  <i class="bi bi-calendar-range" aria-hidden="true"></i>
+  <span>Analysis done for <strong><%= analysisRange %></strong></span>
+  <span class="analysis-period-meta">
+    <%= analysisScope %> &middot; <%= view.window.startText %> &ndash; <%= view.window.endText %>
+    &middot; <%= view.capacityBusinessDays %> working days<% if (view.window.isPast) { %> &middot; past period<% } %>
+  </span>
+</div>
+
 <% if (typeof loadError !== 'undefined' && loadError) { %>
   <div class="alert alert-warning">
     <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>Could not load assignment data: <%= loadError %>

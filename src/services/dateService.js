@@ -176,6 +176,21 @@ function formatUnitLabel(date, perspective) {
   return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
 }
 
+/** Sortable period key for a unit start: "2026-11", "2026-W47", "2026-Q4" or "2026-H2". */
+function formatUnitKey(date, perspective) {
+  const year = date.getUTCFullYear();
+  if (perspective === 'weeks') {
+    // ISO week: the week belongs to the year its Thursday falls in.
+    const thursday = new Date(Date.UTC(year, date.getUTCMonth(), date.getUTCDate() + 3 - ((date.getUTCDay() + 6) % 7)));
+    const weekYear = thursday.getUTCFullYear();
+    const week = Math.ceil(((thursday - Date.UTC(weekYear, 0, 1)) / 86400000 + 1) / 7);
+    return `${weekYear}-W${String(week).padStart(2, '0')}`;
+  }
+  if (perspective === 'quarters') return `${year}-Q${Math.floor(date.getUTCMonth() / 3) + 1}`;
+  if (perspective === 'halfyears') return `${year}-${date.getUTCMonth() < 6 ? 'H1' : 'H2'}`;
+  return `${year}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 /** 1 -> "1st", 22 -> "22nd", 13 -> "13th". */
 function ordinal(day) {
   const n = Number(day);
@@ -333,6 +348,7 @@ module.exports = {
   startOfIsoWeek,
   startOfUnit,
   addUnit,
+  formatUnitKey,
   formatUnitLabel,
   formatWeekRangeLabel,
   ordinal,

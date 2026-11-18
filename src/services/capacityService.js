@@ -8,6 +8,7 @@ const {
   countBusinessDaysInclusive,
   startOfUnit,
   addUnit,
+  formatUnitKey,
   formatUnitLabel,
   unitGroup,
   formatShortDate,
@@ -906,6 +907,11 @@ function buildManagementView({
     window: {
       ...window,
       label: describeWindow(window, perspective),
+      // "2026-11 to 2026-12": the first and last unit the numbers cover.
+      fromKey: formatUnitKey(window.start, perspective),
+      toKey: formatUnitKey(addUnit(window.start, perspective, window.units - 1), perspective),
+      startText: toDateText(window.start),
+      endText: toDateText(new Date(window.endExclusive.getTime() - DAY_MS)),
       isPast: window.endExclusive.getTime() <= Date.now(),
     },
     capacityBusinessDays: countBusinessDays(window.start, window.endExclusive),

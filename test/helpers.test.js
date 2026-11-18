@@ -64,3 +64,12 @@ test('CSP allows scripts only from this origin and the request nonce', () => {
   assert.doesNotMatch(policy, /script-src[^;]*unsafe-inline/);
   assert.match(policy, /frame-ancestors 'none'/);
 });
+
+test('formatUnitKey names the period each timeline unit starts', () => {
+  const { formatUnitKey } = require('../src/services/dateService');
+  assert.equal(formatUnitKey(new Date(Date.UTC(2026, 10, 1)), 'months'), '2026-11');
+  assert.equal(formatUnitKey(new Date(Date.UTC(2026, 9, 1)), 'quarters'), '2026-Q4');
+  assert.equal(formatUnitKey(new Date(Date.UTC(2026, 6, 1)), 'halfyears'), '2026-H2');
+  assert.equal(formatUnitKey(new Date(Date.UTC(2026, 10, 16)), 'weeks'), '2026-W47');
+  assert.equal(formatUnitKey(new Date(Date.UTC(2026, 11, 28)), 'weeks'), '2026-W53');
+});
